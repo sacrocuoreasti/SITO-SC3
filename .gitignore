@@ -1,0 +1,17 @@
+# Virtual Environment
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Operating System
+.DS_Store
+Thumbs.db
+
+# Uploads and Database (optional: keep if you want initial seed, or exclude for production database separation)
+# database/sacro_cuore.db
+# uploads/*

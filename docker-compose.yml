@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: sacro_cuore_app
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    environment:
+      - SECRET_KEY=cambia-questa-chiave-segreta-in-produzione
+      - PORT=5001
+    volumes:
+      - ./database:/app/database
+      - ./uploads:/app/uploads
