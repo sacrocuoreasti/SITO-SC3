@@ -495,6 +495,7 @@ class GruppoCatechismo(db.Model):
     catechista_utente_id = db.Column(db.Integer, db.ForeignKey('utente.id', ondelete='SET NULL'), nullable=True)
     orario_incontri = db.Column(db.String(100), nullable=True)
     aula = db.Column(db.String(50), nullable=True)
+    google_calendar_url = db.Column(db.String(500), nullable=True)
     note = db.Column(db.Text, nullable=True)
     stato = db.Column(db.String(20), default='pubblico')  # 'pubblico', 'bozza', 'chiuso'
     attivita_id = db.Column(db.Integer, db.ForeignKey('attivita.id', ondelete='SET NULL'), nullable=True)
@@ -540,6 +541,7 @@ class GruppoCatechismo(db.Model):
             'catechisti_ids': [c['id'] for c in catechisti_list],
             'orario_incontri': self.orario_incontri or '',
             'aula': self.aula or '',
+            'google_calendar_url': self.google_calendar_url or '',
             'note': self.note or '',
             'stato': self.stato or 'pubblico',
             'attivita_id': self.attivita_id,
@@ -679,6 +681,8 @@ class Presenza(db.Model):
     codice_fiscale_persona = db.Column(db.String(16), db.ForeignKey('persona.codice_fiscale', ondelete='CASCADE'), nullable=False)
     data = db.Column(db.Date, default=date.today, nullable=False)
     presente = db.Column(db.Boolean, default=True)
+    concorre_percentuale = db.Column(db.Boolean, default=True)  # True se l'incontro fa media presenze
+    titolo_incontro = db.Column(db.String(100), nullable=True)  # es. "Festa Parrocchiale" o "Incontro Ordinario"
     note = db.Column(db.String(255), nullable=True)
 
     persona = db.relationship('Persona')
@@ -691,6 +695,8 @@ class Presenza(db.Model):
             'codice_fiscale_persona': self.codice_fiscale_persona,
             'data': self.data.isoformat(),
             'presente': self.presente,
+            'concorre_percentuale': self.concorre_percentuale if self.concorre_percentuale is not None else True,
+            'titolo_incontro': self.titolo_incontro or '',
             'note': self.note or '',
             'nominativo': self.persona.nominativo if self.persona else ''
         }
@@ -741,6 +747,13 @@ class ImpostazioniSito(db.Model):
     segreteria_telefono = db.Column(db.String(100), default='0141 355150')
     segreteria_email = db.Column(db.String(120), default='sacrocuoreasti@gmail.com')
     segreteria_orari = db.Column(db.Text, default='Martedì e Giovedì: 16:00 - 18:30\nSabato mattina: 09:30 - 11:30\nDomenica: dopo le Sante Messe')
+    
+    # Donazioni & Offerte Parrocchiali
+    iban = db.Column(db.String(50), default='IT60X0542811101000000123456')
+    satispay_url = db.Column(db.String(300), default='https://tag.satispay.com/sacrocuoreasti')
+    intestatario_offerte = db.Column(db.String(150), default='Parrocchia Sacro Cuore di Gesù - Asti')
+    causale_predefinita_offerte = db.Column(db.String(150), default='Offerta liberale per le attività parrocchiali')
+    
     init_defaults_completed = db.Column(db.Boolean, default=False)
 
     def to_dict(self):
@@ -759,7 +772,11 @@ class ImpostazioniSito(db.Model):
             'segreteria_indirizzo': self.segreteria_indirizzo or 'Parrocchia Sacro Cuore di Gesù\nVia Pier Santi Mattarella 2\n14100 Asti (AT) · Diocesi di Asti',
             'segreteria_telefono': self.segreteria_telefono or '0141 355150',
             'segreteria_email': self.segreteria_email or 'sacrocuoreasti@gmail.com',
-            'segreteria_orari': self.segreteria_orari or 'Martedì e Giovedì: 16:00 - 18:30\nSabato mattina: 09:30 - 11:30\nDomenica: dopo le Sante Messe'
+            'segreteria_orari': self.segreteria_orari or 'Martedì e Giovedì: 16:00 - 18:30\nSabato mattina: 09:30 - 11:30\nDomenica: dopo le Sante Messe',
+            'iban': self.iban or 'IT60X0542811101000000123456',
+            'satispay_url': self.satispay_url or 'https://tag.satispay.com/sacrocuoreasti',
+            'intestatario_offerte': self.intestatario_offerte or 'Parrocchia Sacro Cuore di Gesù - Asti',
+            'causale_predefinita_offerte': self.causale_predefinita_offerte or 'Offerta liberale per le attività parrocchiali'
         }
 
 
@@ -909,14 +926,21 @@ def init_default_configurazioni():
             ('lista', 'categoria', 'VARCHAR(50) DEFAULT "badge"'),
             ('gruppo_catechismo', 'catechista_utente_id', 'INTEGER'),
             ('gruppo_catechismo', 'stato', 'VARCHAR(20) DEFAULT "pubblico"'),
+            ('gruppo_catechismo', 'google_calendar_url', 'VARCHAR(500)'),
             ('gruppo_doposcuola', 'stato', 'VARCHAR(20) DEFAULT "pubblico"'),
             ('gruppo_oratorio', 'stato', 'VARCHAR(20) DEFAULT "pubblico"'),
+            ('presenza', 'concorre_percentuale', 'BOOLEAN DEFAULT 1'),
+            ('presenza', 'titolo_incontro', 'VARCHAR(100)'),
             ('impostazioni_sito', 'segreteria_titolo', 'VARCHAR(150) DEFAULT "Segreteria & Recapiti"'),
             ('impostazioni_sito', 'segreteria_sottotitolo', 'VARCHAR(255) DEFAULT "Siamo a tua disposizione per informazioni su catechesi, certificati e attività parrocchiali"'),
             ('impostazioni_sito', 'segreteria_indirizzo', 'TEXT'),
             ('impostazioni_sito', 'segreteria_telefono', 'VARCHAR(100) DEFAULT "0141 355150"'),
             ('impostazioni_sito', 'segreteria_email', 'VARCHAR(120) DEFAULT "sacrocuoreasti@gmail.com"'),
             ('impostazioni_sito', 'segreteria_orari', 'TEXT'),
+            ('impostazioni_sito', 'iban', 'VARCHAR(50) DEFAULT "IT60X0542811101000000123456"'),
+            ('impostazioni_sito', 'satispay_url', 'VARCHAR(300) DEFAULT "https://tag.satispay.com/sacrocuoreasti"'),
+            ('impostazioni_sito', 'intestatario_offerte', 'VARCHAR(150) DEFAULT "Parrocchia Sacro Cuore di Gesù - Asti"'),
+            ('impostazioni_sito', 'causale_predefinita_offerte', 'VARCHAR(150) DEFAULT "Offerta liberale per le attività parrocchiali"'),
             ('impostazioni_sito', 'init_defaults_completed', 'BOOLEAN DEFAULT 0')
         ]
         for table, col, col_type in col_checks:

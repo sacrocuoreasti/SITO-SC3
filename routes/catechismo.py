@@ -103,6 +103,7 @@ def create_gruppo():
         aula=data.get('aula', '').strip(),
         note=data.get('note', '').strip(),
         stato=data.get('stato', 'pubblico').strip(),
+        google_calendar_url=data.get('google_calendar_url', '').strip(),
         attivita_id=data.get('attivita_id')
     )
 
@@ -141,6 +142,7 @@ def update_gruppo(id):
     if 'aula' in data: g.aula = data['aula'].strip()
     if 'note' in data: g.note = data['note'].strip()
     if 'stato' in data: g.stato = data['stato'].strip()
+    if 'google_calendar_url' in data: g.google_calendar_url = data['google_calendar_url'].strip()
     if 'attivita_id' in data: g.attivita_id = data['attivita_id']
 
     if 'catechisti_ids' in data:
@@ -210,6 +212,38 @@ def remove_ragazzo_gruppo(id, cf):
         'gruppo': g.to_dict(include_ragazzi=True)
     })
 
+@catechismo_bp.route('/gruppi/<int:id>/incontri/<data_str>', methods=['DELETE'])
+def delete_incontro_catechismo(id, data_str):
+    """Permette di cancellare un incontro di catechismo dal registro presenze."""
+    g = db.session.get(GruppoCatechismo, id)
+    if not g:
+        return jsonify({'error': 'Gruppo non trovato'}), 404
+
+    if current_user.is_authenticated:
+        roles = current_user.get_all_roles()
+        is_supervisor = any(r in ['admin', 'parroco', 'segreteria'] for r in roles)
+        if not is_supervisor:
+            return jsonify({'error': 'Solo la segreteria o l\'amministratore possono cancellare incontri'}), 403
+
+    try:
+        data_del = datetime.strptime(data_str, '%Y-%m-%d').date()
+    except Exception:
+        return jsonify({'error': 'Formato data non valido (richiesto YYYY-MM-DD)'}), 400
+
+    cf_ragazzi = [r.codice_fiscale for r in g.ragazzi]
+    query = Presenza.query.filter_by(data=data_del)
+    if g.attivita_id:
+        query = query.filter_by(attivita_id=g.attivita_id)
+    if cf_ragazzi:
+        query = query.filter(Presenza.codice_fiscale_persona.in_(cf_ragazzi))
+
+    deleted_count = query.delete(synchronize_session=False)
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'message': f'Incontro del {data_str} cancellato con successo ({deleted_count} presenze rimosse)'
+    })
+
 @catechismo_bp.route('/presenze', methods=['POST'])
 def save_presenze_catechismo():
     data = request.get_json() or {}
@@ -217,6 +251,10 @@ def save_presenze_catechismo():
     attivita_id = data.get('attivita_id')
     data_str = data.get('data')
     elenco = data.get('presenze', [])
+    concorre = data.get('concorre_percentuale', True)
+    if concorre is None:
+        concorre = True
+    titolo_inc = data.get('titolo_incontro', '').strip()
 
     gruppo = None
     if gruppo_id:
@@ -252,7 +290,7 @@ def save_presenze_catechismo():
             att_cat = Attivita(
                 titolo=f"Incontri di Catechismo - {gruppo.nome if gruppo else 'Parrocchia'}",
                 categoria='catechismo',
-                anno_pastorale='2025/2026',
+                anno_pastorale='2026/2027',
                 is_attiva=True,
                 is_pubblicato=True
             )
@@ -282,12 +320,17 @@ def save_presenze_catechismo():
 
         if rec:
             rec.presente = presente
+            rec.concorre_percentuale = bool(concorre)
+            if titolo_inc:
+                rec.titolo_incontro = titolo_inc
         else:
             rec = Presenza(
                 attivita_id=attivita_id,
                 codice_fiscale_persona=cf,
                 data=data_presenza,
-                presente=presente
+                presente=presente,
+                concorre_percentuale=bool(concorre),
+                titolo_incontro=titolo_inc or None
             )
             db.session.add(rec)
 
@@ -317,6 +360,8 @@ def get_storico_gruppo(id):
             date_map[d_str] = {
                 'data': d_str,
                 'data_it': p.data.strftime('%d/%m/%Y'),
+                'titolo_incontro': p.titolo_incontro or '',
+                'concorre_percentuale': p.concorre_percentuale if p.concorre_percentuale is not None else True,
                 'presenti': 0,
                 'assenti': 0,
                 'presenti_count': 0,
@@ -336,14 +381,20 @@ def get_storico_gruppo(id):
             'presente': p.presente
         })
 
-    # Statistiche di presenza per ciascun ragazzo del gruppo
+    # Statistiche di presenza per ciascun ragazzo del gruppo (escludendo incontri che non concorrono alla percentuale)
     stats_ragazzi = []
     tot_date = len(date_map)
     for r in g.ragazzi:
         p_rag = [p for p in presenze if p.codice_fiscale_persona == r.codice_fiscale]
         tot_inc = len(p_rag)
         pres_inc = sum(1 for p in p_rag if p.presente)
-        perc = round((pres_inc / tot_inc) * 100) if tot_inc > 0 else 0
+
+        # Incontri validi per la percentuale (concorre_percentuale != False)
+        p_rag_validi = [p for p in p_rag if p.concorre_percentuale is not False]
+        tot_inc_validi = len(p_rag_validi)
+        pres_inc_validi = sum(1 for p in p_rag_validi if p.presente)
+
+        perc = round((pres_inc_validi / tot_inc_validi) * 100) if tot_inc_validi > 0 else 0
         stats_ragazzi.append({
             'cf': r.codice_fiscale,
             'codice_fiscale': r.codice_fiscale,
@@ -354,6 +405,8 @@ def get_storico_gruppo(id):
             'assenti': tot_inc - pres_inc,
             'presente_incontri': pres_inc,
             'assente_incontri': tot_inc - pres_inc,
+            'totale_incontri_validi': tot_inc_validi,
+            'presenti_validi': pres_inc_validi,
             'percentuale': perc,
             'percentuale_presenza': perc
         })
@@ -432,6 +485,8 @@ def get_registro_elettronico_gruppo(id):
             date_info_map[d_str] = {
                 'data': d_str,
                 'data_it': p.data.strftime('%d/%m/%Y'),
+                'titolo_incontro': p.titolo_incontro or '',
+                'concorre_percentuale': p.concorre_percentuale if p.concorre_percentuale is not None else True,
                 'presenti_count': 0,
                 'assenti_count': 0
             }
@@ -444,14 +499,19 @@ def get_registro_elettronico_gruppo(id):
 
     sorted_dates = sorted(list(date_info_map.values()), key=lambda x: x['data'])
 
-    # Statistiche per ciascun ragazzo
+    # Statistiche per ciascun ragazzo (calcolando percentuale solo su incontri validi)
     studenti = []
     for r in g.ragazzi:
         cf = r.codice_fiscale
         p_rag = [p for p in presenze if p.codice_fiscale_persona == cf]
         tot_inc = len(p_rag)
         pres_inc = sum(1 for p in p_rag if p.presente)
-        perc = round((pres_inc / tot_inc) * 100) if tot_inc > 0 else 0
+
+        p_rag_validi = [p for p in p_rag if p.concorre_percentuale is not False]
+        tot_inc_validi = len(p_rag_validi)
+        pres_inc_validi = sum(1 for p in p_rag_validi if p.presente)
+
+        perc = round((pres_inc_validi / tot_inc_validi) * 100) if tot_inc_validi > 0 else 0
         studenti.append({
             'codice_fiscale': cf,
             'nominativo': r.nominativo,
@@ -460,6 +520,8 @@ def get_registro_elettronico_gruppo(id):
             'totale_incontri': tot_inc,
             'presenti': pres_inc,
             'assenti': tot_inc - pres_inc,
+            'totale_incontri_validi': tot_inc_validi,
+            'presenti_validi': pres_inc_validi,
             'percentuale': perc
         })
 
@@ -508,7 +570,7 @@ def add_ragazzi_batch(id):
 def get_miei_figli_catechismo():
     """
     Ritorna SOLO i figli/minori della famiglia dell'utente autenticato per il catechismo:
-    - Informazioni gruppo e catechista di riferimento
+    - Informazioni gruppo e catechista di riferimento (con link google calendar)
     - Registro presenze e storico incontri del singolo figlio
     - Disponibilità per l'iscrizione se non ancora assegnato
     Non mostra mai gli altri partecipanti parrocchiali.
@@ -559,6 +621,7 @@ def get_miei_figli_catechismo():
                 'anno_pastorale': gruppo_assegnato.anno_pastorale,
                 'anno_catechismo': gruppo_assegnato.anno_catechismo or '',
                 'catechista_nome': gruppo_assegnato.catechista_nome or 'Da assegnare',
+                'google_calendar_url': gruppo_assegnato.google_calendar_url or '',
                 'catechisti': [
                     {
                         'nominativo': u.persona.nominativo if u.persona else u.email.split('@')[0],
@@ -578,11 +641,18 @@ def get_miei_figli_catechismo():
 
             tot = len(presenze)
             pres = sum(1 for p in presenze if p.presente)
-            perc = round((pres / tot) * 100) if tot > 0 else 0
+            
+            p_validi = [p for p in presenze if p.concorre_percentuale is not False]
+            tot_val = len(p_validi)
+            pres_val = sum(1 for p in p_validi if p.presente)
+            perc = round((pres_val / tot_val) * 100) if tot_val > 0 else 0
+
             statistiche = {
                 'totale_incontri': tot,
                 'presenti': pres,
                 'assenti': tot - pres,
+                'totale_incontri_validi': tot_val,
+                'presenti_validi': pres_val,
                 'percentuale': perc
             }
             storico_presenze = [
@@ -590,6 +660,8 @@ def get_miei_figli_catechismo():
                     'data': p.data.strftime('%Y-%m-%d'),
                     'data_it': p.data.strftime('%d/%m/%Y'),
                     'presente': p.presente,
+                    'concorre_percentuale': p.concorre_percentuale if p.concorre_percentuale is not None else True,
+                    'titolo_incontro': p.titolo_incontro or '',
                     'note': p.note or ''
                 } for p in presenze
             ]
@@ -617,6 +689,7 @@ def get_miei_figli_catechismo():
             'orario_incontri': g.orario_incontri or '',
             'aula': g.aula or '',
             'catechista_nome': g.catechista_nome or 'Da assegnare',
+            'google_calendar_url': g.google_calendar_url or '',
             'stato': g.stato or 'pubblico'
         } for g in tutti_gruppi
     ]

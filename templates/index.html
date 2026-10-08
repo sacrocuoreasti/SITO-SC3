@@ -346,7 +346,10 @@ Domenica: dopo le Sante Messe</p>
           </div>
         </div>
 
-        <div class="topbar-right">
+        <div class="topbar-right" style="display: flex; align-items: center; gap: 12px;">
+          <button type="button" class="btn btn-sm btn-outline-primary" id="topbarBtnOfferte" onclick="openModalOfferteDonazioni()" style="font-weight: 700; border-radius: var(--radius-full); padding: 6px 14px; background: rgba(185, 28, 28, 0.06);">
+            ❤️ Offerte & Satispay
+          </button>
           <div class="user-profile-badge">
             <div class="user-avatar" id="topAvatar">SC</div>
             <div class="user-info">
@@ -368,7 +371,8 @@ Domenica: dopo le Sante Messe</p>
               <h1 id="dashGreeting">Benvenuto in Parrocchia Sacro Cuore</h1>
               <p>Panoramica delle attività pastorali, iscrizioni attive e avvisi della comunità di Asti.</p>
             </div>
-            <div class="header-actions">
+            <div class="header-actions" style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <button class="btn btn-outline-primary" onclick="openModalOfferteDonazioni()"><i>❤️</i> Offerte & Donazioni</button>
               <button class="btn btn-secondary" onclick="navigateTo('anagrafica')"><i>♙</i> Cerca Anagrafica</button>
               <button class="btn btn-primary" onclick="openModalNuovaIscrizione()"><i>+</i> Nuova Iscrizione</button>
             </div>
@@ -400,12 +404,20 @@ Domenica: dopo le Sante Messe</p>
                 <small>Ragazzi alle attività</small>
               </div>
             </div>
-            <div class="kpi-card">
+            <div class="kpi-card" id="kpiCardCassaQuote">
               <div class="kpi-icon blue"><i>💶</i></div>
               <div class="kpi-content">
                 <span>Cassa Quote Versate</span>
                 <strong id="kpiQuoteIncassate">€ 0.00</strong>
                 <small id="kpiQuoteResiduo">Saldo residuo da incassare</small>
+              </div>
+            </div>
+            <div class="kpi-card" id="kpiCardOfferteUtente" style="display: none; cursor: pointer; border: 1.5px solid #fecaca; background: #fffafb;" onclick="openModalOfferteDonazioni()" title="Clicca per visualizzare quadro offerte e donare con Satispay o IBAN">
+              <div class="kpi-icon crimson"><i>❤️</i></div>
+              <div class="kpi-content">
+                <span style="color: #991b1b; font-weight: 700;">Offerte & Sostegno</span>
+                <strong id="kpiMioTotOfferto" style="color: #991b1b;">€ 0.00</strong>
+                <small style="color: #b91c1c; font-weight: 600;">Satispay · IBAN · Storico →</small>
               </div>
             </div>
           </div>
@@ -2001,6 +2013,12 @@ Domenica: dopo le Sante Messe</p>
           </div>
 
           <div class="form-group">
+            <label>📅 Link Google Calendar (opzionale)</label>
+            <input type="url" id="catGoogleCalendarUrl" class="form-control" placeholder="https://calendar.google.com/calendar/u/0?cid=...">
+            <small style="color: var(--ink-500); font-size: 11.5px;">I genitori potranno cliccare per aggiungere il calendario degli incontri al proprio smartphone o account Google.</small>
+          </div>
+
+          <div class="form-group">
             <label>Note o Obiettivi</label>
             <textarea id="catNote" class="form-control" rows="2"></textarea>
           </div>
@@ -2810,18 +2828,31 @@ Domenica: dopo le Sante Messe</p>
             </div>
           </div>
 
-          <!-- Barra Strumenti Appello: Data Incontro e Azioni Rapide -->
-          <div style="display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; background: #fff; border: 1px solid var(--border-light); padding: 12px 16px; border-radius: var(--radius-md); margin-bottom: 16px;">
-            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-              <label for="appelloDataIncontro" style="margin: 0; font-weight: 700; font-size: 13px; color: var(--ink-800);">📅 Data Incontro:</label>
-              <input type="date" id="appelloDataIncontro" class="form-control" style="width: 170px; font-weight: 600;" onchange="onDataIncontroCatechismoChanged()" required>
-              <button type="button" class="btn btn-sm btn-secondary" onclick="impostaOggiDataCatechismo()">Oggi</button>
+          <!-- Barra Strumenti Appello: Data Incontro, Titolo, Percentuale e Azioni Rapide -->
+          <div style="display: flex; flex-direction: column; gap: 12px; background: #fff; border: 1px solid var(--border-light); padding: 14px 18px; border-radius: var(--radius-md); margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap;">
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <label for="appelloDataIncontro" style="margin: 0; font-weight: 700; font-size: 13px; color: var(--ink-800);">📅 Data Incontro:</label>
+                <input type="date" id="appelloDataIncontro" class="form-control" style="width: 160px; font-weight: 600;" onchange="onDataIncontroCatechismoChanged()" required>
+                <button type="button" class="btn btn-sm btn-secondary" onclick="impostaOggiDataCatechismo()">Oggi</button>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; justify-content: flex-end;">
+                <input type="text" id="appelloTitoloIncontro" class="form-control" placeholder="Titolo incontro (es. Festa di Carnevale, Incontro #3)" style="max-width: 280px; font-size: 12.5px;">
+                <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; margin: 0; cursor: pointer; font-weight: 600; color: var(--ink-800); background: #f8fafc; border: 1px solid var(--border-light); padding: 6px 10px; border-radius: var(--radius-sm);" title="Se deselezionato (es. festa parrocchiale), gli assenti non saranno penalizzati nel calcolo della percentuale presenze">
+                  <input type="checkbox" id="appelloConcorrePercentuale" checked> Concorre a % presenze
+                </label>
+                <button type="button" id="btnCancellaIncontroCatechismo" class="btn btn-sm btn-outline-danger" onclick="confermaCancellaIncontroCatechismo()" title="Elimina questo incontro dal registro presenze" style="font-weight: 600;">
+                  🗑️ Cancella Incontro
+                </button>
+              </div>
             </div>
-            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-              <span style="font-size: 12px; font-weight: 600; color: var(--ink-500); margin-right: 4px;">Azioni Rapide:</span>
-              <button type="button" class="btn btn-sm" onclick="segnaTuttiPresentiCatechismo()" style="color: #166534; background: #f0fdf4; border: 1px solid #bbf7d0; font-weight: 600;">✓ Tutti Presenti</button>
-              <button type="button" class="btn btn-sm" onclick="segnaTuttiAssentiCatechismo()" style="color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; font-weight: 600;">✗ Tutti Assenti</button>
-              <div id="appelloConteggioLive" style="margin-left: 6px; font-size: 12.5px; font-weight: 700; color: var(--ink-800); background: #f8fafc; padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border-light);"></div>
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; border-top: 1px dashed var(--border-light); padding-top: 10px;">
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span style="font-size: 12px; font-weight: 600; color: var(--ink-500); margin-right: 4px;">Azioni Rapide:</span>
+                <button type="button" class="btn btn-sm" onclick="segnaTuttiPresentiCatechismo()" style="color: #166534; background: #f0fdf4; border: 1px solid #bbf7d0; font-weight: 600;">✓ Tutti Presenti</button>
+                <button type="button" class="btn btn-sm" onclick="segnaTuttiAssentiCatechismo()" style="color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; font-weight: 600;">✗ Tutti Assenti</button>
+              </div>
+              <div id="appelloConteggioLive" style="font-size: 12.5px; font-weight: 700; color: var(--ink-800); background: #f8fafc; padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border-light);"></div>
             </div>
           </div>
 
@@ -3022,6 +3053,12 @@ Domenica: dopo le Sante Messe</p>
             <label>Attività di Riferimento</label>
             <select id="modCatAttivitaSelect" class="form-control"></select>
           </div>
+          <div class="form-group">
+            <label>📅 Link Google Calendar (opzionale)</label>
+            <input type="url" id="modCatGoogleCalendarUrl" class="form-control" placeholder="https://calendar.google.com/calendar/u/0?cid=...">
+            <small style="color: var(--ink-500); font-size: 11.5px;">Incolla il link pubblico o di condivisione di Google Calendar per sincronizzare gli incontri con il calendario dei genitori.</small>
+          </div>
+
           <div class="form-group">
             <label>Note Interne</label>
             <textarea id="modCatNote" class="form-control" rows="2" placeholder="Note per i catechisti..."></textarea>
@@ -4033,6 +4070,105 @@ Domenica: dopo le Sante Messe</p>
           <button type="submit" class="btn btn-primary">Conferma Iscrizione al Gruppo</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Modal Offerte & Donazioni (Satispay, IBAN, Quadro Aggiornato) -->
+  <div class="modal-overlay" id="modalOfferteDonazioni">
+    <div class="modal-window" style="max-width: 680px; width: 95vw; max-height: 90vh; display: flex; flex-direction: column;">
+      <div class="modal-header" style="background: linear-gradient(135deg, #fef2f2 0%, #fff 100%); border-bottom: 1px solid #fee2e2;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 40px; height: 40px; border-radius: var(--radius-full); background: #fee2e2; color: #b91c1c; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+            ❤️
+          </div>
+          <div>
+            <h3 style="margin: 0; color: #991b1b; font-size: 18px;">Offerte & Sostegno Parrocchiale</h3>
+            <p style="margin: 2px 0 0 0; font-size: 12.5px; color: var(--ink-600);">
+              Sostieni le attività educative, i campi estivi e le opere caritative della Parrocchia Sacro Cuore.
+            </p>
+          </div>
+        </div>
+        <button class="btn-close-modal" onclick="closeModal('modalOfferteDonazioni')">×</button>
+      </div>
+      <div class="modal-body" style="overflow-y: auto; flex: 1; padding: 20px 24px;">
+        
+        <!-- Canali Rapidi di Donazione -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-bottom: 20px;">
+          <!-- Card Satispay -->
+          <div style="background: #fff5f5; border: 1.5px solid #fecaca; border-radius: var(--radius-md); padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <strong style="color: #dc2626; font-size: 15px; display: flex; align-items: center; gap: 6px;">
+                  <span style="background: #dc2626; color: #fff; border-radius: 4px; padding: 1px 6px; font-size: 11px; font-weight: 800;">S</span> Satispay
+                </strong>
+                <span class="badge badge-success" style="font-size: 10.5px;">Istantaneo</span>
+              </div>
+              <p style="font-size: 12.5px; color: var(--ink-700); margin-bottom: 12px; line-height: 1.4;">
+                Dona direttamente dall'app Satispay inquadrando o cliccando sul link parrocchiale ufficiale.
+              </p>
+            </div>
+            <a id="offerteSatispayLink" href="https://tag.satispay.com/sacrocuoreasti" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary" style="width: 100%; text-align: center; justify-content: center; background: #dc2626; border-color: #dc2626; font-weight: 700;">
+               Dona con Satispay ↗
+            </a>
+          </div>
+
+          <!-- Card Bonifico Bancario IBAN -->
+          <div style="background: #f0f9ff; border: 1.5px solid #bae6fd; border-radius: var(--radius-md); padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <strong style="color: #0369a1; font-size: 15px;">🏦 Bonifico Bancario</strong>
+                <span class="badge badge-info" style="font-size: 10.5px;">IBAN</span>
+              </div>
+              <div style="margin-bottom: 8px;">
+                <div style="font-size: 11px; text-transform: uppercase; color: var(--ink-500); font-weight: 700;">IBAN Parrocchia:</div>
+                <code id="offerteIbanText" style="font-size: 13px; font-weight: 700; color: #0c4a6e; display: block; margin-top: 2px; word-break: break-all;">IT60X0542811101000000123456</code>
+              </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="copiaIbanOfferte()" style="width: 100%; font-weight: 700;">
+              📋 Copia IBAN
+            </button>
+          </div>
+        </div>
+
+        <!-- Dati Intestatario e Causale -->
+        <div style="background: var(--bg-subtle); border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 22px; font-size: 12.5px; color: var(--ink-800); line-height: 1.5;">
+          <div>👤 <strong>Intestatario:</strong> <span id="offerteIntestatario">Parrocchia Sacro Cuore di Gesù - Asti</span></div>
+          <div>📝 <strong>Causale consigliata:</strong> <span id="offerteCausale">Offerta liberale per le attività parrocchiali</span></div>
+        </div>
+
+        <!-- Quadro Aggiornato Offerte e Quote Versate dal Fedele / Famiglia -->
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+            <h4 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--ink-900);">
+              📊 Il Tuo Quadro Offerte & Quote Versate
+            </h4>
+            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-sm); padding: 4px 10px; font-size: 13px; font-weight: 700; color: #166534;">
+              Totale registrato: <span id="offerteTotaleVersato" style="font-size: 15px;">€ 0.00</span>
+            </div>
+          </div>
+
+          <div class="table-responsive" style="max-height: 220px; overflow-y: auto; border: 1px solid var(--border-light); border-radius: var(--radius-md); background: #fff;">
+            <table class="custom-table" id="tableStoricoOfferteFamiglia" style="margin: 0; font-size: 12.5px;">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Descrizione / Attività</th>
+                  <th>Metodo</th>
+                  <th style="text-align: right;">Importo</th>
+                </tr>
+              </thead>
+              <tbody id="storicoOfferteBody">
+                <tr>
+                  <td colspan="4" style="text-align: center; color: var(--ink-500); padding: 18px;">Caricamento storico offerte...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="background: #f8fafc; border-top: 1px solid var(--border-light);">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modalOfferteDonazioni')">Chiudi</button>
+      </div>
     </div>
   </div>
 

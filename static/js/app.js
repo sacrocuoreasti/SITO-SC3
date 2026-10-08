@@ -197,7 +197,10 @@ function applyRolePermissions() {
   const isGestionePura = currentUser.is_gestione_pura || ['segreteria', 'oratorio'].includes(currentUser.ruolo);
   const puoIscrivereFigli = !isGestionePura;
 
-  if (oratorioNav) oratorioNav.style.display = isOratorio ? 'flex' : 'none';
+  if (oratorioNav) {
+    oratorioNav.style.display = (isOratorio || puoIscrivereFigli) ? 'flex' : 'none';
+    oratorioNav.innerHTML = !isOratorio && puoIscrivereFigli ? '<i>🏓</i> Oratorio Figli' : '<i>🏓</i> Oratorio & Allergie';
+  }
   if (catechismoNav) {
     catechismoNav.style.display = (isCatechista || puoIscrivereFigli) ? 'flex' : 'none';
     catechismoNav.innerHTML = !isCatechista && puoIscrivereFigli ? '<i>🕮</i> Catechismo Figli' : '<i>🕮</i> Gruppi Catechismo';
@@ -213,6 +216,15 @@ function applyRolePermissions() {
   if (anagraficaNav) anagraficaNav.style.display = isStaff ? 'flex' : 'none';
   if (excelNav) excelNav.style.display = isStaff ? 'flex' : 'none';
   if (gestioneLabel) gestioneLabel.style.display = (isStaff || isAdminOrParroco) ? 'block' : 'none';
+
+  // Gestione Card Cassa Quote (per Staff) vs Card Offerte & Donazioni (per Utente/Famiglia)
+  const kpiCassa = document.getElementById('kpiCardCassaQuote');
+  const kpiOfferte = document.getElementById('kpiCardOfferteUtente');
+  if (kpiCassa) kpiCassa.style.display = isStaff ? 'flex' : 'none';
+  if (kpiOfferte) {
+    kpiOfferte.style.display = !isStaff ? 'flex' : 'none';
+    if (!isStaff) caricaTotaleOfferteCard();
+  }
 
   // Nascondi pulsante "Cerca Anagrafica" nella dashboard per utenti normali
   const btnDashAnagrafica = document.querySelector('#viewDashboard .header-actions button[onclick*="anagrafica"]');
@@ -1095,20 +1107,20 @@ async function loadOratorio() {
 
 function switchOratorioTab(tab) {
   currentOratorioTipoTab = tab;
-  document.querySelectorAll('.tab-oratorio-btn').forEach(btn => {
-    btn.className = 'btn btn-sm btn-secondary tab-oratorio-btn';
+  document.querySelectorAll('.tab-ora-btn').forEach(btn => {
+    btn.className = 'btn btn-sm btn-secondary tab-ora-btn';
   });
-  const activeBtn = document.getElementById(`tabOratorio${tab.charAt(0).toUpperCase() + tab.slice(1)}Btn`);
-  if (activeBtn) activeBtn.className = 'btn btn-sm btn-primary tab-oratorio-btn active';
+  const activeBtn = document.getElementById(`tabOra${tab.charAt(0).toUpperCase() + tab.slice(1)}Btn`);
+  if (activeBtn) activeBtn.className = 'btn btn-sm btn-primary tab-ora-btn active';
 
-  const gridSec = document.getElementById('oratorioGruppiSection');
-  const allergieSec = document.getElementById('oratorioAllergieSection');
+  const gruppiSec = document.getElementById('tabContentOraGruppi');
+  const allergieSec = document.getElementById('tabContentOraAllergie');
 
   if (tab === 'allergie') {
-    if (gridSec) gridSec.style.display = 'none';
+    if (gruppiSec) gruppiSec.style.display = 'none';
     if (allergieSec) allergieSec.style.display = 'block';
   } else {
-    if (gridSec) gridSec.style.display = 'block';
+    if (gruppiSec) gruppiSec.style.display = 'block';
     if (allergieSec) allergieSec.style.display = 'none';
     renderGruppiOratorioGrid();
   }
@@ -1116,11 +1128,17 @@ function switchOratorioTab(tab) {
 
 function selezionaAnnoOratorio(anno) {
   currentOratorioAnnoFilter = anno;
-  document.querySelectorAll('.anno-oratorio-btn').forEach(btn => {
-    btn.className = btn.textContent.includes(anno) 
-      ? 'btn btn-sm btn-primary anno-oratorio-btn active' 
-      : 'btn btn-sm btn-secondary anno-oratorio-btn';
+  document.querySelectorAll('.ora-anno-btn').forEach(btn => {
+    const text = btn.textContent.trim();
+    const isMatch = (!anno && text === 'Tutti') || (anno && text.startsWith(anno));
+    btn.className = isMatch 
+      ? 'btn btn-sm btn-primary ora-anno-btn active' 
+      : 'btn btn-sm btn-secondary ora-anno-btn';
   });
+  renderGruppiOratorioGrid();
+}
+
+function filtraGruppiOratorio() {
   renderGruppiOratorioGrid();
 }
 
@@ -1128,7 +1146,7 @@ function renderGruppiOratorioGrid() {
   const container = document.getElementById('oratorioGruppiGrid');
   if (!container) return;
 
-  const q = (document.getElementById('searchOratorioInput')?.value || '').toLowerCase().trim();
+  const q = ((document.getElementById('searchOratorioGruppi')?.value || document.getElementById('searchOratorioInput')?.value || '')).toLowerCase().trim();
 
   const filtrati = cacheGruppiOratorio.filter(g => {
     const matchTipo = (g.tipo_oratorio || 'estivo') === currentOratorioTipoTab;
@@ -1778,10 +1796,15 @@ async function loadCatechismoParentView() {
                   Età: <strong>${figlio.eta !== null ? figlio.eta + ' anni' : 'N/D'}</strong> · Data di Nascita: <strong>${figlio.data_nascita_it || 'N/D'}</strong> · CF: <code>${figlio.codice_fiscale}</code>
                 </div>
               </div>
-              <div style="text-align: right;">
+              <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
                 <span style="font-size: 13px; font-weight: 700; color: var(--wine-700); background: #fdf2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 4px 10px;">
                   📖 ${escapeHtml(g.nome)} (${escapeHtml(g.anno_pastorale)})
                 </span>
+                ${g.google_calendar_url ? `
+                  <a href="${escapeHtml(g.google_calendar_url)}" target="_blank" rel="noopener noreferrer" class="btn btn-xs btn-outline-primary" style="font-weight: 700; display: inline-flex; align-items: center; gap: 4px; background: #fff;">
+                    📅 Aggiungi al mio Google Calendar ↗
+                  </a>
+                ` : ''}
               </div>
             </div>
 
@@ -1822,19 +1845,25 @@ async function loadCatechismoParentView() {
                     <tr>
                       <th>Data Incontro</th>
                       <th>Esito Presenza</th>
-                      <th>Note Incontro</th>
+                      <th>Note Incontro / Titolo</th>
                     </tr>
                   </thead>
                   <tbody>
                     ${presenze.map(p => `
                       <tr>
-                        <td><strong>${p.data_it}</strong></td>
+                        <td>
+                          <strong>${p.data_it}</strong>
+                          ${p.concorre_percentuale === false ? '<br><span class="badge badge-neutral" style="font-size: 10px;">Non concorre a %</span>' : ''}
+                        </td>
                         <td>
                           ${p.presente 
                             ? '<span class="badge badge-success">✓ Presente</span>' 
                             : '<span class="badge badge-danger">✗ Assente</span>'}
                         </td>
-                        <td style="color: var(--ink-600);">${escapeHtml(p.note || '-')}</td>
+                        <td style="color: var(--ink-600);">
+                          ${p.titolo_incontro ? `<strong>${escapeHtml(p.titolo_incontro)}</strong> ` : ''}
+                          ${p.note ? escapeHtml(p.note) : (!p.titolo_incontro ? '-' : '')}
+                        </td>
                       </tr>
                     `).join('')}
                   </tbody>
@@ -2003,7 +2032,7 @@ async function openModalAppelloCatechismo(gruppoId) {
   document.getElementById('appelloAttivitaId').value = g.attivita_id || g.id;
   document.getElementById('appelloGruppoNome').textContent = g.nome;
   document.getElementById('appelloGruppoDettaglio').textContent = 
-    `Catechista: ${g.catechista_nome || 'Non assegnato'} · Anno: ${g.anno_pastorale || '2025/2026'} ${g.aula ? '· Aula: ' + g.aula : ''}`;
+    `Catechista: ${g.catechista_nome || 'Non assegnato'} · Anno: ${g.anno_pastorale || '2026/2027'} ${g.aula ? '· Aula: ' + g.aula : ''}`;
 
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('appelloDataIncontro').value = today;
@@ -2011,7 +2040,7 @@ async function openModalAppelloCatechismo(gruppoId) {
   openModal('modalAppelloCatechismo');
 
   const bodyEl = document.getElementById('registroElettronicoCatechismoBody');
-  bodyEl.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--ink-500);">Caricamento registro elettronico e presenze passate in corso...</td></tr>`;
+  bodyEl.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--ink-500);"><div class="spinner" style="margin:0 auto 10px;"></div>Caricamento registro elettronico e presenze passate in corso...</td></tr>`;
 
   try {
     const res = await fetch(`/api/catechismo/gruppi/${gruppoId}/registro`);
@@ -2024,10 +2053,31 @@ async function openModalAppelloCatechismo(gruppoId) {
       statsBadge.textContent = `${data.totale_date} incontri registrati · ${data.studenti.length} iscritti`;
     }
 
+    aggiornaCampiIncontroCorrente();
     inizializzaStatoPresenzeCatechismo();
     renderTabellaRegistroCatechismo();
   } catch (err) {
     bodyEl.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--crimson-600);">Errore: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function aggiornaCampiIncontroCorrente() {
+  if (!cacheRegistroCatechismo) return;
+  const dataSel = document.getElementById('appelloDataIncontro').value;
+  const found = (cacheRegistroCatechismo.date_incontri || []).find(d => d.data === dataSel);
+
+  const titoloInput = document.getElementById('appelloTitoloIncontro');
+  const concorreChk = document.getElementById('appelloConcorrePercentuale');
+  const btnCanc = document.getElementById('btnCancellaIncontroCatechismo');
+
+  if (found) {
+    if (titoloInput) titoloInput.value = found.titolo_incontro || '';
+    if (concorreChk) concorreChk.checked = found.concorre_percentuale !== false;
+    if (btnCanc) btnCanc.style.display = 'inline-flex';
+  } else {
+    if (titoloInput) titoloInput.value = '';
+    if (concorreChk) concorreChk.checked = true;
+    if (btnCanc) btnCanc.style.display = 'none';
   }
 }
 
@@ -2052,8 +2102,33 @@ function impostaOggiDataCatechismo() {
 }
 
 function onDataIncontroCatechismoChanged() {
+  aggiornaCampiIncontroCorrente();
   inizializzaStatoPresenzeCatechismo();
   renderTabellaRegistroCatechismo();
+}
+
+async function confermaCancellaIncontroCatechismo() {
+  const gruppoId = parseInt(document.getElementById('appelloGruppoId').value);
+  const dataStr = document.getElementById('appelloDataIncontro').value;
+  if (!gruppoId || !dataStr) return;
+
+  if (!confirm(`Sei sicuro di voler cancellare l'incontro del ${dataStr} dall'appello? Le presenze di questa data verranno rimosse definitivamente.`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/catechismo/gruppi/${gruppoId}/incontri/${dataStr}`, {
+      method: 'DELETE'
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Errore cancellazione incontro');
+
+    showToast(data.message || `Incontro del ${dataStr} cancellato con successo`, 'success');
+    await openModalAppelloCatechismo(gruppoId);
+    await loadCatechismo();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
 }
 
 function segnaTuttiPresentiCatechismo() {
@@ -2143,10 +2218,11 @@ function renderTabellaRegistroCatechismo() {
       storicoHtml = '<div style="display:flex; gap:4px; flex-wrap:wrap; align-items:center;">' +
         datePassate.slice(-6).map(d => {
           const pres = s.presenze_map ? s.presenze_map[d.data] : undefined;
+          const noPercTag = d.concorre_percentuale === false ? ' (no %)' : '';
           if (pres === true) {
-            return `<span class="badge" style="background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; font-size:11px; padding:2px 6px;" title="${d.data_it}: Presente">✓ ${d.data_it.substring(0,5)}</span>`;
+            return `<span class="badge" style="background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; font-size:11px; padding:2px 6px;" title="${d.data_it}${noPercTag}: Presente">✓ ${d.data_it.substring(0,5)}${d.concorre_percentuale === false ? '*' : ''}</span>`;
           } else if (pres === false) {
-            return `<span class="badge" style="background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; font-size:11px; padding:2px 6px;" title="${d.data_it}: Assente">✗ ${d.data_it.substring(0,5)}</span>`;
+            return `<span class="badge" style="background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; font-size:11px; padding:2px 6px;" title="${d.data_it}${noPercTag}: Assente">✗ ${d.data_it.substring(0,5)}${d.concorre_percentuale === false ? '*' : ''}</span>`;
           } else {
             return `<span class="badge" style="background:#f1f5f9; color:#64748b; font-size:11px; padding:2px 6px;" title="${d.data_it}: Non iscritto">- ${d.data_it.substring(0,5)}</span>`;
           }
@@ -2199,6 +2275,8 @@ async function handleSalvaAppelloCatechismo(e) {
   const gruppoId = parseInt(document.getElementById('appelloGruppoId').value);
   const attivitaId = parseInt(document.getElementById('appelloAttivitaId').value);
   const data = document.getElementById('appelloDataIncontro').value;
+  const titoloIncontro = (document.getElementById('appelloTitoloIncontro')?.value || '').trim();
+  const concorrePercentuale = document.getElementById('appelloConcorrePercentuale')?.checked !== false;
 
   const presenze = Object.keys(statoPresenzeCorrentiCatechismo).map(cf => ({
     codice_fiscale: cf,
@@ -2219,6 +2297,8 @@ async function handleSalvaAppelloCatechismo(e) {
         gruppo_id: gruppoId,
         attivita_id: attivitaId,
         data: data,
+        titolo_incontro: titoloIncontro,
+        concorre_percentuale: concorrePercentuale,
         presenze: presenze
       })
     });
@@ -2275,6 +2355,7 @@ async function openModalNuovoGruppoCatechismo() {
   if (document.getElementById('catStatoGruppo')) document.getElementById('catStatoGruppo').value = 'pubblico';
   document.getElementById('catOrario').value = '';
   document.getElementById('catAula').value = '';
+  if (document.getElementById('catGoogleCalendarUrl')) document.getElementById('catGoogleCalendarUrl').value = '';
   document.getElementById('catNote').value = '';
   await loadCatechistiCheckboxes('catNuovoCatechistiContainer', []);
   openModal('modalNuovoGruppoCatechismo');
@@ -2290,6 +2371,7 @@ async function handleSalvaGruppoCatechismo(e) {
   const catechistiIds = Array.from(chks).map(x => parseInt(x.value));
   const orario = document.getElementById('catOrario').value.trim();
   const aula = document.getElementById('catAula').value.trim();
+  const googleCalendarUrl = (document.getElementById('catGoogleCalendarUrl')?.value || '').trim();
   const note = document.getElementById('catNote').value.trim();
 
   try {
@@ -2304,6 +2386,7 @@ async function handleSalvaGruppoCatechismo(e) {
         catechisti_ids: catechistiIds,
         orario_incontri: orario,
         aula,
+        google_calendar_url: googleCalendarUrl,
         note
       })
     });
@@ -2332,6 +2415,9 @@ async function openModalModificaGruppoCatechismo(id) {
   document.getElementById('modCatAnnoCatechismo').value = g.anno_catechismo || '';
   document.getElementById('modCatOrario').value = g.orario_incontri || '';
   document.getElementById('modCatAula').value = g.aula || '';
+  if (document.getElementById('modCatGoogleCalendarUrl')) {
+    document.getElementById('modCatGoogleCalendarUrl').value = g.google_calendar_url || '';
+  }
   document.getElementById('modCatNote').value = g.note || '';
 
   // Popola selezione multipla catechisti con quelli già assegnati
@@ -2369,6 +2455,7 @@ async function handleSalvaModificaGruppoCatechismo(e) {
   const catechistiIds = Array.from(chks).map(x => parseInt(x.value));
   const orario = document.getElementById('modCatOrario').value.trim();
   const aula = document.getElementById('modCatAula').value.trim();
+  const googleCalendarUrl = (document.getElementById('modCatGoogleCalendarUrl')?.value || '').trim();
   const selAtt = document.getElementById('modCatAttivitaSelect');
   const attId = selAtt && selAtt.value ? parseInt(selAtt.value) : null;
   const note = document.getElementById('modCatNote').value.trim();
@@ -2385,6 +2472,7 @@ async function handleSalvaModificaGruppoCatechismo(e) {
         catechisti_ids: catechistiIds,
         orario_incontri: orario,
         aula,
+        google_calendar_url: googleCalendarUrl,
         attivita_id: attId,
         note
       })
@@ -2811,48 +2899,13 @@ async function loadDoposcuolaParentView() {
                 </div>
               </div>
               <div>
-                <div style="font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-500); font-weight: 700; margin-bottom: 4px;">Frequenza e Presenze</div>
+                <div style="font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-500); font-weight: 700; margin-bottom: 4px;">Informazioni Attività</div>
                 <div style="font-size: 13.5px; color: var(--ink-800);">
-                  <strong style="color: #0284c7; font-size: 17px;">${stats.percentuale}%</strong> di presenza<br>
-                  <span>${stats.presenti} presenti, ${stats.assenti} assenti su ${stats.totale_incontri} sessioni</span>
+                  <span class="badge badge-info" style="font-size: 11.5px;">${escapeHtml(g.fascia_eta || 'Tutte le età')}</span>
+                  ${g.note ? `<div style="font-size: 12px; color: var(--ink-600); margin-top: 4px;">${escapeHtml(g.note)}</div>` : ''}
                 </div>
               </div>
             </div>
-
-            <!-- Registro Incontri del Singolo Figlio -->
-            <h4 style="font-size: 14px; font-weight: 700; color: var(--ink-800); margin-bottom: 10px;">
-              📅 Storico Presenze Sessioni di Studio
-            </h4>
-            ${!presenze.length ? `
-              <p style="font-size: 13px; color: var(--ink-500); font-style: italic;">
-                Nessuna presenza ancora registrata per questa attività.
-              </p>
-            ` : `
-              <div class="table-responsive" style="max-height: 220px; overflow-y: auto; border: 1px solid var(--border-light); border-radius: var(--radius-sm);">
-                <table class="custom-table" style="font-size: 12.5px;">
-                  <thead>
-                    <tr>
-                      <th>Data Sessione</th>
-                      <th>Stato Presenza</th>
-                      <th>Note Educatore</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${presenze.map(p => `
-                      <tr>
-                        <td><strong>${p.data_it}</strong></td>
-                        <td>
-                          ${p.presente 
-                            ? '<span class="badge badge-success">✓ Presente</span>' 
-                            : '<span class="badge badge-danger">✗ Assente</span>'}
-                        </td>
-                        <td style="color: var(--ink-600);">${escapeHtml(p.note || '-')}</td>
-                      </tr>
-                    `).join('')}
-                  </tbody>
-                </table>
-              </div>
-            `}
           </div>
         `;
       } else {
@@ -7350,14 +7403,22 @@ async function openModalAssegnaPersoneMassa(tipo = 'catechismo') {
         });
       }
     } else {
-      const targetSeason = tipo === 'oratorio_estivo' ? 'estivo' : 'invernale';
-      const gruppiOratorio = (dataG.gruppi || []).filter(g => (g.tipo_oratorio || 'estivo') === targetSeason);
+      let gruppiOratorio = dataG.gruppi || [];
+      if (tipo === 'oratorio_estivo') {
+        const estivi = gruppiOratorio.filter(g => (g.tipo_oratorio || 'estivo').toLowerCase() === 'estivo');
+        if (estivi.length > 0) gruppiOratorio = estivi;
+      } else if (tipo === 'oratorio_invernale') {
+        const invernali = gruppiOratorio.filter(g => (g.tipo_oratorio || '').toLowerCase() === 'invernale');
+        if (invernali.length > 0) gruppiOratorio = invernali;
+      }
       if (selectGruppo) {
         gruppiOratorio.forEach(g => {
-          selectGruppo.innerHTML += `<option value="${g.id}">${targetSeason === 'estivo' ? '☀️' : '❄️'} ${escapeHtml(g.nome)} (${escapeHtml(g.anno_pastorale || '2026/2027')}) - Animatori: ${escapeHtml(g.animatori_nomi || 'In definizione')}</option>`;
+          const isEst = (g.tipo_oratorio || 'estivo').toLowerCase() === 'estivo';
+          const icon = isEst ? '☀️ [Estivo]' : '❄️ [Invernale]';
+          selectGruppo.innerHTML += `<option value="${g.id}">${icon} ${escapeHtml(g.nome)} (${escapeHtml(g.anno_pastorale || '2026/2027')}) - Animatori: ${escapeHtml(g.animatori_nomi || 'In definizione')}</option>`;
           (g.ragazzi || []).forEach(r => {
             cacheAssegnatiMassaMap.add(r.codice_fiscale);
-            cacheGruppoMassaMap.set(r.codice_fiscale, g.nome);
+            cacheGruppoMassaMap.set(r.codice_fiscale, `${g.nome} (${isEst ? 'Estivo' : 'Invernale'})`);
           });
         });
       }
@@ -7921,6 +7982,119 @@ async function handleSalvaGeneraBadgeAutomatica(e) {
   } catch (err) {
     showToast(err.message, 'error');
   }
+}
+
+// ================= OFFERTE & DONAZIONI (SATISPAY, IBAN, QUADRO FAMIGLIA) =================
+let cacheInfoOfferte = null;
+
+async function caricaTotaleOfferteCard() {
+  try {
+    const res = await fetch('/api/famiglie/offerte');
+    const data = await res.json();
+    cacheInfoOfferte = data;
+    const kpiEl = document.getElementById('kpiMioTotOfferto');
+    if (kpiEl) {
+      kpiEl.textContent = `€ ${(data.totale_offerto || 0).toFixed(2)}`;
+    }
+  } catch (err) {
+    console.error('Errore caricamento totale offerte:', err);
+  }
+}
+
+async function openModalOfferteDonazioni() {
+  openModal('modalOfferteDonazioni');
+  const tbody = document.getElementById('storicoOfferteBody');
+  if (tbody) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--ink-500); padding: 18px;"><div class="spinner" style="margin: 0 auto 8px;"></div>Caricamento quadro offerte e donazioni...</td></tr>';
+  }
+
+  try {
+    const res = await fetch('/api/famiglie/offerte');
+    const data = await res.json();
+    cacheInfoOfferte = data;
+
+    const info = data.info_pagamento || {};
+    const satispayLink = document.getElementById('offerteSatispayLink');
+    if (satispayLink) {
+      satispayLink.href = info.satispay_url || 'https://tag.satispay.com/sacrocuoreasti';
+    }
+
+    const ibanText = document.getElementById('offerteIbanText');
+    if (ibanText) {
+      ibanText.textContent = info.iban || 'IT60X0542811101000000123456';
+    }
+
+    const intestatarioEl = document.getElementById('offerteIntestatario');
+    if (intestatarioEl) {
+      intestatarioEl.textContent = info.intestatario || 'Parrocchia Sacro Cuore di Gesù - Asti';
+    }
+
+    const causaleEl = document.getElementById('offerteCausale');
+    if (causaleEl) {
+      causaleEl.textContent = info.causale_predefinita || 'Offerta liberale per le attività parrocchiali';
+    }
+
+    const totEl = document.getElementById('offerteTotaleVersato');
+    if (totEl) {
+      totEl.textContent = `€ ${(data.totale_offerto || 0).toFixed(2)}`;
+    }
+
+    const kpiEl = document.getElementById('kpiMioTotOfferto');
+    if (kpiEl) {
+      kpiEl.textContent = `€ ${(data.totale_offerto || 0).toFixed(2)}`;
+    }
+
+    const storico = data.storico_versamenti || [];
+    if (!tbody) return;
+
+    if (!storico.length) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="4" style="text-align: center; padding: 22px; color: var(--ink-500); font-style: italic;">
+            Nessuna quota o offerta registrata al momento. Le quote e donazioni compariranno qui una volta registrate.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = storico.map(item => `
+      <tr>
+        <td style="white-space: nowrap; font-weight: 600; color: var(--ink-700);">${escapeHtml(item.data || '-')}</td>
+        <td>
+          <div style="font-weight: 700; color: var(--ink-900);">${escapeHtml(item.descrizione)}</div>
+          <small style="color: var(--ink-500);">${escapeHtml(item.tipo)}</small>
+        </td>
+        <td><span class="badge badge-neutral" style="font-size: 11px;">${escapeHtml(item.metodo || 'Satispay/Bonifico')}</span></td>
+        <td style="text-align: right; font-weight: 700; color: #166534; font-size: 13.5px; white-space: nowrap;">
+          + € ${(item.importo || 0).toFixed(2)}
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    console.error('Errore quadro offerte:', err);
+    if (tbody) {
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--danger); padding: 18px;">Errore caricamento dati: ${escapeHtml(err.message)}</td></tr>`;
+    }
+  }
+}
+
+function copiaIbanOfferte() {
+  const ibanText = document.getElementById('offerteIbanText')?.textContent || '';
+  if (!ibanText) return;
+
+  navigator.clipboard.writeText(ibanText.replace(/\s+/g, '')).then(() => {
+    showToast('IBAN copiato negli appunti! 📋', 'success');
+  }).catch(() => {
+    // Fallback
+    const input = document.createElement('input');
+    input.value = ibanText.replace(/\s+/g, '');
+    document.body.appendChild(input);
+    input.select();
+    document.execCommand('copy');
+    document.body.removeChild(input);
+    showToast('IBAN copiato negli appunti! 📋', 'success');
+  });
 }
 
 

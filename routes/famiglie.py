@@ -199,3 +199,56 @@ def remove_membro(id, cf):
     persona.ruolo_famiglia = None
     db.session.commit()
     return jsonify({'success': True, 'message': 'Membro rimosso dal nucleo familiare'})
+
+@famiglie_bp.route('/offerte', methods=['GET'])
+def get_offerte_famiglia():
+    """Restituisce le coordinate per le offerte (Satispay, IBAN) e il quadro aggiornato delle offerte/quote versate dalla famiglia."""
+    from models import ImpostazioniSito, Iscrizione
+    impostazioni = ImpostazioniSito.query.first()
+    info_pagamento = {
+        'iban': (impostazioni.iban if impostazioni and impostazioni.iban else 'IT60X0542811101000000123456'),
+        'satispay_url': (impostazioni.satispay_url if impostazioni and impostazioni.satispay_url else 'https://tag.satispay.com/sacrocuoreasti'),
+        'intestatario': (impostazioni.intestatario_offerte if impostazioni and impostazioni.intestatario_offerte else 'Parrocchia Sacro Cuore di Gesù - Asti'),
+        'causale_predefinita': (impostazioni.causale_predefinita_offerte if impostazioni and impostazioni.causale_predefinita_offerte else 'Offerta per le attività parrocchiali')
+    }
+
+    if not current_user.is_authenticated:
+        return jsonify({
+            'info_pagamento': info_pagamento,
+            'totale_offerto': 0.0,
+            'storico_versamenti': []
+        })
+
+    cfs_famiglia = set()
+    if current_user.codice_fiscale:
+        cfs_famiglia.add(current_user.codice_fiscale)
+    if current_user.persona:
+        cfs_famiglia.add(current_user.persona.codice_fiscale)
+        if current_user.persona.nucleo:
+            for m in current_user.persona.nucleo.componenti:
+                cfs_famiglia.add(m.codice_fiscale)
+
+    storico = []
+    totale = 0.0
+
+    if cfs_famiglia:
+        # Quote iscrizioni pagate / offerte
+        iscrizioni = Iscrizione.query.filter(Iscrizione.codice_fiscale_partecipante.in_(cfs_famiglia)).all()
+        for isc in iscrizioni:
+            versato = float(isc.quota_versata or 0.0)
+            if versato > 0:
+                totale += versato
+                storico.append({
+                    'data': isc.data_iscrizione.strftime('%d/%m/%Y') if isc.data_iscrizione else '',
+                    'tipo': 'Quota Iscrizione Attività',
+                    'descrizione': f"Attività: {isc.attivita.titolo if isc.attivita else 'Attività Parrocchiale'} ({isc.partecipante.nominativo if isc.partecipante else isc.codice_fiscale_partecipante})",
+                    'importo': versato,
+                    'metodo': isc.metodo_pagamento or 'Contanti / Satispay / Bonifico',
+                    'stato': isc.stato_pagamento or 'saldato'
+                })
+
+    return jsonify({
+        'info_pagamento': info_pagamento,
+        'totale_offerto': round(totale, 2),
+        'storico_versamenti': storico
+    })
