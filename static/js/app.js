@@ -728,6 +728,10 @@ async function loadDashboard() {
           avvisiCont.innerHTML = '<p style="font-size: 13px; color: var(--ink-500);">Nessun avviso straordinario al momento.</p>';
         }
       }
+    } catch (e) {
+      console.warn('Errore caricamento messe e avvisi dashboard:', e);
+    }
+
     // Carica calendari parrocchiali per la dashboard personale
     await loadUserCalendari();
   } catch (err) {
