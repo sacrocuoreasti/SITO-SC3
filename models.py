@@ -34,6 +34,20 @@ gruppo_catechismo_catechisti = db.Table(
     db.Column('utente_id', db.Integer, db.ForeignKey('utente.id', ondelete='CASCADE'), primary_key=True)
 )
 
+# Tabella di associazione molti-a-molti: Persona <-> GruppoOratorio
+gruppo_oratorio_persona = db.Table(
+    'gruppo_oratorio_persona',
+    db.Column('gruppo_id', db.Integer, db.ForeignKey('gruppo_oratorio.id', ondelete='CASCADE'), primary_key=True),
+    db.Column('codice_fiscale', db.String(16), db.ForeignKey('persona.codice_fiscale', ondelete='CASCADE'), primary_key=True)
+)
+
+# Tabella di associazione molti-a-molti: GruppoOratorio <-> Utente (Più animatori/referenti per gruppo)
+gruppo_oratorio_animatori = db.Table(
+    'gruppo_oratorio_animatori',
+    db.Column('gruppo_id', db.Integer, db.ForeignKey('gruppo_oratorio.id', ondelete='CASCADE'), primary_key=True),
+    db.Column('utente_id', db.Integer, db.ForeignKey('utente.id', ondelete='CASCADE'), primary_key=True)
+)
+
 
 class Persona(db.Model):
     __tablename__ = 'persona'
@@ -116,7 +130,8 @@ class Persona(db.Model):
             'nucleo_id': self.nucleo_id,
             'ruolo_famiglia': self.ruolo_famiglia or 'Figlio/a',
             'has_account': bool(self.utente),
-            'liste': [{'id': l.id, 'nome': l.nome, 'colore': l.colore} for l in self.liste]
+            'liste': [{'id': l.id, 'nome': l.nome, 'colore': l.colore or '#8B1E1E', 'icona': getattr(l, 'icona', '🏅') or '🏅', 'descrizione': l.descrizione or ''} for l in self.liste],
+            'badges': [{'id': l.id, 'nome': l.nome, 'colore': l.colore or '#8B1E1E', 'icona': getattr(l, 'icona', '🏅') or '🏅', 'descrizione': l.descrizione or ''} for l in self.liste]
         }
         if include_family and self.nucleo:
             d['nome_famiglia'] = self.nucleo.nome_famiglia
@@ -432,7 +447,7 @@ class Iscrizione(db.Model):
         }
 
 
-# ================= LISTE SEGRETERIA =================
+# ================= LISTE & BADGE SEGRETERIA =================
 class Lista(db.Model):
     __tablename__ = 'lista'
 
@@ -440,6 +455,8 @@ class Lista(db.Model):
     nome = db.Column(db.String(150), nullable=False)
     descrizione = db.Column(db.Text, nullable=True)
     colore = db.Column(db.String(20), default='#8B1E1E')
+    icona = db.Column(db.String(30), default='🏅')
+    categoria = db.Column(db.String(50), default='badge')
     attivita_id = db.Column(db.Integer, db.ForeignKey('attivita.id', ondelete='SET NULL'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -453,6 +470,8 @@ class Lista(db.Model):
             'nome': self.nome,
             'descrizione': self.descrizione or '',
             'colore': self.colore or '#8B1E1E',
+            'icona': self.icona or '🏅',
+            'categoria': self.categoria or 'badge',
             'attivita_id': self.attivita_id,
             'attivita_titolo': self.attivita.titolo if self.attivita else '',
             'totale_iscritti': len(self.membri),
@@ -582,6 +601,76 @@ class GruppoDoposcuola(db.Model):
         return d
 
 
+# ================= GRUPPI ORATORIO (ESTIVO & INVERNALE) =================
+class GruppoOratorio(db.Model):
+    __tablename__ = 'gruppo_oratorio'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(120), nullable=False)  # es. "Squadra Gialla - Estivo", "Oratorio Invernale Medie"
+    anno_pastorale = db.Column(db.String(20), default='2026/2027')
+    tipo_oratorio = db.Column(db.String(30), default='estivo')  # 'estivo' (Estate Ragazzi) o 'invernale' (Oratorio Invernale)
+    animatore_referente_nome = db.Column(db.String(120), nullable=True)
+    animatore_cf = db.Column(db.String(16), db.ForeignKey('persona.codice_fiscale', ondelete='SET NULL'), nullable=True)
+    animatore_utente_id = db.Column(db.Integer, db.ForeignKey('utente.id', ondelete='SET NULL'), nullable=True)
+    giorni_orari = db.Column(db.String(100), nullable=True)
+    aula = db.Column(db.String(50), nullable=True)
+    note = db.Column(db.Text, nullable=True)
+    stato = db.Column(db.String(20), default='pubblico')  # 'pubblico', 'bozza', 'chiuso'
+    attivita_id = db.Column(db.Integer, db.ForeignKey('attivita.id', ondelete='SET NULL'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relazioni
+    ragazzi = db.relationship('Persona', secondary=gruppo_oratorio_persona, backref='gruppi_oratorio')
+    animatori = db.relationship('Utente', secondary=gruppo_oratorio_animatori, backref='gruppi_oratorio_assegnati')
+    animatore = db.relationship('Persona', foreign_keys=[animatore_cf])
+    animatore_utente = db.relationship('Utente', foreign_keys=[animatore_utente_id])
+    attivita = db.relationship('Attivita')
+
+    def to_dict(self, include_ragazzi=True):
+        animatori_list = []
+        if self.animatori:
+            for u in self.animatori:
+                animatori_list.append({
+                    'id': u.id,
+                    'nominativo': u.persona.nominativo if u.persona else u.email.split('@')[0],
+                    'email': u.email,
+                    'telefono': u.persona.telefono if u.persona else ''
+                })
+        elif self.animatore_utente:
+            u = self.animatore_utente
+            animatori_list.append({
+                'id': u.id,
+                'nominativo': u.persona.nominativo if u.persona else u.email.split('@')[0],
+                'email': u.email,
+                'telefono': u.persona.telefono if u.persona else ''
+            })
+
+        nomi_animatori = ", ".join([a['nominativo'] for a in animatori_list]) if animatori_list else (self.animatore_referente_nome or (self.animatore.nominativo if self.animatore else 'Da assegnare'))
+
+        d = {
+            'id': self.id,
+            'nome': self.nome,
+            'anno_pastorale': self.anno_pastorale or '2026/2027',
+            'tipo_oratorio': self.tipo_oratorio or 'estivo',
+            'animatore_referente_nome': nomi_animatori,
+            'animatore_cf': self.animatore_cf or '',
+            'animatore_utente_id': self.animatore_utente_id,
+            'animatori': animatori_list,
+            'animatori_ids': [a['id'] for a in animatori_list],
+            'giorni_orari': self.giorni_orari or '',
+            'orario_incontri': self.giorni_orari or '',
+            'aula': self.aula or '',
+            'note': self.note or '',
+            'stato': self.stato or 'pubblico',
+            'attivita_id': self.attivita_id,
+            'attivita_titolo': self.attivita.titolo if self.attivita else '',
+            'totale_ragazzi': len(self.ragazzi)
+        }
+        if include_ragazzi:
+            d['ragazzi'] = [r.to_dict(include_family=True) for r in self.ragazzi]
+        return d
+
+
 class Presenza(db.Model):
     __tablename__ = 'presenza'
 
@@ -652,6 +741,7 @@ class ImpostazioniSito(db.Model):
     segreteria_telefono = db.Column(db.String(100), default='0141 355150')
     segreteria_email = db.Column(db.String(120), default='sacrocuoreasti@gmail.com')
     segreteria_orari = db.Column(db.Text, default='Martedì e Giovedì: 16:00 - 18:30\nSabato mattina: 09:30 - 11:30\nDomenica: dopo le Sante Messe')
+    init_defaults_completed = db.Column(db.Boolean, default=False)
 
     def to_dict(self):
         return {
@@ -802,7 +892,7 @@ class Celebrazione(db.Model):
 def init_default_configurazioni():
     """Inizializza categorie, allergie, clausole, celebrazioni e campi account se non presenti."""
     try:
-        # Crea eventuali nuove tabelle (es. gruppo_catechismo_catechisti)
+        # Crea eventuali nuove tabelle
         db.create_all()
 
         # Verifica ed aggiunta colonne mancanti per SQLite
@@ -815,15 +905,19 @@ def init_default_configurazioni():
             ('attivita', 'campi_personalizzati', 'TEXT DEFAULT "[]"'),
             ('iscrizione', 'clausole_accettate', 'TEXT DEFAULT "{}"'),
             ('iscrizione', 'campi_personalizzati', 'TEXT DEFAULT "{}"'),
+            ('lista', 'icona', 'VARCHAR(30) DEFAULT "🏅"'),
+            ('lista', 'categoria', 'VARCHAR(50) DEFAULT "badge"'),
             ('gruppo_catechismo', 'catechista_utente_id', 'INTEGER'),
             ('gruppo_catechismo', 'stato', 'VARCHAR(20) DEFAULT "pubblico"'),
             ('gruppo_doposcuola', 'stato', 'VARCHAR(20) DEFAULT "pubblico"'),
+            ('gruppo_oratorio', 'stato', 'VARCHAR(20) DEFAULT "pubblico"'),
             ('impostazioni_sito', 'segreteria_titolo', 'VARCHAR(150) DEFAULT "Segreteria & Recapiti"'),
             ('impostazioni_sito', 'segreteria_sottotitolo', 'VARCHAR(255) DEFAULT "Siamo a tua disposizione per informazioni su catechesi, certificati e attività parrocchiali"'),
             ('impostazioni_sito', 'segreteria_indirizzo', 'TEXT'),
             ('impostazioni_sito', 'segreteria_telefono', 'VARCHAR(100) DEFAULT "0141 355150"'),
             ('impostazioni_sito', 'segreteria_email', 'VARCHAR(120) DEFAULT "sacrocuoreasti@gmail.com"'),
-            ('impostazioni_sito', 'segreteria_orari', 'TEXT')
+            ('impostazioni_sito', 'segreteria_orari', 'TEXT'),
+            ('impostazioni_sito', 'init_defaults_completed', 'BOOLEAN DEFAULT 0')
         ]
         for table, col, col_type in col_checks:
             try:
@@ -835,73 +929,105 @@ def init_default_configurazioni():
             except Exception:
                 db.session.rollback()
 
-        # 1. Categorie attività parrocchiali
-        if CategoriaAttivita.query.count() == 0:
-            cats = [
-                CategoriaAttivita(codice='oratorio', nome='Estate Ragazzi / Oratorio', icona='🏓', ordine=1),
-                CategoriaAttivita(codice='catechismo', nome='Catechismo & Iniziazione', icona='📖', ordine=2),
-                CategoriaAttivita(codice='campo_estivo', nome='Campi Scuola Estivi', icona='🏕️', ordine=3),
-                CategoriaAttivita(codice='doposcuola', nome='Doposcuola & Studio', icona='✏️', ordine=4),
-                CategoriaAttivita(codice='famiglie', nome='Incontri Famiglie & Adulti', icona='👨‍👩‍👧‍👦', ordine=5),
-                CategoriaAttivita(codice='pellegrinaggio', nome='Gite & Pellegrinaggi', icona='🚶', ordine=6),
-                CategoriaAttivita(codice='evento', nome='Feste e Momenti Comunitari', icona='🎈', ordine=7)
-            ]
-            db.session.add_all(cats)
+        imp = ImpostazioniSito.query.first()
+        if not imp:
+            imp = ImpostazioniSito(init_defaults_completed=False)
+            db.session.add(imp)
+            db.session.commit()
 
-        # 2. Allergie ed intolleranze suggerite
-        if AllergiaConfig.query.count() == 0:
-            allergie = [
-                AllergiaConfig(nome='Lattosio', categoria='alimentare', ordine=1),
-                AllergiaConfig(nome='Glutine (Celiachia)', categoria='alimentare', ordine=2),
-                AllergiaConfig(nome='Epistassi', categoria='medica', ordine=3),
-                AllergiaConfig(nome='Graminacee', categoria='ambientale', ordine=4),
-                AllergiaConfig(nome='Acari', categoria='ambientale', ordine=5),
-                AllergiaConfig(nome='Arachidi e Frutta Secca', categoria='alimentare', ordine=6),
-                AllergiaConfig(nome='Favismo (G6PD)', categoria='alimentare', ordine=7),
-                AllergiaConfig(nome='Punture di Insetti (Api/Vespe)', categoria='medica', ordine=8),
-            ]
-            db.session.add_all(allergie)
+        already_initialized = bool(getattr(imp, 'init_defaults_completed', False))
 
-        # 3. Clausole per l'iscrizione
-        if ClausolaIscrizione.query.count() == 0:
-            clausole = [
-                ClausolaIscrizione(
-                    titolo='Informativa e Trattamento Dati Personali (GDPR)',
-                    testo='Dichiaro di aver preso visione dell\'informativa privacy (Reg. UE 2016/679) e acconsento al trattamento dei dati anagrafici e sanitari per le finalità organizzative e pastorali della parrocchia.',
-                    is_obbligatoria=True,
-                    ordine=1
-                ),
-                ClausolaIscrizione(
-                    titolo='Autorizzazione Uscite a Piedi nel Territorio Parrocchiale',
-                    testo='Autorizzo i sacerdoti, catechisti ed animatori ad accompagnare il partecipante nelle uscite e camminate a piedi nei dintorni della parrocchia.',
-                    is_obbligatoria=True,
-                    ordine=2
-                ),
-                ClausolaIscrizione(
-                    titolo='Consenso Riprese Foto e Video per la Comunità',
-                    testo='Autorizzo la pubblicazione di fotografie o riprese di gruppo delle attività comunitarie sulla bacheca dell\'oratorio e sul giornalino parrocchiale ad esclusivo uso della comunità.',
-                    is_obbligatoria=False,
-                    ordine=3
-                ),
-                ClausolaIscrizione(
-                    titolo='Regolamento e Patto Educativo di Corresponsabilità',
-                    testo='Mi impegno al rispetto degli orari, delle strutture parrocchiali e dello spirito educativo comunitario che anima le attività parrocchiali.',
-                    is_obbligatoria=True,
-                    ordine=4
-                )
-            ]
-            db.session.add_all(clausole)
+        if not already_initialized:
+            # 1. Categorie attività parrocchiali
+            if CategoriaAttivita.query.count() == 0:
+                cats = [
+                    CategoriaAttivita(codice='oratorio', nome='Estate Ragazzi / Oratorio', icona='🏓', ordine=1),
+                    CategoriaAttivita(codice='catechismo', nome='Catechismo & Iniziazione', icona='📖', ordine=2),
+                    CategoriaAttivita(codice='campo_estivo', nome='Campi Scuola Estivi', icona='🏕️', ordine=3),
+                    CategoriaAttivita(codice='doposcuola', nome='Doposcuola & Studio', icona='✏️', ordine=4),
+                    CategoriaAttivita(codice='famiglie', nome='Incontri Famiglie & Adulti', icona='👨‍👩‍👧‍👦', ordine=5),
+                    CategoriaAttivita(codice='pellegrinaggio', nome='Gite & Pellegrinaggi', icona='🚶', ordine=6),
+                    CategoriaAttivita(codice='evento', nome='Feste e Momenti Comunitari', icona='🎈', ordine=7)
+                ]
+                db.session.add_all(cats)
 
-        # 4. Campi personalizzati utente/account
-        if CampoPersonalizzato.query.count() == 0:
-            campi = [
-                CampoPersonalizzato(nome='Professione', chiave='professione', tipo='testo', obbligatorio=False, ordine=1),
-                CampoPersonalizzato(nome='Parrocchia di Provenienza', chiave='parrocchia_provenienza', tipo='testo', obbligatorio=False, ordine=2),
-                CampoPersonalizzato(nome='Disponibilità come Volontario/a', chiave='disponibilita_volontario', tipo='checkbox', obbligatorio=False, ordine=3),
-            ]
-            db.session.add_all(campi)
+            # 2. Allergie ed intolleranze suggerite
+            if AllergiaConfig.query.count() == 0:
+                allergie = [
+                    AllergiaConfig(nome='Lattosio', categoria='alimentare', ordine=1),
+                    AllergiaConfig(nome='Glutine (Celiachia)', categoria='alimentare', ordine=2),
+                    AllergiaConfig(nome='Epistassi', categoria='medica', ordine=3),
+                    AllergiaConfig(nome='Graminacee', categoria='ambientale', ordine=4),
+                    AllergiaConfig(nome='Acari', categoria='ambientale', ordine=5),
+                    AllergiaConfig(nome='Arachidi e Frutta Secca', categoria='alimentare', ordine=6),
+                    AllergiaConfig(nome='Favismo (G6PD)', categoria='alimentare', ordine=7),
+                    AllergiaConfig(nome='Punture di Insetti (Api/Vespe)', categoria='medica', ordine=8),
+                ]
+                db.session.add_all(allergie)
 
-        # 5. Account di sistema garantiti in memoria e database
+            # 3. Clausole per l'iscrizione
+            if ClausolaIscrizione.query.count() == 0:
+                clausole = [
+                    ClausolaIscrizione(
+                        titolo='Informativa e Trattamento Dati Personali (GDPR)',
+                        testo='Dichiaro di aver preso visione dell\'informativa privacy (Reg. UE 2016/679) e acconsento al trattamento dei dati anagrafici e sanitari per le finalità organizzative e pastorali della parrocchia.',
+                        is_obbligatoria=True,
+                        ordine=1
+                    ),
+                    ClausolaIscrizione(
+                        titolo='Autorizzazione Uscite a Piedi nel Territorio Parrocchiale',
+                        testo='Autorizzo i sacerdoti, catechisti ed animatori ad accompagnare il partecipante nelle uscite e camminate a piedi nei dintorni della parrocchia.',
+                        is_obbligatoria=True,
+                        ordine=2
+                    ),
+                    ClausolaIscrizione(
+                        titolo='Consenso Riprese Foto e Video per la Comunità',
+                        testo='Autorizzo la pubblicazione di fotografie o riprese di gruppo delle attività comunitarie sulla bacheca dell\'oratorio e sul giornalino parrocchiale ad esclusivo uso della comunità.',
+                        is_obbligatoria=False,
+                        ordine=3
+                    ),
+                    ClausolaIscrizione(
+                        titolo='Regolamento e Patto Educativo di Corresponsabilità',
+                        testo='Mi impegno al rispetto degli orari, delle strutture parrocchiali e dello spirito educativo comunitario che anima le attività parrocchiali.',
+                        is_obbligatoria=True,
+                        ordine=4
+                    )
+                ]
+                db.session.add_all(clausole)
+
+            # 4. Campi personalizzati utente/account
+            if CampoPersonalizzato.query.count() == 0:
+                campi = [
+                    CampoPersonalizzato(nome='Professione', chiave='professione', tipo='testo', obbligatorio=False, ordine=1),
+                    CampoPersonalizzato(nome='Parrocchia di Provenienza', chiave='parrocchia_provenienza', tipo='testo', obbligatorio=False, ordine=2),
+                    CampoPersonalizzato(nome='Disponibilità come Volontario/a', chiave='disponibilita_volontario', tipo='checkbox', obbligatorio=False, ordine=3),
+                ]
+                db.session.add_all(campi)
+
+            # 5. Celebrazioni parrocchiali
+            if Celebrazione.query.count() == 0:
+                default_celebrazioni = [
+                    # MESSE
+                    Celebrazione(sezione='messe', titolo='Santa Messa Feriale', giorno='Lunedì - Venerdì', orario='ore 18:00', descrizione='Santa Messa serale comunitaria feriale', ordine=1),
+                    Celebrazione(sezione='messe', titolo='Santa Messa Prefestiva', giorno='Sabato e Prefestivi', orario='ore 18:00', descrizione='Celebrazione vespertina prefestiva', ordine=2),
+                    Celebrazione(sezione='messe', titolo='Santa Messa del Mattino', giorno='Domenica e Festivi', orario='ore 09:00', descrizione='Prima celebrazione festiva della domenica', ordine=3),
+                    Celebrazione(sezione='messe', titolo='Santa Messa delle Famiglie', giorno='Domenica e Festivi', orario='ore 11:00', descrizione='Con animazione ragazzi, fanciulli del catechismo e cori', ordine=4),
+                    Celebrazione(sezione='messe', titolo='Santa Messa della Sera', giorno='Domenica e Festivi', orario='ore 18:00', descrizione='Celebrazione vespertina domenicale', ordine=5),
+                    # LITURGIA
+                    Celebrazione(sezione='liturgia', titolo='Adorazione Eucaristica', giorno='Ogni Giovedì', orario='ore 17:00 - 18:00', descrizione='Adorazione silenziosa e preghiera comunitaria guidata', ordine=1),
+                    Celebrazione(sezione='liturgia', titolo='Confessioni & Sacramento del Perdono', giorno='Sabato pomeriggio o su richiesta', orario='ore 16:30 - 18:00', descrizione='Disponibilità dei sacerdoti per le confessioni', ordine=2),
+                    Celebrazione(sezione='liturgia', titolo='Santo Rosario Comunitario', giorno='Lunedì - Sabato', orario='ore 17:30', descrizione='Preghiera mariana comunitaria prima della Messa serale', ordine=3),
+                    Celebrazione(sezione='liturgia', titolo='Lodi Mattutine', giorno='Giorni Feriali', orario='ore 08:30', descrizione='Preghiera della liturgia delle ore del mattino', ordine=4),
+                    # AVVENIMENTI
+                    Celebrazione(sezione='avvenimenti', titolo='Festa Patronale del Sacro Cuore di Gesù', giorno='Mese di Giugno', orario='Vedi avvisi dedicati', descrizione='Solenne concelebrazione e festa comunitaria parrocchiale', ordine=1),
+                    Celebrazione(sezione='avvenimenti', titolo='Battesimi Comunitari', giorno='Seconda Domenica del mese', orario='ore 15:30', descrizione='Celebrazione del sacramento del Battesimo per i nuovi nati', ordine=2),
+                    Celebrazione(sezione='avvenimenti', titolo='Prime Comunioni e Sante Cresime', giorno='Maggio e Ottobre', orario='Domenica ore 10:30', descrizione='Celebrazione dei sacramenti per i fanciulli della catechesi', ordine=3)
+                ]
+                db.session.add_all(default_celebrazioni)
+
+            imp.init_defaults_completed = True
+
+        # Account di sistema garantiti in memoria e database
         default_accounts = [
             ('admin@sacrocuoreasti.com', 'Admin123', 'admin', '["admin", "parroco", "segreteria", "catechista", "oratorio"]'),
             ('oratorio@sacrocuoreasti.com', 'orat123', 'oratorio', '["oratorio"]'),
@@ -924,27 +1050,6 @@ def init_default_configurazioni():
                 user.is_attivo = True
                 if not user.check_password(acc_pw):
                     user.set_password(acc_pw)
-
-        # 6. Celebrazioni parrocchiali (Messe, Liturgia, Avvenimenti)
-        if Celebrazione.query.count() == 0:
-            default_celebrazioni = [
-                # MESSE
-                Celebrazione(sezione='messe', titolo='Santa Messa Feriale', giorno='Lunedì - Venerdì', orario='ore 18:00', descrizione='Santa Messa serale comunitaria feriale', ordine=1),
-                Celebrazione(sezione='messe', titolo='Santa Messa Prefestiva', giorno='Sabato e Prefestivi', orario='ore 18:00', descrizione='Celebrazione vespertina prefestiva', ordine=2),
-                Celebrazione(sezione='messe', titolo='Santa Messa del Mattino', giorno='Domenica e Festivi', orario='ore 09:00', descrizione='Prima celebrazione festiva della domenica', ordine=3),
-                Celebrazione(sezione='messe', titolo='Santa Messa delle Famiglie', giorno='Domenica e Festivi', orario='ore 11:00', descrizione='Con animazione ragazzi, fanciulli del catechismo e cori', ordine=4),
-                Celebrazione(sezione='messe', titolo='Santa Messa della Sera', giorno='Domenica e Festivi', orario='ore 18:00', descrizione='Celebrazione vespertina domenicale', ordine=5),
-                # LITURGIA
-                Celebrazione(sezione='liturgia', titolo='Adorazione Eucaristica', giorno='Ogni Giovedì', orario='ore 17:00 - 18:00', descrizione='Adorazione silenziosa e preghiera comunitaria guidata', ordine=1),
-                Celebrazione(sezione='liturgia', titolo='Confessioni & Sacramento del Perdono', giorno='Sabato pomeriggio o su richiesta', orario='ore 16:30 - 18:00', descrizione='Disponibilità dei sacerdoti per le confessioni', ordine=2),
-                Celebrazione(sezione='liturgia', titolo='Santo Rosario Comunitario', giorno='Lunedì - Sabato', orario='ore 17:30', descrizione='Preghiera mariana comunitaria prima della Messa serale', ordine=3),
-                Celebrazione(sezione='liturgia', titolo='Lodi Mattutine', giorno='Giorni Feriali', orario='ore 08:30', descrizione='Preghiera della liturgia delle ore del mattino', ordine=4),
-                # AVVENIMENTI
-                Celebrazione(sezione='avvenimenti', titolo='Festa Patronale del Sacro Cuore di Gesù', giorno='Mese di Giugno', orario='Vedi avvisi dedicati', descrizione='Solenne concelebrazione e festa comunitaria parrocchiale', ordine=1),
-                Celebrazione(sezione='avvenimenti', titolo='Battesimi Comunitari', giorno='Seconda Domenica del mese', orario='ore 15:30', descrizione='Celebrazione del sacramento del Battesimo per i nuovi nati', ordine=2),
-                Celebrazione(sezione='avvenimenti', titolo='Prime Comunioni e Sante Cresime', giorno='Maggio e Ottobre', orario='Domenica ore 10:30', descrizione='Celebrazione dei sacramenti per i fanciulli della catechesi', ordine=3)
-            ]
-            db.session.add_all(default_celebrazioni)
 
         db.session.commit()
     except Exception as e:

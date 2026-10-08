@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, send_file
-from models import db, Lista, Persona, Attivita, Iscrizione
+from models import db, Lista, Persona, Attivita, Iscrizione, GruppoCatechismo, GruppoDoposcuola, GruppoOratorio
 from services.cf_validator import normalizza_cf
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -19,7 +19,7 @@ def get_liste():
 def get_lista(id):
     l = db.session.get(Lista, id)
     if not l:
-        return jsonify({'error': 'Lista non trovata'}), 404
+        return jsonify({'error': 'Lista / Badge non trovato'}), 404
     return jsonify({'lista': l.to_dict(include_members=True)})
 
 @liste_bp.route('', methods=['POST'])
@@ -27,12 +27,14 @@ def create_lista():
     data = request.get_json() or {}
     nome = data.get('nome', '').strip()
     if not nome:
-        return jsonify({'error': 'Il nome della lista è obbligatorio'}), 400
+        return jsonify({'error': 'Il nome della lista / badge è obbligatorio'}), 400
 
     nuova = Lista(
         nome=nome,
         descrizione=data.get('descrizione', '').strip(),
         colore=data.get('colore', '#8B1E1E'),
+        icona=data.get('icona', '🏅').strip() or '🏅',
+        categoria=data.get('categoria', 'badge').strip() or 'badge',
         attivita_id=data.get('attivita_id')
     )
     db.session.add(nuova)
@@ -40,7 +42,7 @@ def create_lista():
 
     return jsonify({
         'success': True,
-        'message': f'Lista "{nuova.nome}" creata con successo',
+        'message': f'Badge / Lista "{nuova.nome}" creato con successo',
         'lista': nuova.to_dict(include_members=True)
     }), 201
 
@@ -48,18 +50,20 @@ def create_lista():
 def update_lista(id):
     l = db.session.get(Lista, id)
     if not l:
-        return jsonify({'error': 'Lista non trovata'}), 404
+        return jsonify({'error': 'Lista / Badge non trovato'}), 404
 
     data = request.get_json() or {}
     if 'nome' in data: l.nome = data['nome'].strip()
     if 'descrizione' in data: l.descrizione = data['descrizione'].strip()
     if 'colore' in data: l.colore = data['colore'].strip()
+    if 'icona' in data: l.icona = data['icona'].strip() or '🏅'
+    if 'categoria' in data: l.categoria = data['categoria'].strip() or 'badge'
     if 'attivita_id' in data: l.attivita_id = data['attivita_id']
 
     db.session.commit()
     return jsonify({
         'success': True,
-        'message': 'Lista aggiornata con successo',
+        'message': f'Badge / Lista "{l.nome}" aggiornato con successo',
         'lista': l.to_dict(include_members=True)
     })
 
@@ -67,17 +71,17 @@ def update_lista(id):
 def delete_lista(id):
     l = db.session.get(Lista, id)
     if not l:
-        return jsonify({'error': 'Lista non trovata'}), 404
+        return jsonify({'error': 'Lista / Badge non trovato'}), 404
 
     db.session.delete(l)
     db.session.commit()
-    return jsonify({'success': True, 'message': 'Lista eliminata con successo'})
+    return jsonify({'success': True, 'message': 'Lista / Badge eliminato con successo'})
 
 @liste_bp.route('/<int:id>/membri', methods=['POST'])
 def add_membro_lista(id):
     l = db.session.get(Lista, id)
     if not l:
-        return jsonify({'error': 'Lista non trovata'}), 404
+        return jsonify({'error': 'Lista / Badge non trovato'}), 404
 
     data = request.get_json() or {}
     cf = normalizza_cf(data.get('codice_fiscale', ''))
@@ -91,7 +95,7 @@ def add_membro_lista(id):
 
     return jsonify({
         'success': True,
-        'message': f'{persona.nominativo} aggiunto/a alla lista "{l.nome}"',
+        'message': f'{persona.nominativo} aggiunto/a al badge/lista "{l.nome}"',
         'lista': l.to_dict(include_members=True)
     })
 
@@ -99,7 +103,7 @@ def add_membro_lista(id):
 def remove_membro_lista(id, cf):
     l = db.session.get(Lista, id)
     if not l:
-        return jsonify({'error': 'Lista non trovata'}), 404
+        return jsonify({'error': 'Lista / Badge non trovato'}), 404
 
     cf = normalizza_cf(cf)
     persona = db.session.get(Persona, cf)
@@ -109,9 +113,165 @@ def remove_membro_lista(id, cf):
 
     return jsonify({
         'success': True,
-        'message': f'Rimosso dalla lista "{l.nome}"',
+        'message': f'Rimosso/a dal badge/lista "{l.nome}"',
         'lista': l.to_dict(include_members=True)
     })
+
+@liste_bp.route('/assegna-massa', methods=['POST'])
+def assegna_badge_massa():
+    """
+    Assegna o rimuove uno o più Badge / Liste a un elenco di persone selezionate via checkbox.
+    Body: {
+      "codici_fiscali": ["CF1", "CF2"],
+      "lista_ids_aggiungi": [1, 2],
+      "lista_ids_rimuovi": [3]
+    }
+    """
+    data = request.get_json() or {}
+    cfs = data.get('codici_fiscali', [])
+    aggiungi_ids = data.get('lista_ids_aggiungi', [])
+    rimuovi_ids = data.get('lista_ids_rimuovi', [])
+
+    if not isinstance(cfs, list) or not cfs:
+        return jsonify({'error': 'Nessuna persona selezionata'}), 400
+
+    persone = []
+    for raw_cf in cfs:
+        cf = normalizza_cf(raw_cf)
+        p = db.session.get(Persona, cf)
+        if p:
+            persone.append(p)
+
+    if not persone:
+        return jsonify({'error': 'Nessuna persona valida trovata'}), 404
+
+    # Liste da aggiungere
+    liste_agg = Lista.query.filter(Lista.id.in_(aggiungi_ids)).all() if aggiungi_ids else []
+    # Liste da rimuovere
+    liste_rim = Lista.query.filter(Lista.id.in_(rimuovi_ids)).all() if rimuovi_ids else []
+
+    for p in persone:
+        for l in liste_agg:
+            if p not in l.membri:
+                l.membri.append(p)
+        for l in liste_rim:
+            if p in l.membri:
+                l.membri.remove(p)
+
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': f'Badge / Liste aggiornati con successo per {len(persone)} persone!'
+    })
+
+@liste_bp.route('/genera-automatica', methods=['POST'])
+def genera_automatica():
+    """
+    Genera un Badge / Lista popolato automaticamente in base a:
+    - sorgente: 'catechismo', 'doposcuola', 'oratorio_estivo', 'oratorio_invernale', 'attivita', 'anagrafica_filtri'
+    - opzioni aggiuntive: gruppo_id, anno_pastorale, attivita_id, sesso, eta_min, eta_max
+    """
+    data = request.get_json() or {}
+    sorgente = data.get('sorgente', 'catechismo').strip().lower()
+    nome_badge = data.get('nome', '').strip()
+    colore = data.get('colore', '#8B1E1E')
+    icona = data.get('icona', '🏅')
+    descrizione = data.get('descrizione', '').strip()
+
+    persone_match = set()
+
+    if sorgente == 'catechismo':
+        gruppo_id = data.get('gruppo_id')
+        anno = data.get('anno_pastorale')
+        query = GruppoCatechismo.query
+        if gruppo_id: query = query.filter_by(id=gruppo_id)
+        if anno: query = query.filter_by(anno_pastorale=anno)
+        for g in query.all():
+            for r in g.ragazzi: persone_match.add(r)
+        if not nome_badge:
+            nome_badge = f"Catechismo {anno or 'Comunità'}"
+        if not descrizione:
+            descrizione = f"Iscritti al cammino di Catechismo {anno or ''}".strip()
+
+    elif sorgente == 'doposcuola':
+        gruppo_id = data.get('gruppo_id')
+        anno = data.get('anno_scolastico') or data.get('anno_pastorale')
+        query = GruppoDoposcuola.query
+        if gruppo_id: query = query.filter_by(id=gruppo_id)
+        if anno: query = query.filter_by(anno_scolastico=anno)
+        for g in query.all():
+            for s in g.studenti: persone_match.add(s)
+        if not nome_badge:
+            nome_badge = f"Doposcuola {anno or 'Studio'}"
+        if not descrizione:
+            descrizione = f"Studenti del Doposcuola & Studio Pomeridiano {anno or ''}".strip()
+
+    elif sorgente in ['oratorio_estivo', 'oratorio_invernale']:
+        tipo = 'estivo' if sorgente == 'oratorio_estivo' else 'invernale'
+        gruppo_id = data.get('gruppo_id')
+        anno = data.get('anno_pastorale')
+        query = GruppoOratorio.query.filter_by(tipo_oratorio=tipo)
+        if gruppo_id: query = query.filter_by(id=gruppo_id)
+        if anno: query = query.filter_by(anno_pastorale=anno)
+        for g in query.all():
+            for r in g.ragazzi: persone_match.add(r)
+        if not nome_badge:
+            nome_badge = f"Oratorio {'Estivo (Estate Ragazzi)' if tipo == 'estivo' else 'Invernale'} {anno or ''}".strip()
+        if not descrizione:
+            descrizione = f"Partecipanti Oratorio {tipo.capitalize()} {anno or ''}".strip()
+
+    elif sorgente == 'attivita':
+        att_id = data.get('attivita_id')
+        if not att_id:
+            return jsonify({'error': 'ID attività obbligatorio'}), 400
+        att = db.session.get(Attivita, att_id)
+        if not att:
+            return jsonify({'error': 'Attività non trovata'}), 404
+        for isc in att.iscrizioni:
+            if isc.stato in ['confermata', 'in_attesa'] and isc.partecipante:
+                persone_match.add(isc.partecipante)
+        if not nome_badge:
+            nome_badge = f"Iscritti: {att.titolo}"
+        if not descrizione:
+            descrizione = f"Partecipanti iscritti a {att.titolo}"
+
+    # Filtri opzionali anagrafici (Età, Sesso)
+    sesso = data.get('sesso')
+    eta_min = data.get('eta_min')
+    eta_max = data.get('eta_max')
+
+    filtrati = []
+    for p in persone_match:
+        if sesso and p.sesso != sesso:
+            continue
+        if eta_min is not None and (p.eta is None or p.eta < int(eta_min)):
+            continue
+        if eta_max is not None and (p.eta is None or p.eta > int(eta_max)):
+            continue
+        filtrati.append(p)
+
+    if not nome_badge:
+        nome_badge = "Nuovo Badge Parrocchiale"
+
+    nuova_lista = Lista(
+        nome=nome_badge,
+        descrizione=descrizione,
+        colore=colore,
+        icona=icona,
+        categoria='badge'
+    )
+    for p in filtrati:
+        nuova_lista.membri.append(p)
+
+    db.session.add(nuova_lista)
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': f'Badge "{nuova_lista.nome}" generato con successo con {len(filtrati)} partecipanti!',
+        'lista': nuova_lista.to_dict(include_members=True)
+    }), 201
 
 @liste_bp.route('/genera-da-attivita', methods=['POST'])
 def genera_da_attivita():
@@ -125,7 +285,6 @@ def genera_da_attivita():
     if not att:
         return jsonify({'error': 'Attività non trovata'}), 404
 
-    # Trova o crea lista
     nome_lista = data.get('nome_lista') or f"Iscritti: {att.titolo}"
     lista = Lista.query.filter_by(attivita_id=attivita_id).first()
     if not lista:
@@ -133,22 +292,21 @@ def genera_da_attivita():
             nome=nome_lista,
             descrizione=f"Elenco dei partecipanti iscritti all'attività {att.titolo}",
             attivita_id=attivita_id,
-            colore='#1d5f9e'
+            colore='#1d5f9e',
+            icona='🏅',
+            categoria='badge'
         )
         db.session.add(lista)
         db.session.flush()
 
-    # Aggiungi tutti i partecipanti confermati dell'attività
-    count_aggiunti = 0
     for isc in att.iscrizioni:
         if isc.stato in ['confermata', 'in_attesa'] and isc.partecipante not in lista.membri:
             lista.membri.append(isc.partecipante)
-            count_aggiunti += 1
 
     db.session.commit()
     return jsonify({
         'success': True,
-        'message': f'Lista "{lista.nome}" creata/aggiornata con {len(lista.membri)} partecipanti!',
+        'message': f'Lista / Badge "{lista.nome}" sincronizzato con {len(lista.membri)} partecipanti!',
         'lista': lista.to_dict(include_members=True)
     })
 

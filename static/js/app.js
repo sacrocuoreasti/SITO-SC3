@@ -1004,69 +1004,658 @@ function filterAttivitaByStatus(status, btn) {
   applyAttivitaFilters();
 }
 
-// ================= VIEW 4: ORATORIO & ALLERGIE =================
+// ================= VIEW 4: ORATORIO (ESTIVO, INVERNALE, ALLERGIE) =================
+let cacheGruppiOratorio = [];
+let currentOratorioTipoTab = 'estivo'; // 'estivo' | 'invernale' | 'allergie'
+let currentOratorioAnnoFilter = '2026/2027';
+let cacheRegistroOratorio = null;
+let statoPresenzeCorrentiOratorio = {};
+let currentEditingOratorioId = null;
+
 async function loadOratorio() {
+  const roles = (currentUser && currentUser.tutti_i_ruoli) || [currentUser ? currentUser.ruolo : 'utente'];
+  const isSupervisor = roles.some(r => ['admin', 'parroco', 'segreteria'].includes(r));
+  const isAnimatore = isSupervisor || roles.includes('oratorio');
+
+  if (!isAnimatore) {
+    // Genitore / Fedele: visualizza iscrizioni e presenze dei propri figli
+    const staffSec = document.getElementById('oratorioStaffSection');
+    const staffActions = document.getElementById('oratorioStaffHeaderActions');
+    const parentSec = document.getElementById('oratorioParentSection');
+    if (staffSec) staffSec.style.display = 'none';
+    if (staffActions) staffActions.style.display = 'none';
+    if (parentSec) parentSec.style.display = 'block';
+    const titleEl = document.getElementById('oratorioPageTitle');
+    const descEl = document.getElementById('oratorioPageDesc');
+    if (titleEl) titleEl.textContent = 'Oratorio & Estate Ragazzi dei Tuoi Figli';
+    if (descEl) descEl.textContent = 'Consulta i gruppi assegnati a tuo figlio/a per l\'Oratorio Estivo o Invernale, gli animatori di riferimento e il registro presenze.';
+    await loadOratorioParentView();
+    return;
+  }
+
+  // Staff / Animatori / Segreteria
+  const staffSec = document.getElementById('oratorioStaffSection');
+  const staffActions = document.getElementById('oratorioStaffHeaderActions');
+  const parentSec = document.getElementById('oratorioParentSection');
+  if (staffSec) staffSec.style.display = 'block';
+  if (staffActions) staffActions.style.display = 'flex';
+  if (parentSec) parentSec.style.display = 'none';
+  const titleEl = document.getElementById('oratorioPageTitle');
+  const descEl = document.getElementById('oratorioPageDesc');
+  if (titleEl) titleEl.textContent = 'Oratorio & Estate Ragazzi (Sacro Cuore)';
+  if (descEl) descEl.textContent = 'Gestione gruppi Oratorio Estivo ed Invernale, registro presenze giornaliero, animatori e schede allergie per la cucina.';
+
   try {
-    const [allergieRes, presenzeRes] = await Promise.all([
-      fetch('/api/oratorio/allergie'),
-      fetch('/api/oratorio/presenze')
+    const [gruppiRes, allergieRes] = await Promise.all([
+      fetch('/api/oratorio/gruppi'),
+      fetch('/api/oratorio/allergie')
     ]);
 
-    const allergieData = await allergieRes.json();
-    const presenzeData = await presenzeRes.json();
+    const dataG = await gruppiRes.json();
+    const dataA = await allergieRes.json();
 
+    cacheGruppiOratorio = dataG.gruppi || [];
+
+    // Aggiorna KPI Cucina & Allergie
     const kpiEl = document.getElementById('allergiesKpiRow');
-    const c = allergieData.conteggi;
-    kpiEl.innerHTML = `
-      <span class="allergy-tag celiac" style="font-size: 13px; padding: 6px 12px;">🌾 Celiachia: <strong>${c.celiachia_glutine}</strong></span>
-      <span class="allergy-tag lactose" style="font-size: 13px; padding: 6px 12px;">🥛 Lattosio: <strong>${c.lattosio}</strong></span>
-      <span class="allergy-tag peanut" style="font-size: 13px; padding: 6px 12px;">🥜 Arachidi: <strong>${c.arachidi_frutta_secca}</strong></span>
-      <span class="allergy-tag meds" style="font-size: 13px; padding: 6px 12px;">💊 Farmaci: <strong>${c.farmaci_salvavita}</strong></span>
-    `;
+    if (kpiEl && dataA.conteggi) {
+      const c = dataA.conteggi;
+      kpiEl.innerHTML = `
+        <span class="allergy-tag celiac" style="font-size: 13px; padding: 6px 12px;">🌾 Celiachia: <strong>${c.celiachia_glutine || 0}</strong></span>
+        <span class="allergy-tag lactose" style="font-size: 13px; padding: 6px 12px;">🥛 Lattosio: <strong>${c.lattosio || 0}</strong></span>
+        <span class="allergy-tag peanut" style="font-size: 13px; padding: 6px 12px;">🥜 Arachidi: <strong>${c.arachidi_frutta_secca || 0}</strong></span>
+        <span class="allergy-tag meds" style="font-size: 13px; padding: 6px 12px;">💊 Farmaci: <strong>${c.farmaci_salvavita || 0}</strong></span>
+      `;
+    }
 
+    // Popola tabella riassuntiva allergie
     const tbodyAllergie = document.querySelector('#tableAllergieOratorio tbody');
-    if (!allergieData.segnalazioni.length) {
-      tbodyAllergie.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--ink-500);">Nessun partecipante con intolleranze/allergie censito.</td></tr>`;
-    } else {
-      tbodyAllergie.innerHTML = allergieData.segnalazioni.map(s => `
-        <tr>
-          <td><strong>${escapeHtml(s.nominativo)}</strong></td>
-          <td>${s.eta ? `${s.eta} anni` : '-'}<br><small style="font-family:monospace; color:var(--ink-500);">${escapeHtml(s.codice_fiscale)}</small></td>
-          <td><strong>${escapeHtml(s.attivita_titolo)}</strong><br><span class="badge badge-info">${escapeHtml(s.squadra)}</span></td>
-          <td><strong style="color:#b45309;">${escapeHtml(s.intolleranze_alimentari)}</strong></td>
-          <td><strong style="color:#b91c1c;">${escapeHtml(s.allergie)}</strong></td>
-          <td><strong>📞 ${escapeHtml(s.telefono_emergenza || '-')}</strong></td>
-        </tr>
-      `).join('');
+    if (tbodyAllergie) {
+      if (!dataA.segnalazioni || !dataA.segnalazioni.length) {
+        tbodyAllergie.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--ink-500);">Nessun partecipante con intolleranze/allergie censito.</td></tr>`;
+      } else {
+        tbodyAllergie.innerHTML = dataA.segnalazioni.map(s => `
+          <tr>
+            <td><strong>${escapeHtml(s.nominativo)}</strong></td>
+            <td>${s.eta ? `${s.eta} anni` : '-'}<br><small style="font-family:monospace; color:var(--ink-500);">${escapeHtml(s.codice_fiscale)}</small></td>
+            <td><strong>${escapeHtml(s.attivita_titolo || 'Oratorio')}</strong><br><span class="badge badge-info">${escapeHtml(s.squadra || 'Generale')}</span></td>
+            <td><strong style="color:#b45309;">${escapeHtml(s.intolleranze_alimentari || '-')}</strong></td>
+            <td><strong style="color:#b91c1c;">${escapeHtml(s.allergie || '-')}</strong></td>
+            <td><strong>📞 ${escapeHtml(s.telefono_emergenza || '-')}</strong></td>
+          </tr>
+        `).join('');
+      }
     }
 
-    document.getElementById('inputDataPresenzeOratorio').value = presenzeData.data || new Date().toISOString().split('T')[0];
-    const tbodyPres = document.querySelector('#tablePresenzeOratorio tbody');
-    if (!presenzeData.partecipanti.length) {
-      tbodyPres.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--ink-500);">Nessun iscritto confermato all'oratorio.</td></tr>`;
-    } else {
-      tbodyPres.innerHTML = presenzeData.partecipanti.map(p => `
-        <tr>
-          <td>
-            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-              <input type="checkbox" class="check-presenza" data-cf="${p.codice_fiscale}" ${p.presente ? 'checked' : ''} style="width:18px; height:18px;">
-              <span>${p.presente ? 'Presente' : 'Assente'}</span>
-            </label>
-          </td>
-          <td><strong>${escapeHtml(p.nominativo)}</strong><br><small style="font-family:monospace; color:var(--ink-500);">${escapeHtml(p.codice_fiscale)}</small></td>
-          <td><span class="badge badge-neutral">${escapeHtml(p.squadra || 'Da assegnare')}</span></td>
-          <td>${escapeHtml(p.allergie || 'Nessuna')}</td>
-          <td>📞 ${escapeHtml(p.telefono || '-')}</td>
-        </tr>
-      `).join('');
-    }
+    renderGruppiOratorioGrid();
   } catch (err) {
-    console.error('Errore oratorio:', err);
+    console.error('Errore caricamento oratorio:', err);
+  }
+}
+
+function switchOratorioTab(tab) {
+  currentOratorioTipoTab = tab;
+  document.querySelectorAll('.tab-oratorio-btn').forEach(btn => {
+    btn.className = 'btn btn-sm btn-secondary tab-oratorio-btn';
+  });
+  const activeBtn = document.getElementById(`tabOratorio${tab.charAt(0).toUpperCase() + tab.slice(1)}Btn`);
+  if (activeBtn) activeBtn.className = 'btn btn-sm btn-primary tab-oratorio-btn active';
+
+  const gridSec = document.getElementById('oratorioGruppiSection');
+  const allergieSec = document.getElementById('oratorioAllergieSection');
+
+  if (tab === 'allergie') {
+    if (gridSec) gridSec.style.display = 'none';
+    if (allergieSec) allergieSec.style.display = 'block';
+  } else {
+    if (gridSec) gridSec.style.display = 'block';
+    if (allergieSec) allergieSec.style.display = 'none';
+    renderGruppiOratorioGrid();
+  }
+}
+
+function selezionaAnnoOratorio(anno) {
+  currentOratorioAnnoFilter = anno;
+  document.querySelectorAll('.anno-oratorio-btn').forEach(btn => {
+    btn.className = btn.textContent.includes(anno) 
+      ? 'btn btn-sm btn-primary anno-oratorio-btn active' 
+      : 'btn btn-sm btn-secondary anno-oratorio-btn';
+  });
+  renderGruppiOratorioGrid();
+}
+
+function renderGruppiOratorioGrid() {
+  const container = document.getElementById('oratorioGruppiGrid');
+  if (!container) return;
+
+  const q = (document.getElementById('searchOratorioInput')?.value || '').toLowerCase().trim();
+
+  const filtrati = cacheGruppiOratorio.filter(g => {
+    const matchTipo = (g.tipo_oratorio || 'estivo') === currentOratorioTipoTab;
+    const matchAnno = !currentOratorioAnnoFilter || g.anno_pastorale === currentOratorioAnnoFilter;
+    if (!matchTipo || !matchAnno) return false;
+
+    if (q) {
+      const matchText = (g.nome || '').toLowerCase().includes(q) ||
+                        (g.luogo || '').toLowerCase().includes(q) ||
+                        (g.animatori_nomi || '').toLowerCase().includes(q);
+      if (!matchText) return false;
+    }
+    return true;
+  });
+
+  const countBadge = document.getElementById('oratorioGruppiCountBadge');
+  if (countBadge) {
+    countBadge.textContent = `${filtrati.length} gruppi (${currentOratorioTipoTab === 'estivo' ? 'Estivo' : 'Invernale'} ${currentOratorioAnnoFilter})`;
+  }
+
+  if (!filtrati.length) {
+    container.innerHTML = `
+      <div style="grid-column: 1/-1; padding: 40px; text-align: center; background: #fff; border: 1px dashed var(--border-light); border-radius: var(--radius-md);">
+        <div style="font-size: 32px; margin-bottom: 8px;">🏓</div>
+        <h3 style="font-size: 16px; margin-bottom: 6px;">Nessun gruppo ${currentOratorioTipoTab === 'estivo' ? 'Estivo' : 'Invernale'} per l'anno ${escapeHtml(currentOratorioAnnoFilter)}</h3>
+        <p style="color: var(--ink-500); font-size: 13.5px; margin-bottom: 16px;">Crea il primo gruppo o squadra cliccando sul pulsante "+ Nuovo Gruppo Oratorio".</p>
+        <button class="btn btn-primary" onclick="openModalNuovoGruppoOratorio('${currentOratorioTipoTab}')">+ Nuovo Gruppo ${currentOratorioTipoTab === 'estivo' ? 'Estivo' : 'Invernale'}</button>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = filtrati.map(g => {
+    const numIscritti = (g.ragazzi || []).length;
+    const isChiuso = g.stato === 'chiuso';
+    const isBozza = g.stato === 'bozza';
+    const statoBadge = isChiuso 
+      ? '<span class="badge badge-danger" style="font-size: 11px;">🔴 Chiuso</span>' 
+      : (isBozza ? '<span class="badge badge-warning" style="font-size: 11px;">🟡 Bozza</span>' : '<span class="badge badge-success" style="font-size: 11px;">🟢 Pubblico</span>');
+
+    const animatoriBadges = (g.animatori && g.animatori.length)
+      ? g.animatori.map(a => `<span class="badge badge-neutral" style="font-size: 11.5px; margin-right: 4px;">👤 ${escapeHtml(a.nominativo)}</span>`).join('')
+      : `<span style="color: var(--ink-500); font-size: 12px; font-style: italic;">Nessun animatore assegnato</span>`;
+
+    return `
+      <div class="card" style="border-top: 4px solid ${currentOratorioTipoTab === 'estivo' ? '#eab308' : '#3b82f6'}; display: flex; flex-direction: column; justify-content: space-between;">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+              <span style="font-size: 18px;">${currentOratorioTipoTab === 'estivo' ? '☀️' : '❄️'}</span>
+              <h3 style="margin: 0; font-size: 16.5px; font-weight: 700; color: var(--ink-900);">${escapeHtml(g.nome)}</h3>
+            </div>
+            <span style="font-size: 12px; color: var(--ink-500); font-weight: 600;">Anno Pastorale: ${escapeHtml(g.anno_pastorale)}</span>
+          </div>
+          <div>${statoBadge}</div>
+        </div>
+
+        <div class="card-body" style="padding-top: 10px; padding-bottom: 10px;">
+          <div style="font-size: 13px; color: var(--ink-700); margin-bottom: 8px;">
+            <div>🕒 <strong>Orario:</strong> ${escapeHtml(g.orario_incontri || 'Sabato / Pomeriggio')}</div>
+            <div>📍 <strong>Luogo:</strong> ${escapeHtml(g.luogo || 'Cortile / Salone Oratorio')}</div>
+            <div style="margin-top: 4px;">👥 <strong>Iscritti:</strong> <span class="badge badge-info">${numIscritti} ragazzi</span> ${g.max_iscritti ? `<small style="color:var(--ink-500);">(Max: ${g.max_iscritti})</small>` : ''}</div>
+          </div>
+
+          <div style="margin-top: 10px; border-top: 1px dashed var(--border-light); padding-top: 8px;">
+            <strong style="font-size: 12px; color: var(--ink-600); display: block; margin-bottom: 4px;">Animatori Responsabili:</strong>
+            <div style="display: flex; flex-wrap: wrap; gap: 4px;">${animatoriBadges}</div>
+          </div>
+        </div>
+
+        <div class="card-footer" style="background: #f8fafc; border-top: 1px solid var(--border-light); display: flex; gap: 6px; flex-wrap: wrap; justify-content: space-between; align-items: center; padding: 10px 14px;">
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-xs btn-primary" onclick="openModalRegistroPresenzeOratorio(${g.id})">
+              📋 Registro Presenze
+            </button>
+            <button type="button" class="btn btn-xs btn-secondary" onclick="openModalAllergieGruppoOratorio(${g.id}, '${escapeHtml(g.nome)}')">
+              ⚠️ Allergie
+            </button>
+          </div>
+          <button type="button" class="btn btn-xs btn-outline-primary" onclick="openModalModificaGruppoOratorio(${g.id})">
+            ✏️ Modifica
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function loadOratorioParentView() {
+  const container = document.getElementById('oratorioParentContainer');
+  if (!container) return;
+  container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--ink-500);">Caricamento oratorio dei tuoi figli...</div>';
+
+  try {
+    const res = await fetch('/api/oratorio/miei-figli');
+    const data = await res.json();
+    if (!data.ha_famiglia || !data.figli || !data.figli.length) {
+      container.innerHTML = `
+        <div class="card" style="padding: 30px; text-align: center;">
+          <h3 style="font-size: 16px; margin-bottom: 8px;">Nessun componente registrato nel nucleo familiare</h3>
+          <p style="color: var(--ink-500); font-size: 13.5px; margin-bottom: 16px;">
+            Aggiungi i tuoi figli nella sezione "La Mia Famiglia" per visualizzare e gestire le iscrizioni all'Oratorio Estivo o Invernale.
+          </p>
+          <button class="btn btn-primary" onclick="navigateTo('famiglia')">Vai a La Mia Famiglia →</button>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = data.figli.map(figlio => {
+      const isAssegnato = figlio.is_assegnato;
+      const gruppi = figlio.gruppi || [];
+
+      return `
+        <div class="card" style="border-left: 4px solid var(--primary); padding: 22px; margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; border-bottom: 1px solid var(--border-light); padding-bottom: 14px;">
+            <div>
+              <span class="badge ${isAssegnato ? 'badge-success' : 'badge-neutral'}" style="font-size: 11px; margin-bottom: 6px;">
+                ${isAssegnato ? 'ISCRITTO ALL\'ORATORIO' : 'NON ANCORA ISCRITTO'}
+              </span>
+              <h2 style="font-size: 20px; font-weight: 700; color: var(--ink-900); margin: 0;">${escapeHtml(figlio.nominativo)}</h2>
+              <div style="font-size: 13px; color: var(--ink-600); margin-top: 4px;">
+                Età: <strong>${figlio.eta !== null ? figlio.eta + ' anni' : 'N/D'}</strong> · Data Nascita: <strong>${figlio.data_nascita_it || 'N/D'}</strong> · CF: <code>${figlio.codice_fiscale}</code>
+              </div>
+            </div>
+            <div>
+              <button class="btn btn-sm btn-primary" onclick="openModalIscriviFiglioOratorio('${figlio.codice_fiscale}', '${escapeHtml(figlio.nominativo)}')">
+                🏓 + Iscrivi a Oratorio Estivo / Invernale
+              </button>
+            </div>
+          </div>
+
+          ${gruppi.length > 0 ? `
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px;">
+              ${gruppi.map(g => `
+                <div style="background: var(--bg-subtle); border-radius: var(--radius-md); padding: 14px; border: 1px solid var(--border-light);">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <strong style="font-size: 15px; color: var(--primary);">
+                      ${g.tipo_oratorio === 'estivo' ? '☀️ Oratorio Estivo' : '❄️ Oratorio Invernale'}: ${escapeHtml(g.nome)}
+                    </strong>
+                    <span class="badge badge-info" style="font-size: 11px;">${escapeHtml(g.anno_pastorale)}</span>
+                  </div>
+                  <div style="font-size: 12.5px; color: var(--ink-700); line-height: 1.5;">
+                    <div>🕒 <strong>Orario:</strong> ${escapeHtml(g.orario_incontri || 'Sabato / Pomeriggio')}</div>
+                    <div>📍 <strong>Luogo:</strong> ${escapeHtml(g.luogo || 'Oratorio Sacro Cuore')}</div>
+                    <div>👤 <strong>Animatori:</strong> ${escapeHtml(g.animatori_nomi || 'In definizione')}</div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          ` : `
+            <div style="background: #f8fafc; border: 1px dashed var(--border-light); padding: 14px; border-radius: var(--radius-sm); font-size: 13px; color: var(--ink-600); text-align: center;">
+              Nessun gruppo assegnato attualmente. Clicca su "+ Iscrivi a Oratorio" per registrare tuo figlio.
+            </div>
+          `}
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Errore oratorio parent view:', err);
+  }
+}
+
+async function openModalNuovoGruppoOratorio(tipoPredefinito = 'estivo') {
+  document.getElementById('nuovoOratorioTipo').value = tipoPredefinito;
+  document.getElementById('nuovoOratorioAnno').value = currentOratorioAnnoFilter || '2026/2027';
+  document.getElementById('nuovoOratorioNome').value = '';
+  document.getElementById('nuovoOratorioOrario').value = '';
+  document.getElementById('nuovoOratorioLuogo').value = '';
+  document.getElementById('nuovoOratorioMaxIscritti').value = '0';
+  document.getElementById('nuovoOratorioStato').value = 'pubblico';
+
+  const sel = document.getElementById('nuovoOratorioAnimatoriSelect');
+  sel.innerHTML = '<option value="">Caricamento persone...</option>';
+
+  try {
+    const res = await fetch('/api/persone');
+    const data = await res.json();
+    const persone = data.persone || [];
+
+    sel.innerHTML = persone.map(p => `
+      <option value="${p.id}">${escapeHtml(p.nominativo)} (${escapeHtml(p.codice_fiscale)})</option>
+    `).join('');
+  } catch (err) {
+    console.error('Errore caricamento persone per animatori:', err);
+  }
+
+  openModal('modalNuovoGruppoOratorio');
+}
+
+async function handleSalvaNuovoGruppoOratorio(e) {
+  e.preventDefault();
+  const animatoriSel = document.getElementById('nuovoOratorioAnimatoriSelect');
+  const animatoriIds = Array.from(animatoriSel.selectedOptions).map(o => parseInt(o.value)).filter(Boolean);
+
+  const payload = {
+    tipo_oratorio: document.getElementById('nuovoOratorioTipo').value,
+    anno_pastorale: document.getElementById('nuovoOratorioAnno').value.trim(),
+    nome: document.getElementById('nuovoOratorioNome').value.trim(),
+    orario_incontri: document.getElementById('nuovoOratorioOrario').value.trim(),
+    luogo: document.getElementById('nuovoOratorioLuogo').value.trim(),
+    max_iscritti: parseInt(document.getElementById('nuovoOratorioMaxIscritti').value) || 0,
+    stato: document.getElementById('nuovoOratorioStato').value,
+    animatori_ids: animatoriIds
+  };
+
+  try {
+    const res = await fetch('/api/oratorio/gruppi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Errore salvataggio gruppo');
+
+    showToast(data.message, 'success');
+    closeModal('modalNuovoGruppoOratorio');
+    await loadOratorio();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function openModalModificaGruppoOratorio(id) {
+  currentEditingOratorioId = id;
+  const g = cacheGruppiOratorio.find(x => x.id === id);
+  if (!g) return;
+
+  document.getElementById('modOratorioId').value = g.id;
+  document.getElementById('modOratorioTipo').value = g.tipo_oratorio || 'estivo';
+  document.getElementById('modOratorioAnno').value = g.anno_pastorale || '2026/2027';
+  document.getElementById('modOratorioNome').value = g.nome || '';
+  document.getElementById('modOratorioOrario').value = g.orario_incontri || '';
+  document.getElementById('modOratorioLuogo').value = g.luogo || '';
+  document.getElementById('modOratorioMaxIscritti').value = g.max_iscritti || 0;
+  document.getElementById('modOratorioStato').value = g.stato || 'pubblico';
+
+  const sel = document.getElementById('modOratorioAnimatoriSelect');
+  sel.innerHTML = '<option value="">Caricamento animatori...</option>';
+
+  try {
+    const res = await fetch('/api/persone');
+    const data = await res.json();
+    const persone = data.persone || [];
+    const animatoriIds = new Set((g.animatori || []).map(a => a.id));
+
+    sel.innerHTML = persone.map(p => `
+      <option value="${p.id}" ${animatoriIds.has(p.id) ? 'selected' : ''}>
+        ${escapeHtml(p.nominativo)} (${escapeHtml(p.codice_fiscale)})
+      </option>
+    `).join('');
+  } catch (err) {
+    console.error('Errore animatori:', err);
+  }
+
+  openModal('modalModificaGruppoOratorio');
+}
+
+async function handleSalvaModificaGruppoOratorio(e) {
+  e.preventDefault();
+  if (!currentEditingOratorioId) return;
+
+  const animatoriSel = document.getElementById('modOratorioAnimatoriSelect');
+  const animatoriIds = Array.from(animatoriSel.selectedOptions).map(o => parseInt(o.value)).filter(Boolean);
+
+  const payload = {
+    tipo_oratorio: document.getElementById('modOratorioTipo').value,
+    anno_pastorale: document.getElementById('modOratorioAnno').value.trim(),
+    nome: document.getElementById('modOratorioNome').value.trim(),
+    orario_incontri: document.getElementById('modOratorioOrario').value.trim(),
+    luogo: document.getElementById('modOratorioLuogo').value.trim(),
+    max_iscritti: parseInt(document.getElementById('modOratorioMaxIscritti').value) || 0,
+    stato: document.getElementById('modOratorioStato').value,
+    animatori_ids: animatoriIds
+  };
+
+  try {
+    const res = await fetch(`/api/oratorio/gruppi/${currentEditingOratorioId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Errore modifica gruppo');
+
+    showToast(data.message, 'success');
+    closeModal('modalModificaGruppoOratorio');
+    await loadOratorio();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function handleEliminaGruppoOratorioCorrente() {
+  if (!currentEditingOratorioId) return;
+  if (!confirm('Sei sicuro di voler eliminare questo gruppo oratorio? I ragazzi torneranno non assegnati.')) return;
+
+  try {
+    const res = await fetch(`/api/oratorio/gruppi/${currentEditingOratorioId}`, {
+      method: 'DELETE'
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Errore eliminazione gruppo');
+
+    showToast(data.message, 'success');
+    closeModal('modalModificaGruppoOratorio');
+    await loadOratorio();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function openModalRegistroPresenzeOratorio(gruppoId) {
+  document.getElementById('registroOratorioGruppoId').value = gruppoId;
+  const g = cacheGruppiOratorio.find(x => x.id === gruppoId);
+  if (!g) return;
+
+  document.getElementById('registroOratorioTitle').textContent = `📋 Registro Presenze: ${g.nome}`;
+  document.getElementById('registroOratorioSubTitle').textContent = `${g.tipo_oratorio === 'estivo' ? '☀️ Oratorio Estivo' : '❄️ Oratorio Invernale'} · Anno ${g.anno_pastorale}`;
+
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('registroOratorioData').value = today;
+
+  await caricaPresenzeOratorioData();
+  openModal('modalRegistroPresenzeOratorio');
+}
+
+async function caricaPresenzeOratorioData() {
+  const gruppoId = document.getElementById('registroOratorioGruppoId').value;
+  const data = document.getElementById('registroOratorioData').value;
+  const tbody = document.getElementById('registroOratorioTableBody');
+  if (!tbody || !gruppoId) return;
+
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px;">Caricamento presenze...</td></tr>';
+
+  try {
+    const res = await fetch(`/api/oratorio/gruppi/${gruppoId}/presenze?data=${data}`);
+    const resData = await res.json();
+    cacheRegistroOratorio = resData;
+
+    const ragazzi = resData.ragazzi || [];
+    if (!ragazzi.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--ink-500);">Nessun ragazzo iscritto a questo gruppo.</td></tr>';
+      return;
+    }
+
+    statoPresenzeCorrentiOratorio = {};
+    tbody.innerHTML = ragazzi.map(r => {
+      statoPresenzeCorrentiOratorio[r.codice_fiscale] = r.presente || false;
+      const noteSanitarie = [r.allergie, r.intolleranze_alimentari].filter(Boolean).join('; ');
+
+      return `
+        <tr>
+          <td style="text-align: center;">
+            <input type="checkbox" class="presenza-oratorio-chk" data-cf="${r.codice_fiscale}" ${r.presente ? 'checked' : ''} onchange="statoPresenzeCorrentiOratorio['${r.codice_fiscale}'] = this.checked">
+          </td>
+          <td>
+            <strong>${escapeHtml(r.nominativo)}</strong><br>
+            <code>${escapeHtml(r.codice_fiscale)}</code>
+          </td>
+          <td>${r.eta !== null ? `${r.eta} anni` : 'N/D'}</td>
+          <td>
+            ${noteSanitarie ? `<span style="color:#b91c1c; font-weight:600; font-size:12px;">⚠️ ${escapeHtml(noteSanitarie)}</span>` : '<span style="color:#15803d; font-size:12px;">✓ Regolare</span>'}
+          </td>
+          <td>
+            <input type="text" class="form-control form-control-sm presenza-oratorio-nota" data-cf="${r.codice_fiscale}" value="${escapeHtml(r.note_presenza || '')}" placeholder="Note..." style="font-size:12px;">
+          </td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--danger); padding:20px;">Errore: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function segnaTuttiPresenzeOratorio(presente) {
+  document.querySelectorAll('.presenza-oratorio-chk').forEach(chk => {
+    chk.checked = presente;
+    const cf = chk.getAttribute('data-cf');
+    if (cf) statoPresenzeCorrentiOratorio[cf] = presente;
+  });
+}
+
+async function handleSalvaPresenzeOratorio(e) {
+  e.preventDefault();
+  const gruppoId = document.getElementById('registroOratorioGruppoId').value;
+  const data = document.getElementById('registroOratorioData').value;
+
+  const presenze = [];
+  document.querySelectorAll('.presenza-oratorio-chk').forEach(chk => {
+    const cf = chk.getAttribute('data-cf');
+    const notaInput = document.querySelector(`.presenza-oratorio-nota[data-cf="${cf}"]`);
+    presenze.push({
+      codice_fiscale: cf,
+      presente: chk.checked,
+      note: notaInput ? notaInput.value.trim() : ''
+    });
+  });
+
+  try {
+    const res = await fetch(`/api/oratorio/gruppi/${gruppoId}/presenze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data, presenze })
+    });
+    const resData = await res.json();
+    if (!res.ok) throw new Error(resData.error || 'Errore salvataggio presenze');
+
+    showToast(resData.message || 'Presenze salvate con successo!', 'success');
+    closeModal('modalRegistroPresenzeOratorio');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function openModalAllergieGruppoOratorio(gruppoId, nomeGruppo) {
+  document.getElementById('allergieGruppoTitle').textContent = `⚠️ Scheda Allergie & Sanitaria: ${nomeGruppo}`;
+  document.getElementById('allergieGruppoSubTitle').textContent = `Report medico per animatori e cucina oratorio`;
+
+  const tbody = document.getElementById('allergieGruppoTableBody');
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px;">Caricamento schede sanitarie...</td></tr>';
+  openModal('modalAllergieGruppoOratorio');
+
+  try {
+    const res = await fetch(`/api/oratorio/gruppi/${gruppoId}/allergie`);
+    const data = await res.json();
+    const segnalazioni = data.segnalazioni || [];
+
+    if (!segnalazioni.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--ink-500);">Nessuna allergia o intolleranza segnalata tra i ragazzi di questo gruppo.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = segnalazioni.map(s => `
+      <tr>
+        <td><strong>${escapeHtml(s.nominativo)}</strong><br><code>${escapeHtml(s.codice_fiscale)}</code></td>
+        <td>${s.eta !== null ? `${s.eta} anni` : '-'}</td>
+        <td>
+          ${escapeHtml(s.nome_famiglia || '-')}<br>
+          <strong>📞 ${escapeHtml(s.telefono || '-')}</strong>
+        </td>
+        <td><strong style="color: #b91c1c;">${escapeHtml(s.allergie || s.intolleranze_alimentari || '-')}</strong></td>
+        <td>${escapeHtml(s.note_mediche || s.farmaci_salvavita || 'Nessuna prescrizione specifica')}</td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" style="color: var(--danger); padding: 20px;">Errore: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+let cacheGruppiIscrizioneFiglioOra = [];
+async function openModalIscriviFiglioOratorio(cf, nominativo) {
+  document.getElementById('iscriviFiglioOraCF').value = cf;
+  document.getElementById('iscriviFiglioOraNominativo').textContent = nominativo;
+
+  const sel = document.getElementById('iscriviFiglioOraGruppoSelect');
+  sel.innerHTML = '<option value="">Caricamento gruppi oratorio...</option>';
+  const preview = document.getElementById('iscriviFiglioOraPreviewInfo');
+  preview.innerHTML = '';
+
+  try {
+    const res = await fetch('/api/oratorio/miei-figli');
+    const data = await res.json();
+    cacheGruppiIscrizioneFiglioOra = data.gruppi_disponibili || [];
+
+    if (!cacheGruppiIscrizioneFiglioOra.length) {
+      sel.innerHTML = '<option value="">Nessun gruppo oratorio aperto alle iscrizioni</option>';
+      return;
+    }
+
+    sel.innerHTML = '<option value="">-- Scegli gruppo / squadra oratorio --</option>' +
+      cacheGruppiIscrizioneFiglioOra.map(g => `
+        <option value="${g.id}">
+          ${g.tipo_oratorio === 'estivo' ? '☀️ Estivo' : '❄️ Invernale'}: ${escapeHtml(g.nome)} (${escapeHtml(g.anno_pastorale)}) · Animatori: ${escapeHtml(g.animatori_nomi || 'In definizione')}
+        </option>
+      `).join('');
+
+    sel.onchange = function() {
+      const gId = parseInt(this.value);
+      const g = cacheGruppiIscrizioneFiglioOra.find(x => x.id === gId);
+      if (g) {
+        preview.innerHTML = `
+          <strong>Stagione:</strong> ${g.tipo_oratorio === 'estivo' ? '☀️ Oratorio Estivo (Estate Ragazzi)' : '❄️ Oratorio Invernale'}<br>
+          <strong>Orario:</strong> ${escapeHtml(g.orario_incontri || 'Sabato pomeriggio')}<br>
+          <strong>Luogo:</strong> ${escapeHtml(g.luogo || 'Oratorio Sacro Cuore')}<br>
+          <strong>Animatori:</strong> ${escapeHtml(g.animatori_nomi || 'In definizione')}
+        `;
+      } else {
+        preview.innerHTML = '';
+      }
+    };
+  } catch (err) {
+    console.error('Errore gruppi oratorio:', err);
+  }
+
+  openModal('modalIscriviFiglioOratorio');
+}
+
+async function handleSalvaIscrizioneFiglioOratorio(e) {
+  e.preventDefault();
+  const cf = document.getElementById('iscriviFiglioOraCF').value;
+  const gruppoId = parseInt(document.getElementById('iscriviFiglioOraGruppoSelect').value);
+
+  if (!gruppoId) {
+    showToast('Seleziona un gruppo dell\'oratorio', 'warning');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/oratorio/iscrivi-figlio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ codice_fiscale: cf, gruppo_id: gruppoId })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Errore iscrizione');
+
+    showToast(data.message, 'success');
+    closeModal('modalIscriviFiglioOratorio');
+    await loadOratorioParentView();
+  } catch (err) {
+    showToast(err.message, 'error');
   }
 }
 
 async function salvaPresenzeOratorio() {
-  const data = document.getElementById('inputDataPresenzeOratorio').value;
+  const data = document.getElementById('inputDataPresenzeOratorio')?.value;
   const checkboxes = document.querySelectorAll('.check-presenza');
   const presenze = [];
 
@@ -3958,18 +4547,18 @@ function renderMembroRow(p, fallbackFamiglia) {
   `;
 }
 
+let currentViewingPersonaId = null;
+
 async function apriSchedaVisualizzazionePersona(cf) {
   try {
-    let p = (cacheAnagraficaPersone || []).find(x => x.codice_fiscale === cf);
-    if (!p) {
-      const res = await fetch(`/api/persone/${cf}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Errore');
-      p = data.persona;
-    }
+    const res = await fetch(`/api/persone/${cf}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Errore nel caricamento della persona');
+    const p = data.persona;
     if (!p) return;
 
     currentViewingPersonaCF = p.codice_fiscale;
+    currentViewingPersonaId = p.id;
 
     document.getElementById('viewSchedaNominativo').textContent = p.nominativo;
     document.getElementById('viewSchedaCF').textContent = p.codice_fiscale;
@@ -4018,10 +4607,15 @@ async function apriSchedaVisualizzazionePersona(cf) {
     }
 
     const listeBox = document.getElementById('viewSchedaListePills');
-    if (p.liste && p.liste.length) {
-      listeBox.innerHTML = p.liste.map(l => `<span class="badge" style="background:${l.colore || 'var(--primary)'}; color:#fff; font-size:11px;">${escapeHtml(l.nome)}</span>`).join('');
+    const badges = p.badges || p.liste || [];
+    if (badges.length) {
+      listeBox.innerHTML = badges.map(l => `
+        <span class="badge" style="background:${l.colore || '#8B1E1E'}; color:#fff; font-size:12px; padding:4px 8px; display:inline-flex; align-items:center; gap:4px;" title="${escapeHtml(l.descrizione || '')}">
+          <span>${l.icona || '🏅'}</span> <strong>${escapeHtml(l.nome)}</strong>
+        </span>
+      `).join('');
     } else {
-      listeBox.innerHTML = '<span style="color:var(--ink-500); font-size:12px;">Nessuna lista assegnata</span>';
+      listeBox.innerHTML = '<span style="color:var(--ink-500); font-size:12px;">Nessun badge assegnato</span>';
     }
 
     const noteEl = document.getElementById('viewSchedaNoteGenerali');
@@ -6659,9 +7253,9 @@ async function openModalIscrizioneCatechismo(defaultCF = null) {
   }
 }
 
-// ================= ASSEGNAZIONE DI MASSA (CATECHISMO & DOPOSCUOLA) =================
+// ================= ASSEGNAZIONE DI MASSA (CATECHISMO, DOPOSCUOLA, ORATORIO) =================
 let cacheMassaPersone = [];
-let currentMassaTipo = 'catechismo'; // 'catechismo' | 'doposcuola'
+let currentMassaTipo = 'catechismo'; // 'catechismo' | 'doposcuola' | 'oratorio_estivo' | 'oratorio_invernale'
 let currentMassaFiltroEta = ''; // '' | 'primaria' | 'medie' | 'superiori'
 let cacheAssegnatiMassaMap = new Set();
 let cacheGruppoMassaMap = new Map();
@@ -6674,9 +7268,15 @@ async function openModalAssegnaPersoneMassa(tipo = 'catechismo') {
 
   const titleEl = document.getElementById('massaModalTitle');
   if (titleEl) {
-    titleEl.innerHTML = tipo === 'catechismo' 
-      ? '<i>👥</i> Assegnazione di Massa Ragazzi a Gruppo Catechismo' 
-      : '<i>👥</i> Assegnazione di Massa Studenti a Gruppo Doposcuola';
+    if (tipo === 'catechismo') {
+      titleEl.innerHTML = '<i>👥</i> Assegnazione di Massa Ragazzi a Gruppo Catechismo';
+    } else if (tipo === 'doposcuola') {
+      titleEl.innerHTML = '<i>👥</i> Assegnazione di Massa Studenti a Gruppo Doposcuola';
+    } else if (tipo === 'oratorio_estivo') {
+      titleEl.innerHTML = '<i>☀️</i> Assegnazione di Massa Ragazzi a Oratorio Estivo';
+    } else {
+      titleEl.innerHTML = '<i>❄️</i> Assegnazione di Massa Ragazzi a Oratorio Invernale';
+    }
   }
 
   // Mostra subito il modal con indicatore di caricamento per risposta immediata al click
@@ -6709,7 +7309,10 @@ async function openModalAssegnaPersoneMassa(tipo = 'catechismo') {
   cacheGruppoMassaMap = new Map();
 
   try {
-    const gruppiUrl = tipo === 'catechismo' ? '/api/catechismo/gruppi' : '/api/doposcuola/gruppi';
+    let gruppiUrl = '/api/catechismo/gruppi';
+    if (tipo === 'doposcuola') gruppiUrl = '/api/doposcuola/gruppi';
+    else if (tipo.startsWith('oratorio')) gruppiUrl = '/api/oratorio/gruppi';
+
     const [resG, resP] = await Promise.all([
       fetch(gruppiUrl),
       fetch('/api/persone')
@@ -6735,7 +7338,7 @@ async function openModalAssegnaPersoneMassa(tipo = 'catechismo') {
           });
         });
       }
-    } else {
+    } else if (tipo === 'doposcuola') {
       cacheGruppiDoposcuola = dataG.gruppi || [];
       if (selectGruppo) {
         cacheGruppiDoposcuola.forEach(g => {
@@ -6743,6 +7346,18 @@ async function openModalAssegnaPersoneMassa(tipo = 'catechismo') {
           (g.studenti || []).forEach(s => {
             cacheAssegnatiMassaMap.add(s.codice_fiscale);
             cacheGruppoMassaMap.set(s.codice_fiscale, g.nome);
+          });
+        });
+      }
+    } else {
+      const targetSeason = tipo === 'oratorio_estivo' ? 'estivo' : 'invernale';
+      const gruppiOratorio = (dataG.gruppi || []).filter(g => (g.tipo_oratorio || 'estivo') === targetSeason);
+      if (selectGruppo) {
+        gruppiOratorio.forEach(g => {
+          selectGruppo.innerHTML += `<option value="${g.id}">${targetSeason === 'estivo' ? '☀️' : '❄️'} ${escapeHtml(g.nome)} (${escapeHtml(g.anno_pastorale || '2026/2027')}) - Animatori: ${escapeHtml(g.animatori_nomi || 'In definizione')}</option>`;
+          (g.ragazzi || []).forEach(r => {
+            cacheAssegnatiMassaMap.add(r.codice_fiscale);
+            cacheGruppoMassaMap.set(r.codice_fiscale, g.nome);
           });
         });
       }
@@ -6827,7 +7442,7 @@ function filtraPersoneMassa() {
         <td>${escapeHtml(p.nome_famiglia || '-')}</td>
         <td>
           ${gruppoAttuale 
-            ? `<span class="badge badge-info" style="font-size: 11px;">📖 ${escapeHtml(gruppoAttuale)}</span>` 
+            ? `<span class="badge badge-info" style="font-size: 11px;">${escapeHtml(gruppoAttuale)}</span>` 
             : '<span style="color:var(--ink-500); font-size:12px;">Non assegnato</span>'}
         </td>
       </tr>
@@ -6868,9 +7483,12 @@ async function handleSalvaAssegnazioneMassa(e) {
   }
 
   const tipo = document.getElementById('massaTipoGruppo').value;
-  const url = tipo === 'catechismo'
-    ? `/api/catechismo/gruppi/${destId}/ragazzi/batch`
-    : `/api/doposcuola/gruppi/${destId}/studenti/batch`;
+  let url = `/api/catechismo/gruppi/${destId}/ragazzi/batch`;
+  if (tipo === 'doposcuola') {
+    url = `/api/doposcuola/gruppi/${destId}/studenti/batch`;
+  } else if (tipo.startsWith('oratorio')) {
+    url = `/api/oratorio/gruppi/${destId}/ragazzi/batch`;
+  }
 
   try {
     const res = await fetch(url, {
@@ -6886,8 +7504,10 @@ async function handleSalvaAssegnazioneMassa(e) {
 
     if (tipo === 'catechismo') {
       await loadCatechismo();
-    } else {
+    } else if (tipo === 'doposcuola') {
       await loadDoposcuola();
+    } else {
+      await loadOratorio();
     }
   } catch (err) {
     showToast(err.message, 'error');
@@ -7044,5 +7664,264 @@ async function handleSalvaIscrizioneFiglioDoposcuola(e) {
     showToast(err.message, 'error');
   }
 }
+
+// ================= GESTIONE BADGE & LISTE (INDIVIDUALE E DI MASSA) =================
+let currentGestisciBadgePersonaId = null;
+
+async function openModalGestisciBadgePersona(personaId) {
+  currentGestisciBadgePersonaId = personaId;
+  document.getElementById('gestisciBadgePersonaId').value = personaId;
+
+  const container = document.getElementById('gestisciBadgeCheckboxList');
+  container.innerHTML = '<div style="padding:16px; text-align:center;">Caricamento badge...</div>';
+  openModal('modalGestisciBadgePersona');
+
+  try {
+    const [listeRes, persRes] = await Promise.all([
+      fetch('/api/liste'),
+      fetch(`/api/persone/${personaId}`)
+    ]);
+
+    const listeData = await listeRes.json();
+    const persData = await persRes.json();
+
+    const liste = listeData.liste || [];
+    const persona = persData.persona || {};
+
+    const nameEl = document.getElementById('gestisciBadgePersonaNome');
+    if (nameEl) nameEl.textContent = `Persona: ${persona.nominativo || ''} (${persona.codice_fiscale || ''})`;
+
+    const assignedIds = new Set((persona.badges || persona.liste || []).map(l => l.id));
+
+    if (!liste.length) {
+      container.innerHTML = '<div style="color:var(--ink-500); padding:10px;">Nessun badge o lista parrocchiale configurata. Creane uno nella sezione Segreteria > Liste.</div>';
+      return;
+    }
+
+    container.innerHTML = liste.map(l => `
+      <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; padding:6px; border-radius:4px; background:#f8fafc; border:1px solid var(--border-light);">
+        <input type="checkbox" class="badge-persona-chk" value="${l.id}" ${assignedIds.has(l.id) ? 'checked' : ''}>
+        <span style="font-size:16px;">${l.icona || '🏅'}</span>
+        <div style="flex:1;">
+          <strong style="color:${l.colore || 'var(--ink-900)'};">${escapeHtml(l.nome)}</strong>
+          ${l.descrizione ? `<small style="display:block; color:var(--ink-500); font-size:11px;">${escapeHtml(l.descrizione)}</small>` : ''}
+        </div>
+      </label>
+    `).join('');
+  } catch (err) {
+    container.innerHTML = `<div style="color:var(--danger); padding:10px;">Errore: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+async function handleSalvaBadgePersona(e) {
+  e.preventDefault();
+  const personaId = currentGestisciBadgePersonaId;
+  if (!personaId) return;
+
+  const chks = document.querySelectorAll('.badge-persona-chk');
+  
+  try {
+    // Sincronizza lo stato delle liste per questa persona
+    for (const chk of chks) {
+      const listaId = chk.value;
+      const isChecked = chk.checked;
+      
+      if (isChecked) {
+        await fetch(`/api/liste/${listaId}/membri`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ persona_id: personaId })
+        });
+      } else {
+        await fetch(`/api/liste/${listaId}/membri/${personaId}`, {
+          method: 'DELETE'
+        });
+      }
+    }
+
+    showToast('Badge aggiornati con successo!', 'success');
+    closeModal('modalGestisciBadgePersona');
+    
+    // Ricarica la scheda persona se aperta
+    if (currentViewingPersonaCF) {
+      await apriSchedaVisualizzazionePersona(currentViewingPersonaCF);
+    }
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function openModalAssegnaBadgeMassa() {
+  const selectedCfs = Array.from(selectedPersoneAnagrafica || []);
+  if (!selectedCfs.length) {
+    showToast('Seleziona prima almeno una persona dall\'anagrafica', 'warning');
+    return;
+  }
+
+  document.getElementById('massaBadgeCountLabel').textContent = `${selectedCfs.length} ${selectedCfs.length === 1 ? 'persona selezionata' : 'persone selezionate'}`;
+
+  const sel = document.getElementById('selectMassaBadgeDestinazione');
+  sel.innerHTML = '<option value="">Caricamento badge e liste...</option>';
+  openModal('modalAssegnaBadgeMassa');
+
+  try {
+    const res = await fetch('/api/liste');
+    const data = await res.json();
+    const liste = data.liste || [];
+
+    if (!liste.length) {
+      sel.innerHTML = '<option value="">Nessun badge configurato</option>';
+      return;
+    }
+
+    sel.innerHTML = '<option value="">-- Seleziona Badge / Lista --</option>' +
+      liste.map(l => `
+        <option value="${l.id}">${l.icona || '🏅'} ${escapeHtml(l.nome)} (${l.num_membri || 0} assegnati)</option>
+      `).join('');
+  } catch (err) {
+    console.error('Errore badge:', err);
+  }
+}
+
+async function handleSalvaAssegnaBadgeMassa(e) {
+  e.preventDefault();
+  const listaId = document.getElementById('selectMassaBadgeDestinazione').value;
+  if (!listaId) {
+    showToast('Seleziona il badge di destinazione', 'warning');
+    return;
+  }
+
+  const selectedCfs = Array.from(selectedPersoneAnagrafica || []);
+  if (!selectedCfs.length) {
+    showToast('Nessuna persona selezionata', 'warning');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/liste/assegna-massa', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lista_id: parseInt(listaId),
+        codici_fiscali: selectedCfs
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Errore assegnazione badge');
+
+    showToast(data.message || 'Badge assegnato con successo!', 'success');
+    closeModal('modalAssegnaBadgeMassa');
+    deselezionaTuttePersone();
+    await loadSegreteria();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function openModalGeneraBadgeAutomatica() {
+  const optgroup = document.getElementById('optgroupBadgeAttivita');
+  if (optgroup) {
+    optgroup.innerHTML = '<option value="">Caricamento attività...</option>';
+  }
+
+  openModal('modalGeneraBadgeAutomatica');
+
+  try {
+    const res = await fetch('/api/attivita');
+    const data = await res.json();
+    const atts = data.attivita || [];
+
+    if (optgroup) {
+      if (!atts.length) {
+        optgroup.innerHTML = '<option disabled>Nessuna attività registrata</option>';
+      } else {
+        optgroup.innerHTML = atts.map(a => `
+          <option value="attivita_${a.id}">🎯 ${escapeHtml(a.titolo)} (${escapeHtml(a.categoria)})</option>
+        `).join('');
+      }
+    }
+
+    aggiornaAnteprimaNomeBadge();
+  } catch (err) {
+    console.error('Errore caricamento attività per badge:', err);
+  }
+}
+
+function aggiornaAnteprimaNomeBadge() {
+  const sel = document.getElementById('selectFonteBadgeAutomatica');
+  const nomeInput = document.getElementById('inputNomeBadgeGenerato');
+  const descInput = document.getElementById('inputDescBadgeGenerato');
+  const iconaInput = document.getElementById('inputIconaBadgeGenerato');
+  if (!sel || !nomeInput) return;
+
+  const val = sel.value;
+  if (val === 'oratorio_estivo') {
+    nomeInput.value = 'Iscritti Oratorio Estivo 2026/2027';
+    descInput.value = 'Partecipanti all\'Estate Ragazzi e Oratorio Estivo Sacro Cuore';
+    iconaInput.value = '☀️';
+  } else if (val === 'oratorio_invernale') {
+    nomeInput.value = 'Iscritti Oratorio Invernale 2026/2027';
+    descInput.value = 'Partecipanti alle attività del sabato e domenicali dell\'Oratorio Invernale';
+    iconaInput.value = '❄️';
+  } else if (val === 'catechismo') {
+    nomeInput.value = 'Iscritti Catechismo 2026/2027';
+    descInput.value = 'Bambini e ragazzi iscritti ai cammini di catechismo parrocchiale';
+    iconaInput.value = '📖';
+  } else if (val === 'doposcuola') {
+    nomeInput.value = 'Iscritti Doposcuola 2026/2027';
+    descInput.value = 'Studenti iscritti alle attività di studio pomeridiano e doposcuola';
+    iconaInput.value = '📚';
+  } else if (val.startsWith('attivita_')) {
+    const text = sel.selectedOptions[0]?.text || 'Attività';
+    nomeInput.value = `Partecipanti ${text.replace('🎯', '').trim()}`;
+    descInput.value = `Badge guadagnato per la partecipazione all'attività ${text.replace('🎯', '').trim()}`;
+    iconaInput.value = '🏅';
+  }
+}
+
+async function handleSalvaGeneraBadgeAutomatica(e) {
+  e.preventDefault();
+  const fonte = document.getElementById('selectFonteBadgeAutomatica').value;
+  const nome = document.getElementById('inputNomeBadgeGenerato').value.trim();
+  const icona = document.getElementById('inputIconaBadgeGenerato').value;
+  const colore = document.getElementById('inputColoreBadgeGenerato').value;
+  const descrizione = document.getElementById('inputDescBadgeGenerato').value.trim();
+
+  let fonte_tipo = 'oratorio_estivo';
+  let attivita_id = null;
+
+  if (fonte.startsWith('attivita_')) {
+    fonte_tipo = 'attivita';
+    attivita_id = parseInt(fonte.replace('attivita_', ''));
+  } else {
+    fonte_tipo = fonte;
+  }
+
+  const payload = {
+    nome,
+    icona,
+    colore,
+    descrizione,
+    fonte_tipo,
+    attivita_id
+  };
+
+  try {
+    const res = await fetch('/api/liste/genera-automatica', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Errore generazione badge');
+
+    showToast(data.message || 'Badge generato con successo!', 'success');
+    closeModal('modalGeneraBadgeAutomatica');
+    await loadSegreteria();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
 
 

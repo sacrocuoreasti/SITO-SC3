@@ -321,11 +321,14 @@ Domenica: dopo le Sante Messe</p>
       </nav>
 
       <div class="sidebar-footer">
-        <div style="margin-bottom: 10px;">
-          <a href="#" onclick="goToPublicHome()" style="color: var(--primary); text-decoration: none; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+        <div style="margin-bottom: 8px;">
+          <a href="#" onclick="goToPublicHome()" style="color: var(--primary); text-decoration: none; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; font-size: 13px;">
             🌐 Vai alla Homepage Pubblica
           </a>
         </div>
+        <button type="button" class="btn btn-sm btn-outline-danger" onclick="handleLogout()" style="width: 100%; margin-bottom: 10px; font-weight: 600;">
+          🚪 Esci dall'account
+        </button>
         <div class="parish-address">
           <strong>Parrocchia Sacro Cuore</strong>
           <span>Via Pier Santi Mattarella 2, Asti</span>
@@ -527,79 +530,94 @@ Domenica: dopo le Sante Messe</p>
           <div class="activities-grid" id="activitiesCatalogGrid"></div>
         </section>
 
-        <!-- ================= VIEW 4: ORATORIO & ALLERGIE ================= -->
+        <!-- ================= VIEW 4: ORATORIO (ESTIVO & INVERNALE) ================= -->
         <section id="viewOratorio" class="view-panel" style="display: none;">
           <div class="page-header">
             <div class="page-header-title">
-              <h1>Oratorio & Quadro Allergie</h1>
-              <p>Strumento dedicato agli animatori e al personale di cucina per la tutela sanitaria e la gestione delle presenze.</p>
+              <h1 id="oratorioPageTitle">Oratorio Parrocchiale (Estivo & Invernale)</h1>
+              <p id="oratorioPageDesc">Gestione gruppi Estate Ragazzi, Oratorio Invernale pomeridiano, animatori, registro presenze elettronico e quadro sanitario.</p>
             </div>
-            <div class="header-actions">
-              <button class="btn btn-secondary" onclick="exportExcelOratorio()"><i>📥</i> Esporta Elenco Oratorio</button>
+            <div class="header-actions" id="oratorioStaffHeaderActions" style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <button type="button" class="btn btn-secondary" id="btnMassaOratorio" onclick="openModalAssegnaPersoneMassa('oratorio_estivo')">👥 Assegna Persone di Massa</button>
+              <button class="btn btn-primary" onclick="openModalNuovoGruppoOratorio()"><i>+</i> Crea Nuovo Gruppo Oratorio</button>
             </div>
           </div>
 
-          <!-- Alert box sicurezza sanitaria -->
-          <div style="background: #fff8f8; border: 1px solid #fecaca; border-radius: var(--radius-lg); padding: 18px 24px; margin-bottom: 24px;">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-              <span style="font-size: 20px;">⚠️</span>
-              <h3 style="font-size: 16px; color: #991b1b; font-weight: 700;">Quadro Medico-Sanitario & Esigenze Alimentari per la Cucina</h3>
+          <!-- SEZIONE STAFF / ANIMATORI / SEGRETERIA -->
+          <div id="oratorioStaffSection">
+            <!-- Navigazione Sotto-Sezioni Oratorio: Estivo vs Invernale vs Allergie -->
+            <div style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border-light); padding-bottom: 12px; flex-wrap: wrap;">
+              <button type="button" class="btn btn-sm btn-primary tab-ora-btn active" id="tabOraEstivoBtn" onclick="switchOratorioTab('estivo')">☀️ Oratorio Estivo (Estate Ragazzi)</button>
+              <button type="button" class="btn btn-sm btn-secondary tab-ora-btn" id="tabOraInvernaleBtn" onclick="switchOratorioTab('invernale')">❄️ Oratorio Invernale & Sabato</button>
+              <button type="button" class="btn btn-sm btn-secondary tab-ora-btn" id="tabOraAllergieBtn" onclick="switchOratorioTab('allergie')">⚠️ Quadro Sanitario & Cucina</button>
             </div>
-            <p style="font-size: 13px; color: #7f1d1d; line-height: 1.5;">
-              I dati sotto riportati provengono direttamente dai moduli compilati dai genitori con indicazione specifica di celiachia, allergie alimentari, farmaci e numeri di emergenza.
-            </p>
-            <div style="display: flex; gap: 12px; margin-top: 14px; flex-wrap: wrap;" id="allergiesKpiRow"></div>
-          </div>
 
-          <!-- Tabella Allergie e Intolleranze -->
-          <div class="card">
-            <div class="card-header">
-              <h3><i>🍽</i> Elenco Partecipanti con Note Sanitarie o Diete Speciali</h3>
+            <!-- Tab Gruppi (Estivo / Invernale) -->
+            <div id="tabContentOraGruppi">
+              <!-- Archivio per Anni Pastorali & Ricerca Gruppi -->
+              <div class="card" style="margin-bottom: 20px; padding: 14px 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap;">
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <span style="font-size: 13px; font-weight: 700; color: var(--ink-800);">📁 Anno Pastorale:</span>
+                    <button type="button" class="btn btn-sm btn-secondary ora-anno-btn" onclick="selezionaAnnoOratorio('')">Tutti</button>
+                    <button type="button" class="btn btn-sm btn-secondary ora-anno-btn" onclick="selezionaAnnoOratorio('2025/2026')">2025/2026</button>
+                    <button type="button" class="btn btn-sm btn-primary ora-anno-btn active" onclick="selezionaAnnoOratorio('2026/2027')">2026/2027</button>
+                    <button type="button" class="btn btn-sm btn-secondary ora-anno-btn" onclick="selezionaAnnoOratorio('2027/2028')">2027/2028</button>
+                    <button type="button" class="btn btn-sm btn-secondary ora-anno-btn" onclick="selezionaAnnoOratorio('2024/2025')">2024/2025</button>
+                  </div>
+                  <div style="flex: 1; max-width: 320px;">
+                    <input type="text" id="searchOratorioGruppi" class="form-control" placeholder="🔍 Cerca squadra, animatore, aula..." oninput="filtraGruppiOratorio()">
+                  </div>
+                </div>
+              </div>
+
+              <div class="catechismo-grid" id="oratorioGruppiGrid"></div>
             </div>
-            <div class="card-body">
-              <div class="table-responsive">
-                <table class="custom-table" id="tableAllergieOratorio">
-                  <thead>
-                    <tr>
-                      <th>Nominativo</th>
-                      <th>Età / CF</th>
-                      <th>Attività / Squadra</th>
-                      <th>Intolleranze Alimentari</th>
-                      <th>Allergie & Farmaci</th>
-                      <th>Telefono Genitore Emergenza</th>
-                    </tr>
-                  </thead>
-                  <tbody></tbody>
-                </table>
+
+            <!-- Tab 3: Quadro Sanitario & Allergie Cucina -->
+            <div id="tabContentOraAllergie" style="display: none;">
+              <div style="background: #fff8f8; border: 1px solid #fecaca; border-radius: var(--radius-lg); padding: 18px 24px; margin-bottom: 24px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; flex-wrap: wrap;">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 20px;">⚠️</span>
+                    <h3 style="font-size: 16px; color: #991b1b; font-weight: 700;">Quadro Medico-Sanitario & Esigenze Alimentari per la Cucina</h3>
+                  </div>
+                  <button class="btn btn-sm btn-secondary" onclick="exportExcelOratorio()"><i>📥</i> Esporta Scheda Sanitaria</button>
+                </div>
+                <p style="font-size: 13px; color: #7f1d1d; line-height: 1.5;">
+                  I dati sotto riportati provengono direttamente dai moduli compilati dai genitori con indicazione specifica di celiachia, allergie alimentari, farmaci e numeri di emergenza.
+                </p>
+                <div style="display: flex; gap: 12px; margin-top: 14px; flex-wrap: wrap;" id="allergiesKpiRow"></div>
+              </div>
+
+              <div class="card">
+                <div class="card-header">
+                  <h3><i>🍽</i> Elenco Partecipanti con Note Sanitarie o Diete Speciali</h3>
+                </div>
+                <div class="card-body">
+                  <div class="table-responsive">
+                    <table class="custom-table" id="tableAllergieOratorio">
+                      <thead>
+                        <tr>
+                          <th>Nominativo</th>
+                          <th>Età / CF</th>
+                          <th>Attività / Squadra</th>
+                          <th>Intolleranze Alimentari</th>
+                          <th>Allergie & Farmaci</th>
+                          <th>Telefono Genitore Emergenza</th>
+                        </tr>
+                      </thead>
+                      <tbody></tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Registro Presenze Rapido Oratorio -->
-          <div class="card" style="margin-top: 24px;">
-            <div class="card-header">
-              <h3><i>📋</i> Registro Presenze Giornaliero Oratorio / Estate Ragazzi</h3>
-              <div style="display: flex; gap: 10px; align-items: center;">
-                <input type="date" id="inputDataPresenzeOratorio" class="form-control" style="padding: 6px 10px; font-size: 12px;">
-                <button class="btn btn-sm btn-primary" onclick="salvaPresenzeOratorio()">Salva Appello</button>
-              </div>
-            </div>
-            <div class="card-body">
-              <div class="table-responsive">
-                <table class="custom-table" id="tablePresenzeOratorio">
-                  <thead>
-                    <tr>
-                      <th>Appello</th>
-                      <th>Partecipante</th>
-                      <th>Squadra</th>
-                      <th>Note / Allergie</th>
-                      <th>Contatto Emergenza</th>
-                    </tr>
-                  </thead>
-                  <tbody></tbody>
-                </table>
-              </div>
-            </div>
+          <!-- SEZIONE GENITORE / UTENTE (VEDE SOLO I PROPRI FIGLI) -->
+          <div id="oratorioParentSection" style="display: none;">
+            <div id="oratorioParentContainer" style="display: flex; flex-direction: column; gap: 20px;"></div>
           </div>
         </section>
 
@@ -803,14 +821,15 @@ Domenica: dopo le Sante Messe</p>
 
           <!-- Tab 2: Liste Parrocchiali (Requirement 3: Multi-list membership) -->
           <div id="tabContentSegListe" style="display: none;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
               <div>
-                <h3 style="font-size: 18px; font-weight: 700;">Liste Parrocchiali Personalizzate</h3>
-                <p style="font-size: 13px; color: var(--ink-500);">Un fedele può essere inserito in più liste contemporaneamente (es. Animatori, Volontari, Squadre, Liste attività).</p>
+                <h3 style="font-size: 18px; font-weight: 700;">Liste Parrocchiali & Badge fedeli</h3>
+                <p style="font-size: 13px; color: var(--ink-500);">I badge e le liste compaiono nel profilo dei fedeli (es. Animatori, Volontari, Iscritti Oratorio/Catechismo, Squadre).</p>
               </div>
-              <div style="display: flex; gap: 10px;">
-                <button class="btn btn-sm btn-secondary" onclick="openModalGeneraListaAttivita()"><i>⚡</i> Genera Lista da Attività</button>
-                <button class="btn btn-sm btn-primary" onclick="openModalNuovaLista()"><i>+</i> Nuova Lista</button>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button class="btn btn-sm btn-secondary" onclick="openModalGeneraBadgeAutomatica()"><i>⚡</i> Genera Badge Automatici</button>
+                <button class="btn btn-sm btn-secondary" onclick="openModalAssegnaBadgeMassa()"><i>🏅</i> Assegna Badge</button>
+                <button class="btn btn-sm btn-primary" onclick="openModalNuovaLista()"><i>+</i> Nuovo Badge / Lista</button>
               </div>
             </div>
 
@@ -2018,57 +2037,93 @@ Domenica: dopo le Sante Messe</p>
     </div>
   </div>
 
-  <!-- Modal Nuova Lista Parrocchiale -->
+  <!-- Modal Nuova Lista / Badge Parrocchiale -->
   <div class="modal-overlay" id="modalNuovaLista">
     <div class="modal-window" style="max-width: 520px;">
       <div class="modal-header">
-        <h3>Nuova Lista Parrocchiale</h3>
+        <h3>🏅 Nuovo Badge / Lista Parrocchiale</h3>
         <button class="btn-close-modal" onclick="closeModal('modalNuovaLista')">×</button>
       </div>
       <form onsubmit="handleSalvaNuovaLista(event)">
         <div class="modal-body">
           <div class="form-group">
-            <label>Nome Lista *</label>
+            <label>Nome Badge / Lista *</label>
             <input type="text" id="listaNome" class="form-control" placeholder="es. Animatori Estate Ragazzi, Volontari Cucina, etc." required>
           </div>
-          <div class="form-group">
-            <label>Descrizione</label>
-            <textarea id="listaDescrizione" class="form-control" rows="2" placeholder="Scopo della lista..."></textarea>
+          <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label>Icona Badge</label>
+              <select id="listaIcona" class="form-control">
+                <option value="🏅">🏅 Medaglia d'Oro</option>
+                <option value="🌟">🌟 Stella d'Argento</option>
+                <option value="☀️">☀️ Sole Oratorio Estivo</option>
+                <option value="❄️">❄️ Fiocco Invernale</option>
+                <option value="📖">📖 Vangelo Catechismo</option>
+                <option value="📚">📚 Libri Doposcuola</option>
+                <option value="🏓">🏓 Ping Pong / Sport</option>
+                <option value="⚽">⚽ Calcio Oratorio</option>
+                <option value="✝️">✝️ Croce Parrocchiale</option>
+                <option value="👥">👥 Gruppo Fedeli</option>
+                <option value="🎯">🎯 Obiettivo / Evento</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Colore Distintivo</label>
+              <input type="color" id="listaColore" class="form-control" value="#8B1E1E" style="height: 38px; padding: 2px;">
+            </div>
           </div>
           <div class="form-group">
-            <label>Colore Distintivo</label>
-            <input type="color" id="listaColore" class="form-control" value="#8B1E1E" style="height: 40px; padding: 2px;">
+            <label>Descrizione / Significato</label>
+            <textarea id="listaDescrizione" class="form-control" rows="2" placeholder="Scopo della lista o requisiti del badge..."></textarea>
           </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal('modalNuovaLista')">Annulla</button>
-          <button type="submit" class="btn btn-primary">Crea Lista</button>
+          <button type="submit" class="btn btn-primary">Crea Badge / Lista</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Modal Modifica Lista Parrocchiale -->
+  <!-- Modal Modifica Lista / Badge Parrocchiale -->
   <div class="modal-overlay" id="modalModificaLista">
     <div class="modal-window" style="max-width: 520px;">
       <div class="modal-header">
-        <h3><i>✏️</i> Modifica Lista Parrocchiale</h3>
+        <h3><i>✏️</i> Modifica Badge / Lista</h3>
         <button class="btn-close-modal" onclick="closeModal('modalModificaLista')">×</button>
       </div>
       <form onsubmit="handleSalvaModificaLista(event)">
         <input type="hidden" id="modListaId">
         <div class="modal-body">
           <div class="form-group">
-            <label>Nome Lista *</label>
+            <label>Nome Badge / Lista *</label>
             <input type="text" id="modListaNome" class="form-control" required>
           </div>
-          <div class="form-group">
-            <label>Descrizione</label>
-            <textarea id="modListaDescrizione" class="form-control" rows="2"></textarea>
+          <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label>Icona Badge</label>
+              <select id="modListaIcona" class="form-control">
+                <option value="🏅">🏅 Medaglia d'Oro</option>
+                <option value="🌟">🌟 Stella d'Argento</option>
+                <option value="☀️">☀️ Sole Oratorio Estivo</option>
+                <option value="❄️">❄️ Fiocco Invernale</option>
+                <option value="📖">📖 Vangelo Catechismo</option>
+                <option value="📚">📚 Libri Doposcuola</option>
+                <option value="🏓">🏓 Ping Pong / Sport</option>
+                <option value="⚽">⚽ Calcio Oratorio</option>
+                <option value="✝️">✝️ Croce Parrocchiale</option>
+                <option value="👥">👥 Gruppo Fedeli</option>
+                <option value="🎯">🎯 Obiettivo / Evento</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Colore Distintivo</label>
+              <input type="color" id="modListaColore" class="form-control" value="#8B1E1E" style="height: 38px; padding: 2px;">
+            </div>
           </div>
           <div class="form-group">
-            <label>Colore Distintivo</label>
-            <input type="color" id="modListaColore" class="form-control" value="#8B1E1E" style="height: 40px; padding: 2px;">
+            <label>Descrizione / Significato</label>
+            <textarea id="modListaDescrizione" class="form-control" rows="2"></textarea>
           </div>
         </div>
         <div class="modal-footer">
@@ -3443,11 +3498,14 @@ Domenica: dopo le Sante Messe</p>
 
           <!-- Card 4: Sacramenti & Liste -->
           <div class="dossier-card">
-            <h4>⛪ Sacramenti & Liste Parrocchiali</h4>
+            <h4>⛪ Sacramenti & Badge Parrocchiali</h4>
             <div class="dossier-row"><span class="dossier-label">Certificato Battesimo:</span><span class="dossier-val" id="viewSchedaBattesimo">-</span></div>
             <div style="margin-top: 10px;">
-              <span class="dossier-label" style="display: block; margin-bottom: 6px;">Liste & Gruppi Assegnati:</span>
-              <div id="viewSchedaListePills" style="display: flex; gap: 4px; flex-wrap: wrap;"></div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span class="dossier-label">Badge & Liste Assegnate:</span>
+                <button type="button" class="btn btn-xs btn-outline-primary" onclick="openModalGestisciBadgePersona(currentViewingPersonaId)" style="font-size: 11px; padding: 2px 8px;">🏅 Gestisci Badge</button>
+              </div>
+              <div id="viewSchedaListePills" style="display: flex; gap: 6px; flex-wrap: wrap;"></div>
             </div>
           </div>
         </div>
@@ -3477,9 +3535,37 @@ Domenica: dopo le Sante Messe</p>
         </div>
       </div>
     </div>
-  <!-- Modal Assegnazione di Massa (Catechismo & Doposcuola) -->
+  </div>
+
+  <!-- Modal Gestisci Badge Persona Singola -->
+  <div class="modal-overlay" id="modalGestisciBadgePersona">
+    <div class="modal-window" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3>🏅 Assegna Badge & Liste alla Persona</h3>
+        <button class="btn-close-modal" onclick="closeModal('modalGestisciBadgePersona')">×</button>
+      </div>
+      <form onsubmit="handleSalvaBadgePersona(event)">
+        <input type="hidden" id="gestisciBadgePersonaId">
+        <div class="modal-body">
+          <p id="gestisciBadgePersonaNome" style="font-weight: 700; color: var(--primary); margin-bottom: 12px;"></p>
+          <div style="font-size: 13px; color: var(--ink-600); margin-bottom: 12px;">
+            Seleziona i badge o le liste da associare a questa persona. Compariranno nel suo dossier e nel profilo famiglia:
+          </div>
+          <div id="gestisciBadgeCheckboxList" style="max-height: 260px; overflow-y: auto; border: 1px solid var(--border-light); border-radius: var(--radius-sm); padding: 10px; display: flex; flex-direction: column; gap: 8px;">
+            <!-- Generato dinamicamente -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modalGestisciBadgePersona')">Annulla</button>
+          <button type="submit" class="btn btn-primary">Salva Badge Assegnati</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Assegnazione di Massa Persone a Gruppo -->
   <div class="modal-overlay" id="modalAssegnazioneMassa">
-    <div class="modal-window" style="max-width: 820px; width: 95%;">
+    <div class="modal-window" style="max-width: 860px; width: 95%;">
       <div class="modal-header">
         <h3 id="massaModalTitle"><i>👥</i> Assegnazione di Massa Persone a Gruppo</h3>
         <button class="btn-close-modal" onclick="closeModal('modalAssegnazioneMassa')">×</button>
@@ -3513,7 +3599,7 @@ Domenica: dopo le Sante Messe</p>
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 12.5px; color: var(--ink-700);">
             <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 600;">
               <input type="checkbox" id="massaSoloNonAssegnati" onchange="filtraPersoneMassa()">
-              Mostra solo persone NON ancora assegnate a questo tipo di attività
+              Mostra solo persone NON ancora assegnate a questo gruppo
             </label>
             <span id="massaSelezionatiCounter" style="font-weight: 700; color: var(--primary);">0 selezionati</span>
           </div>
@@ -3542,6 +3628,355 @@ Domenica: dopo le Sante Messe</p>
         <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
           <button type="button" class="btn btn-secondary" onclick="closeModal('modalAssegnazioneMassa')">Annulla</button>
           <button type="submit" class="btn btn-primary" id="massaSubmitBtn">Assegna Persone Selezionate</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Assegna Badge / Liste di Massa da Anagrafica -->
+  <div class="modal-overlay" id="modalAssegnaBadgeMassa">
+    <div class="modal-window" style="max-width: 580px;">
+      <div class="modal-header">
+        <h3>🏅 Assegnazione Badge di Massa ai fedeli</h3>
+        <button class="btn-close-modal" onclick="closeModal('modalAssegnaBadgeMassa')">×</button>
+      </div>
+      <form onsubmit="handleSalvaAssegnaBadgeMassa(event)">
+        <div class="modal-body">
+          <div style="background: #fefce8; border: 1px solid #fef08a; padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 14px; font-size: 13px; color: #854d0e;">
+            Stai per assegnare un Badge a <strong id="massaBadgeCountLabel">0 persone selezionate</strong> dall'anagrafica.
+          </div>
+          <div class="form-group">
+            <label>Seleziona Badge o Lista di Destinazione *</label>
+            <select id="selectMassaBadgeDestinazione" class="form-control" required style="font-weight: 600;">
+              <option value="">-- Seleziona Badge / Lista --</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modalAssegnaBadgeMassa')">Annulla</button>
+          <button type="submit" class="btn btn-primary">Assegna Badge ai Selezionati</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Genera Badge / Liste Automatiche -->
+  <div class="modal-overlay" id="modalGeneraBadgeAutomatica">
+    <div class="modal-window" style="max-width: 560px;">
+      <div class="modal-header">
+        <h3>⚡ Generazione Automatica Badge / Lista</h3>
+        <button class="btn-close-modal" onclick="closeModal('modalGeneraBadgeAutomatica')">×</button>
+      </div>
+      <form onsubmit="handleSalvaGeneraBadgeAutomatica(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Fonte / Attività di Origine *</label>
+            <select id="selectFonteBadgeAutomatica" class="form-control" required onchange="aggiornaAnteprimaNomeBadge()">
+              <optgroup label="Oratorio">
+                <option value="oratorio_estivo">☀️ Oratorio Estivo (Tutti gli iscritti)</option>
+                <option value="oratorio_invernale">❄️ Oratorio Invernale (Tutti gli iscritti)</option>
+              </optgroup>
+              <optgroup label="Catechismo & Studio">
+                <option value="catechismo">📖 Gruppi Catechismo (Tutti gli iscritti)</option>
+                <option value="doposcuola">📚 Doposcuola Parrocchiale (Tutti gli iscritti)</option>
+              </optgroup>
+              <optgroup label="Attività Parrocchiali" id="optgroupBadgeAttivita">
+                <!-- Popolato dinamicamente con le attività -->
+              </optgroup>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Nome del Badge / Lista *</label>
+            <input type="text" id="inputNomeBadgeGenerato" class="form-control" required placeholder="es. Iscritti Oratorio Estivo 2026/2027">
+          </div>
+
+          <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label>Icona Badge</label>
+              <select id="inputIconaBadgeGenerato" class="form-control">
+                <option value="🏅">🏅 Medaglia d'Oro</option>
+                <option value="🌟">🌟 Stella d'Argento</option>
+                <option value="☀️">☀️ Sole Oratorio Estivo</option>
+                <option value="❄️">❄️ Fiocco Invernale</option>
+                <option value="📖">📖 Vangelo Catechismo</option>
+                <option value="📚">📚 Libri Doposcuola</option>
+                <option value="🏓">🏓 Ping Pong / Sport</option>
+                <option value="⚽">⚽ Calcio Oratorio</option>
+                <option value="✝️">✝️ Croce Parrocchiale</option>
+                <option value="👥">👥 Gruppo Fedeli</option>
+                <option value="🎯">🎯 Obiettivo / Evento</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Colore Badge</label>
+              <input type="color" id="inputColoreBadgeGenerato" class="form-control" value="#8B1E1E" style="height: 38px; padding: 2px;">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Descrizione / Scopo</label>
+            <textarea id="inputDescBadgeGenerato" class="form-control" rows="2" placeholder="Descrizione del badge guadagnato o lista..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modalGeneraBadgeAutomatica')">Annulla</button>
+          <button type="submit" class="btn btn-primary">Genera e Assegna a Tutti gli Iscritti</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Nuovo Gruppo Oratorio (Estivo / Invernale) -->
+  <div class="modal-overlay" id="modalNuovoGruppoOratorio">
+    <div class="modal-window" style="max-width: 560px;">
+      <div class="modal-header">
+        <h3 id="modalNuovoOratorioTitle">🏓 Nuovo Gruppo Oratorio</h3>
+        <button class="btn-close-modal" onclick="closeModal('modalNuovoGruppoOratorio')">×</button>
+      </div>
+      <form onsubmit="handleSalvaNuovoGruppoOratorio(event)">
+        <div class="modal-body">
+          <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label>Stagione Oratorio *</label>
+              <select id="nuovoOratorioTipo" class="form-control" required>
+                <option value="estivo">☀️ Oratorio Estivo (Estate Ragazzi)</option>
+                <option value="invernale">❄️ Oratorio Invernale (Sabato/Domenica)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Anno Pastorale *</label>
+              <input type="text" id="nuovoOratorioAnno" class="form-control" value="2026/2027" required placeholder="2026/2027">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Nome Gruppo / Squadra *</label>
+            <input type="text" id="nuovoOratorioNome" class="form-control" placeholder="es. Squadra Gialli (Elementari), Gruppo Medie, etc." required>
+          </div>
+
+          <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label>Orario Incontri</label>
+              <input type="text" id="nuovoOratorioOrario" class="form-control" placeholder="es. Sabato 15:00 - 18:00">
+            </div>
+            <div class="form-group">
+              <label>Luogo / Spazio</label>
+              <input type="text" id="nuovoOratorioLuogo" class="form-control" placeholder="es. Campo sportivo, Salone grande">
+            </div>
+          </div>
+
+          <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label>Max Partecipanti (0 = illimitati)</label>
+              <input type="number" id="nuovoOratorioMaxIscritti" class="form-control" value="0" min="0">
+            </div>
+            <div class="form-group">
+              <label>Stato Visibilità Gruppo *</label>
+              <select id="nuovoOratorioStato" class="form-control" required>
+                <option value="pubblico">🟢 Pubblico (Iscrizioni aperte ai genitori)</option>
+                <option value="bozza">🟡 Bozza (Visibile solo agli animatori/admin)</option>
+                <option value="chiuso">🔴 Chiuso (Iscrizioni terminate, solo presenze)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Animatori / Educatori Responsabili</label>
+            <select id="nuovoOratorioAnimatoriSelect" class="form-control" multiple style="height: 90px;"></select>
+            <small style="color: var(--ink-500);">Tieni premuto Ctrl / Cmd per selezionare più animatori</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modalNuovoGruppoOratorio')">Annulla</button>
+          <button type="submit" class="btn btn-primary">Crea Gruppo Oratorio</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Modifica Gruppo Oratorio -->
+  <div class="modal-overlay" id="modalModificaGruppoOratorio">
+    <div class="modal-window" style="max-width: 560px;">
+      <div class="modal-header">
+        <h3>✏️ Modifica Gruppo Oratorio</h3>
+        <button class="btn-close-modal" onclick="closeModal('modalModificaGruppoOratorio')">×</button>
+      </div>
+      <form onsubmit="handleSalvaModificaGruppoOratorio(event)">
+        <input type="hidden" id="modOratorioId">
+        <div class="modal-body">
+          <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label>Stagione Oratorio *</label>
+              <select id="modOratorioTipo" class="form-control" required>
+                <option value="estivo">☀️ Oratorio Estivo</option>
+                <option value="invernale">❄️ Oratorio Invernale</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Anno Pastorale *</label>
+              <input type="text" id="modOratorioAnno" class="form-control" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Nome Gruppo *</label>
+            <input type="text" id="modOratorioNome" class="form-control" required>
+          </div>
+
+          <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label>Orario Incontri</label>
+              <input type="text" id="modOratorioOrario" class="form-control">
+            </div>
+            <div class="form-group">
+              <label>Luogo / Spazio</label>
+              <input type="text" id="modOratorioLuogo" class="form-control">
+            </div>
+          </div>
+
+          <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label>Max Partecipanti</label>
+              <input type="number" id="modOratorioMaxIscritti" class="form-control" min="0">
+            </div>
+            <div class="form-group">
+              <label>Stato Visibilità Gruppo *</label>
+              <select id="modOratorioStato" class="form-control" required>
+                <option value="pubblico">🟢 Pubblico (Iscrizioni aperte)</option>
+                <option value="bozza">🟡 Bozza (Visibile solo admin)</option>
+                <option value="chiuso">🔴 Chiuso (Solo presenze)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Animatori / Educatori Responsabili</label>
+            <select id="modOratorioAnimatoriSelect" class="form-control" multiple style="height: 90px;"></select>
+          </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: space-between;">
+          <button type="button" class="btn btn-danger" onclick="handleEliminaGruppoOratorioCorrente()">🗑️ Elimina Gruppo</button>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('modalModificaGruppoOratorio')">Annulla</button>
+            <button type="submit" class="btn btn-primary">Salva Modifiche</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Registro Presenze Oratorio -->
+  <div class="modal-overlay" id="modalRegistroPresenzeOratorio">
+    <div class="modal-window" style="max-width: 760px; width: 95%;">
+      <div class="modal-header">
+        <div>
+          <h3 id="registroOratorioTitle">📋 Registro Presenze Oratorio</h3>
+          <small id="registroOratorioSubTitle" style="color: var(--ink-500);"></small>
+        </div>
+        <button class="btn-close-modal" onclick="closeModal('modalRegistroPresenzeOratorio')">×</button>
+      </div>
+      <form onsubmit="handleSalvaPresenzeOratorio(event)">
+        <input type="hidden" id="registroOratorioGruppoId">
+        <div class="modal-body">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; background: var(--bg-subtle); padding: 10px 14px; border-radius: var(--radius-sm);">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <label style="font-weight: 700; font-size: 13px;">Data Incontro:</label>
+              <input type="date" id="registroOratorioData" class="form-control" style="width: auto; padding: 4px 8px;" onchange="caricaPresenzeOratorioData()">
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" class="btn btn-xs btn-outline-primary" onclick="segnaTuttiPresenzeOratorio(true)">Tutti Presenti</button>
+              <button type="button" class="btn btn-xs btn-secondary" onclick="segnaTuttiPresenzeOratorio(false)">Tutti Assenti</button>
+            </div>
+          </div>
+
+          <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
+            <table class="custom-table" style="font-size: 13px;">
+              <thead>
+                <tr>
+                  <th style="width: 40px; text-align: center;">Presenza</th>
+                  <th>Nominativo Ragazzo</th>
+                  <th>Età / Data Nascita</th>
+                  <th>Allergie / Note Sanitarie</th>
+                  <th>Note Giornaliere</th>
+                </tr>
+              </thead>
+              <tbody id="registroOratorioTableBody">
+                <!-- Generato dinamicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modalRegistroPresenzeOratorio')">Chiudi</button>
+          <button type="submit" class="btn btn-primary">Salva Registro Presenze</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Allergie Gruppo Oratorio / Catechismo / Doposcuola -->
+  <div class="modal-overlay" id="modalAllergieGruppoOratorio">
+    <div class="modal-window" style="max-width: 820px; width: 95%;">
+      <div class="modal-header">
+        <div>
+          <h3 id="allergieGruppoTitle">⚠️ Scheda Allergie & Esigenze Sanitarie</h3>
+          <small id="allergieGruppoSubTitle" style="color: var(--ink-500);"></small>
+        </div>
+        <button class="btn-close-modal" onclick="closeModal('modalAllergieGruppoOratorio')">×</button>
+      </div>
+      <div class="modal-body">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+          <p style="font-size: 13px; color: #7f1d1d; margin: 0;">
+            Report riservato ad animatori, catechisti, educatori e personale di cucina dell'oratorio.
+          </p>
+          <button type="button" class="btn btn-sm btn-secondary" onclick="window.print()">🖨️ Stampa Report</button>
+        </div>
+        <div class="table-responsive" style="max-height: 420px; overflow-y: auto;">
+          <table class="custom-table" style="font-size: 13px;">
+            <thead>
+              <tr style="background: #fef2f2;">
+                <th>Nominativo</th>
+                <th>Età</th>
+                <th>Genitori & Contatto</th>
+                <th>Allergie / Intolleranze</th>
+                <th>Note Medico-Sanitarie</th>
+              </tr>
+            </thead>
+            <tbody id="allergieGruppoTableBody">
+              <!-- Generato dinamicamente -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modalAllergieGruppoOratorio')">Chiudi</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Iscrivi Figlio a Oratorio (Genitore) -->
+  <div class="modal-overlay" id="modalIscriviFiglioOratorio">
+    <div class="modal-window" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3>🏓 Iscrivi Figlio all'Oratorio</h3>
+        <button class="btn-close-modal" onclick="closeModal('modalIscriviFiglioOratorio')">×</button>
+      </div>
+      <form onsubmit="handleSalvaIscrizioneFiglioOratorio(event)">
+        <input type="hidden" id="iscriviFiglioOraCF">
+        <div class="modal-body">
+          <div style="background: var(--bg-subtle); padding: 12px; border-radius: var(--radius-sm); margin-bottom: 14px;">
+            Iscrizione per: <strong id="iscriviFiglioOraNominativo" style="color: var(--primary);"></strong>
+          </div>
+          <div class="form-group">
+            <label>Seleziona Gruppo / Squadra Oratorio *</label>
+            <select id="iscriviFiglioOraGruppoSelect" class="form-control" required></select>
+          </div>
+          <div id="iscriviFiglioOraPreviewInfo" style="font-size: 12.5px; color: var(--ink-700); line-height: 1.5; margin-top: 10px;"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modalIscriviFiglioOratorio')">Annulla</button>
+          <button type="submit" class="btn btn-primary">Conferma Iscrizione</button>
         </div>
       </form>
     </div>
