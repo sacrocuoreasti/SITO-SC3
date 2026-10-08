@@ -1626,21 +1626,35 @@ async function openModalIscriviFiglioOratorio(cf, nominativo) {
   const preview = document.getElementById('iscriviFiglioOraPreviewInfo');
   preview.innerHTML = '';
 
+  // Apri subito il modale per feedback immediato
+  openModal('modalIscriviFiglioOratorio');
+
   try {
     const res = await fetch('/api/oratorio/miei-figli');
     const data = await res.json();
     const child = (data.figli || []).find(f => f.codice_fiscale === cf);
-    cacheGruppiIscrizioneFiglioOra = (child && child.gruppi_disponibili && child.gruppi_disponibili.length) ? child.gruppi_disponibili : (data.gruppi_disponibili || []);
+    
+    if (child && child.gruppi_disponibili && child.gruppi_disponibili.length > 0) {
+      cacheGruppiIscrizioneFiglioOra = child.gruppi_disponibili;
+    } else if (data.gruppi_disponibili && data.gruppi_disponibili.length > 0) {
+      cacheGruppiIscrizioneFiglioOra = data.gruppi_disponibili;
+    } else {
+      // Fallback: recupera direttamente dalla lista generale gruppi oratorio
+      const resFallback = await fetch('/api/oratorio/gruppi');
+      const dataFallback = await resFallback.json();
+      cacheGruppiIscrizioneFiglioOra = (dataFallback.gruppi || []).filter(g => g.stato !== 'chiuso');
+    }
 
     if (!cacheGruppiIscrizioneFiglioOra.length) {
       sel.innerHTML = '<option value="">Nessun gruppo oratorio aperto alle iscrizioni</option>';
+      preview.innerHTML = '<div style="color: var(--ink-500); padding: 8px 0;">Al momento non risultano gruppi oratorio aperti. Contatta la segreteria o gli animatori dell\'oratorio.</div>';
       return;
     }
 
     sel.innerHTML = '<option value="">-- Scegli gruppo / squadra oratorio --</option>' +
       cacheGruppiIscrizioneFiglioOra.map(g => `
         <option value="${g.id}">
-          ${g.tipo_oratorio === 'estivo' ? '☀️ Estivo' : '❄️ Invernale'}: ${escapeHtml(g.nome)} (${escapeHtml(g.anno_pastorale)}) · Animatori: ${escapeHtml(g.animatori_nomi || 'In definizione')}
+          ${g.tipo_oratorio === 'estivo' ? '☀️ Estivo' : '❄️ Invernale'}: ${escapeHtml(g.nome)} (${escapeHtml(g.anno_pastorale || '2026/2027')}) · Animatori: ${escapeHtml(g.animatori_nomi || g.animatore_referente_nome || 'In definizione')}
         </option>
       `).join('');
 
@@ -1649,10 +1663,12 @@ async function openModalIscriviFiglioOratorio(cf, nominativo) {
       const g = cacheGruppiIscrizioneFiglioOra.find(x => x.id === gId);
       if (g) {
         preview.innerHTML = `
-          <strong>Stagione:</strong> ${g.tipo_oratorio === 'estivo' ? '☀️ Oratorio Estivo (Estate Ragazzi)' : '❄️ Oratorio Invernale'}<br>
-          <strong>Orario:</strong> ${escapeHtml(g.orario_incontri || 'Sabato pomeriggio')}<br>
-          <strong>Luogo:</strong> ${escapeHtml(g.luogo || 'Oratorio Sacro Cuore')}<br>
-          <strong>Animatori:</strong> ${escapeHtml(g.animatori_nomi || 'In definizione')}
+          <div style="background: var(--bg-subtle); border-radius: var(--radius-sm); padding: 10px; border: 1px solid var(--border-light);">
+            <div><strong>Stagione:</strong> ${g.tipo_oratorio === 'estivo' ? '☀️ Oratorio Estivo (Estate Ragazzi)' : '❄️ Oratorio Invernale'}</div>
+            <div><strong>Orario Incontri:</strong> ${escapeHtml(g.orario_incontri || g.giorni_orari || 'Sabato pomeriggio')}</div>
+            <div><strong>Luogo / Spazio:</strong> ${escapeHtml(g.luogo || g.aula || 'Oratorio Sacro Cuore')}</div>
+            <div><strong>Animatori:</strong> ${escapeHtml(g.animatori_nomi || g.animatore_referente_nome || 'In definizione')}</div>
+          </div>
         `;
       } else {
         preview.innerHTML = '';
@@ -1660,9 +1676,8 @@ async function openModalIscriviFiglioOratorio(cf, nominativo) {
     };
   } catch (err) {
     console.error('Errore gruppi oratorio:', err);
+    sel.innerHTML = '<option value="">Errore nel caricamento dei gruppi oratorio</option>';
   }
-
-  openModal('modalIscriviFiglioOratorio');
 }
 
 async function handleSalvaIscrizioneFiglioOratorio(e) {
@@ -1687,6 +1702,8 @@ async function handleSalvaIscrizioneFiglioOratorio(e) {
     showToast(data.message, 'success');
     closeModal('modalIscriviFiglioOratorio');
     await loadOratorioParentView();
+    if (typeof loadFamiglia === 'function') await loadFamiglia();
+    if (typeof loadOratorio === 'function') await loadOratorio();
   } catch (err) {
     showToast(err.message, 'error');
   }
@@ -7622,9 +7639,11 @@ async function openModalIscriviFiglioCatechismo(cf, nominativo) {
   document.getElementById('iscriviFiglioCatNominativo').textContent = nominativo;
 
   const sel = document.getElementById('iscriviFiglioCatGruppoSelect');
-  sel.innerHTML = '<option value="">Caricamento gruppi...</option>';
+  sel.innerHTML = '<option value="">Caricamento gruppi catechismo...</option>';
   const preview = document.getElementById('iscriviFiglioCatPreviewInfo');
   preview.innerHTML = '';
+
+  openModal('modalIscriviFiglioCatechismo');
 
   try {
     const res = await fetch('/api/catechismo/miei-figli');
@@ -7633,6 +7652,7 @@ async function openModalIscriviFiglioCatechismo(cf, nominativo) {
 
     if (!cacheGruppiIscrizioneFiglioCat.length) {
       sel.innerHTML = '<option value="">Nessun gruppo di catechismo disponibile</option>';
+      preview.innerHTML = '<div style="color: var(--ink-500); padding: 8px 0;">Nessun gruppo di catechismo disponibile per l\'iscrizione diretta al momento.</div>';
       return;
     }
 
@@ -7658,9 +7678,8 @@ async function openModalIscriviFiglioCatechismo(cf, nominativo) {
     };
   } catch (err) {
     console.error('Errore caricamento gruppi catechismo:', err);
+    sel.innerHTML = '<option value="">Errore nel caricamento dei gruppi</option>';
   }
-
-  openModal('modalIscriviFiglioCatechismo');
 }
 
 async function handleSalvaIscrizioneFiglioCatechismo(e) {
@@ -7695,9 +7714,11 @@ async function openModalIscriviFiglioDoposcuola(cf, nominativo) {
   document.getElementById('iscriviFiglioDopNominativo').textContent = nominativo;
 
   const sel = document.getElementById('iscriviFiglioDopGruppoSelect');
-  sel.innerHTML = '<option value="">Caricamento gruppi...</option>';
+  sel.innerHTML = '<option value="">Caricamento gruppi doposcuola...</option>';
   const preview = document.getElementById('iscriviFiglioDopPreviewInfo');
   preview.innerHTML = '';
+
+  openModal('modalIscriviFiglioDoposcuola');
 
   try {
     const res = await fetch('/api/doposcuola/miei-figli');
@@ -7706,6 +7727,7 @@ async function openModalIscriviFiglioDoposcuola(cf, nominativo) {
 
     if (!cacheGruppiIscrizioneFiglioDop.length) {
       sel.innerHTML = '<option value="">Nessun gruppo doposcuola disponibile</option>';
+      preview.innerHTML = '<div style="color: var(--ink-500); padding: 8px 0;">Nessun gruppo doposcuola aperto alle iscrizioni dirette.</div>';
       return;
     }
 
@@ -7732,9 +7754,8 @@ async function openModalIscriviFiglioDoposcuola(cf, nominativo) {
     };
   } catch (err) {
     console.error('Errore caricamento gruppi doposcuola:', err);
+    sel.innerHTML = '<option value="">Errore nel caricamento dei gruppi</option>';
   }
-
-  openModal('modalIscriviFiglioDoposcuola');
 }
 
 async function handleSalvaIscrizioneFiglioDoposcuola(e) {

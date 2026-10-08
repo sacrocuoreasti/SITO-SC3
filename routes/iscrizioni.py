@@ -153,6 +153,28 @@ def create_iscrizione():
         except Exception:
             pass
 
+    # Associazione facoltativa a un Gruppo Oratorio selezionato
+    gruppo_ora_id = data.get('gruppo_oratorio_id')
+    if gruppo_ora_id:
+        from models import GruppoOratorio
+        try:
+            grp_ora = db.session.get(GruppoOratorio, int(gruppo_ora_id))
+            if grp_ora and persona not in grp_ora.ragazzi:
+                grp_ora.ragazzi.append(persona)
+        except Exception:
+            pass
+
+    # Associazione facoltativa a un Gruppo Doposcuola selezionato
+    gruppo_dop_id = data.get('gruppo_doposcuola_id')
+    if gruppo_dop_id:
+        from models import GruppoDoposcuola
+        try:
+            grp_dop = db.session.get(GruppoDoposcuola, int(gruppo_dop_id))
+            if grp_dop and persona not in grp_dop.studenti:
+                grp_dop.studenti.append(persona)
+        except Exception:
+            pass
+
     db.session.commit()
 
     return jsonify({

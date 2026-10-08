@@ -48,7 +48,7 @@ def get_gruppi_oratorio():
         roles = current_user.get_all_roles()
         is_staff = any(r in ['admin', 'parroco', 'segreteria', 'oratorio', 'animatore'] for r in roles)
         if not is_staff:
-            gruppi_db = [g for g in gruppi_db if g.stato in ['pubblico', 'chiuso']]
+            gruppi_db = [g for g in gruppi_db if g.stato in ['pubblico', 'chiuso', 'attivo']]
 
     gruppi = [g.to_dict(include_ragazzi=True) for g in gruppi_db]
 
@@ -280,7 +280,12 @@ def get_allergie_gruppo_oratorio(id):
 @oratorio_bp.route('/miei-figli', methods=['GET'])
 def get_oratorio_miei_figli():
     """Restituisce i gruppi di oratorio (estivo e invernale) a cui sono iscritti i figli dell'utente loggato."""
-    gruppi_aperti_tutti = [g.to_dict(include_ragazzi=False) for g in GruppoOratorio.query.filter_by(stato='pubblico').all()]
+    gruppi_aperti_db = GruppoOratorio.query.filter(GruppoOratorio.stato != 'chiuso').order_by(GruppoOratorio.id.asc()).all()
+    if not gruppi_aperti_db:
+        # Fallback se tutti i gruppi sono marcati diversamente
+        gruppi_aperti_db = GruppoOratorio.query.order_by(GruppoOratorio.id.asc()).all()
+
+    gruppi_aperti_tutti = [g.to_dict(include_ragazzi=False) for g in gruppi_aperti_db]
 
     if not current_user.is_authenticated:
         return jsonify({'ha_famiglia': False, 'figli': [], 'gruppi_disponibili': gruppi_aperti_tutti})
@@ -290,7 +295,7 @@ def get_oratorio_miei_figli():
         # Se utente singolo senza famiglia, usa se stesso come componente
         if persona_utente:
             gruppi_assegnati = [g.to_dict(include_ragazzi=False) for g in persona_utente.gruppi_oratorio]
-            gruppi_disp = [g.to_dict(include_ragazzi=False) for g in GruppoOratorio.query.filter_by(stato='pubblico').all() if g not in persona_utente.gruppi_oratorio]
+            gruppi_disp = [g.to_dict(include_ragazzi=False) for g in gruppi_aperti_db if g not in persona_utente.gruppi_oratorio]
             return jsonify({
                 'ha_famiglia': False,
                 'gruppi_disponibili': gruppi_aperti_tutti,
@@ -298,6 +303,8 @@ def get_oratorio_miei_figli():
                     'codice_fiscale': persona_utente.codice_fiscale,
                     'nominativo': persona_utente.nominativo,
                     'eta': persona_utente.eta,
+                    'data_nascita_it': persona_utente.data_nascita.strftime('%d/%m/%Y') if persona_utente.data_nascita else '',
+                    'is_assegnato': len(gruppi_assegnati) > 0,
                     'gruppi': gruppi_assegnati,
                     'gruppi_disponibili': gruppi_disp
                 }]
@@ -305,24 +312,24 @@ def get_oratorio_miei_figli():
         return jsonify({'ha_famiglia': False, 'figli': [], 'gruppi_disponibili': gruppi_aperti_tutti})
 
     nucleo = persona_utente.nucleo
-    figli = [m for m in nucleo.componenti if m.ruolo_famiglia in ['Figlio/a', 'Figlio', 'Figlia', 'Minore', 'Nipote']]
+    componenti = nucleo.componenti
+    figli = [m for m in componenti if m.ruolo_famiglia in ['Figlio/a', 'Figlio', 'Figlia', 'Minore', 'Nipote'] or (m.eta is not None and m.eta < 18)]
     if not figli:
-        figli = nucleo.componenti
+        figli = [m for m in componenti if m.codice_fiscale != persona_utente.codice_fiscale]
+    if not figli:
+        figli = componenti
 
     risultati = []
     for f in figli:
-        gruppi_assegnati = []
-        for g in f.gruppi_oratorio:
-            gruppi_assegnati.append(g.to_dict(include_ragazzi=False))
-
-        # Gruppi pubblici aperti in cui può iscriversi
-        gruppi_aperti_db = GruppoOratorio.query.filter_by(stato='pubblico').all()
+        gruppi_assegnati = [g.to_dict(include_ragazzi=False) for g in f.gruppi_oratorio]
         gruppi_disponibili = [g.to_dict(include_ragazzi=False) for g in gruppi_aperti_db if g not in f.gruppi_oratorio]
 
         risultati.append({
             'codice_fiscale': f.codice_fiscale,
             'nominativo': f.nominativo,
             'eta': f.eta,
+            'data_nascita_it': f.data_nascita.strftime('%d/%m/%Y') if f.data_nascita else '',
+            'is_assegnato': len(gruppi_assegnati) > 0,
             'gruppi': gruppi_assegnati,
             'gruppi_disponibili': gruppi_disponibili
         })
@@ -346,21 +353,29 @@ def iscrivi_figlio_oratorio():
     if not cf or not gruppo_id:
         return jsonify({'error': 'Dati mancanti per l\'iscrizione'}), 400
 
-    gruppo = db.session.get(GruppoOratorio, gruppo_id)
+    try:
+        gruppo_id_int = int(gruppo_id)
+    except (ValueError, TypeError):
+        return jsonify({'error': 'ID gruppo non valido'}), 400
+
+    gruppo = db.session.get(GruppoOratorio, gruppo_id_int)
     if not gruppo:
         return jsonify({'error': 'Gruppo Oratorio non trovato'}), 404
 
-    if gruppo.stato != 'pubblico':
-        return jsonify({'error': 'Le iscrizioni a questo gruppo sono chiuse o in bozza'}), 403
+    if gruppo.stato == 'chiuso':
+        return jsonify({'error': 'Le iscrizioni a questo gruppo oratorio sono attualmente chiuse'}), 403
 
     persona = db.session.get(Persona, cf)
     if not persona:
-        return jsonify({'error': 'Persona non trovata'}), 404
+        return jsonify({'error': f'Persona con CF {cf} non trovata in anagrafica'}), 404
 
-    # Verifica appartenenza al nucleo familiare dell'utente
-    if current_user.persona and current_user.persona.nucleo_id:
-        if persona.nucleo_id != current_user.persona.nucleo_id:
-            return jsonify({'error': 'Non puoi iscrivere persone che non appartengono alla tua famiglia'}), 403
+    # Verifica appartenenza al nucleo familiare dell'utente se non è staff
+    roles = current_user.get_all_roles()
+    is_staff = any(r in ['admin', 'segreteria', 'parroco', 'oratorio', 'animatore'] for r in roles)
+    if not is_staff:
+        if current_user.persona and current_user.persona.nucleo_id:
+            if persona.nucleo_id != current_user.persona.nucleo_id and persona.codice_fiscale != current_user.persona.codice_fiscale:
+                return jsonify({'error': 'Non puoi iscrivere persone che non appartengono alla tua famiglia'}), 403
 
     if persona not in gruppo.ragazzi:
         gruppo.ragazzi.append(persona)

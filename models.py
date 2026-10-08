@@ -657,6 +657,7 @@ class GruppoOratorio(db.Model):
             'anno_pastorale': self.anno_pastorale or '2026/2027',
             'tipo_oratorio': self.tipo_oratorio or 'estivo',
             'animatore_referente_nome': nomi_animatori,
+            'animatori_nomi': nomi_animatori,
             'animatore_cf': self.animatore_cf or '',
             'animatore_utente_id': self.animatore_utente_id,
             'animatori': animatori_list,
@@ -664,6 +665,7 @@ class GruppoOratorio(db.Model):
             'giorni_orari': self.giorni_orari or '',
             'orario_incontri': self.giorni_orari or '',
             'aula': self.aula or '',
+            'luogo': self.aula or 'Oratorio Sacro Cuore',
             'note': self.note or '',
             'stato': self.stato or 'pubblico',
             'attivita_id': self.attivita_id,
@@ -1117,6 +1119,35 @@ def init_default_configurazioni():
                 )
             ]
             db.session.add_all(default_cal)
+
+        # Gruppi Oratorio di default (Estivo e Invernale)
+        gruppi_oratorio_count = GruppoOratorio.query.count()
+        if gruppi_oratorio_count == 0:
+            g_estivo = GruppoOratorio(
+                nome='Estate Ragazzi 2026/2027',
+                anno_pastorale='2026/2027',
+                tipo_oratorio='estivo',
+                giorni_orari='Lunedì - Venerdì 08:30 - 17:00',
+                aula='Campi sportivi e cortile oratorio',
+                animatore_referente_nome='Equipe Animatori Oratorio',
+                stato='pubblico'
+            )
+            g_invernale = GruppoOratorio(
+                nome='Oratorio Invernale - Sabato Insieme',
+                anno_pastorale='2026/2027',
+                tipo_oratorio='invernale',
+                giorni_orari='Sabato 15:00 - 18:30',
+                aula='Salone don Bosco e campetti',
+                animatore_referente_nome='Animatori Sabato Oratorio',
+                stato='pubblico'
+            )
+            db.session.add_all([g_estivo, g_invernale])
+        else:
+            # Se tutti i gruppi oratorio esistenti risultano chiusi, apri quelli disponibili
+            aperti = GruppoOratorio.query.filter(GruppoOratorio.stato != 'chiuso').count()
+            if aperti == 0:
+                for g in GruppoOratorio.query.all():
+                    g.stato = 'pubblico'
 
         # Account di sistema garantiti in memoria e database
         default_accounts = [
