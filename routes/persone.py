@@ -290,6 +290,101 @@ def delete_certificato_battesimo(cf):
         'persona': p.to_dict()
     })
 
+# ================= GESTIONE FOTO PROFILO / AVATAR =================
+@persone_bp.route('/<cf>/foto-profilo', methods=['POST'])
+def upload_foto_profilo(cf):
+    cf = normalizza_cf(cf)
+    p = db.session.get(Persona, cf)
+    if not p:
+        return jsonify({'error': 'Persona non trovata'}), 404
+
+    # Controllo permessi: admin/segreteria o utente proprietario / membro della stessa famiglia
+    if current_user.is_authenticated:
+        roles = current_user.get_all_roles()
+        is_staff = any(r in ['admin', 'parroco', 'segreteria', 'oratorio', 'catechista'] for r in roles)
+        if not is_staff:
+            curr_persona = current_user.persona
+            if not curr_persona or (curr_persona.codice_fiscale != cf and curr_persona.nucleo_id != p.nucleo_id):
+                return jsonify({'error': 'Non autorizzato a modificare la foto profilo di questo utente'}), 403
+
+    if 'foto' not in request.files and 'file' not in request.files:
+        return jsonify({'error': 'Nessun file immagine selezionato'}), 400
+
+    file = request.files.get('foto') or request.files.get('file')
+    if not file or file.filename == '':
+        return jsonify({'error': 'File non valido'}), 400
+
+    import os
+    from flask import current_app
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ['.jpg', '.jpeg', '.png', '.webp', '.gif']:
+        return jsonify({'error': 'Formato non supportato. Carica un\'immagine (JPG, PNG, WebP)'}), 400
+
+    filename = f"avatar_{cf}_{int(datetime.utcnow().timestamp())}{ext}"
+    mimetype = file.content_type or 'image/jpeg'
+
+    from services.google_drive import is_google_drive_configured, upload_file_to_drive, delete_file_from_drive
+
+    if is_google_drive_configured():
+        drive_res = upload_file_to_drive(file, filename, mimetype=mimetype)
+        if drive_res.get('success'):
+            if p.foto_profilo_url:
+                delete_file_from_drive(p.foto_profilo_url)
+            p.foto_profilo_url = drive_res.get('direct_url') or drive_res.get('url')
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'message': f'Foto profilo aggiornata con successo su Google Drive per {p.nominativo}!',
+                'persona': p.to_dict()
+            })
+
+    # Fallback locale se Drive non è configurato
+    filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+    file.seek(0)
+    file.save(filepath)
+
+    if p.foto_profilo_url and not p.foto_profilo_url.startswith('http'):
+        old_local = os.path.join(current_app.config['UPLOAD_FOLDER'], os.path.basename(p.foto_profilo_url))
+        if os.path.exists(old_local):
+            try: os.remove(old_local)
+            except Exception: pass
+
+    p.foto_profilo_url = f"/uploads/{filename}"
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': f'Foto profilo salvata con successo per {p.nominativo}!',
+        'persona': p.to_dict()
+    })
+
+@persone_bp.route('/<cf>/foto-profilo', methods=['DELETE'])
+def delete_foto_profilo(cf):
+    cf = normalizza_cf(cf)
+    p = db.session.get(Persona, cf)
+    if not p:
+        return jsonify({'error': 'Persona non trovata'}), 404
+
+    if p.foto_profilo_url:
+        import os
+        from flask import current_app
+        from services.google_drive import delete_file_from_drive
+        if p.foto_profilo_url.startswith('http'):
+            delete_file_from_drive(p.foto_profilo_url)
+        else:
+            old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], os.path.basename(p.foto_profilo_url))
+            if os.path.exists(old_path):
+                try: os.remove(old_path)
+                except Exception: pass
+        p.foto_profilo_url = None
+        db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': 'Foto profilo rimossa',
+        'persona': p.to_dict()
+    })
+
 @persone_bp.route('/<cf>', methods=['DELETE'])
 def delete_persona(cf):
     cf = normalizza_cf(cf)

@@ -77,6 +77,7 @@ class Persona(db.Model):
     
     # Documenti e sacramenti
     certificato_battesimo_path = db.Column(db.String(255), nullable=True)
+    foto_profilo_url = db.Column(db.String(500), nullable=True)
 
     # Nucleo familiare
     nucleo_id = db.Column(db.Integer, db.ForeignKey('nucleo_familiare.id', ondelete='SET NULL'), nullable=True)
@@ -127,6 +128,7 @@ class Persona(db.Model):
             'note_generali': self.note_generali or '',
             'certificato_battesimo_path': self.certificato_battesimo_path or '',
             'certificato_battesimo_url': self.certificato_battesimo_path if (self.certificato_battesimo_path and self.certificato_battesimo_path.startswith('http')) else (f"/uploads/{self.certificato_battesimo_path}" if self.certificato_battesimo_path else None),
+            'foto_profilo_url': self.foto_profilo_url or '',
             'nucleo_id': self.nucleo_id,
             'ruolo_famiglia': self.ruolo_famiglia or 'Figlio/a',
             'has_account': bool(self.utente),
@@ -906,6 +908,34 @@ class Celebrazione(db.Model):
         }
 
 
+class CalendarioComunita(db.Model):
+    __tablename__ = 'calendario_comunita'
+
+    id = db.Column(db.Integer, primary_key=True)
+    titolo = db.Column(db.String(150), nullable=False)
+    descrizione = db.Column(db.Text, nullable=True)
+    google_calendar_url = db.Column(db.String(500), nullable=False)
+    colore = db.Column(db.String(30), default='#8B1E1E')
+    icona = db.Column(db.String(30), default='📅')
+    categoria = db.Column(db.String(50), default='parrocchia')  # 'parrocchia', 'catechismo', 'oratorio', 'giovani', 'liturgia'
+    is_pubblico = db.Column(db.Boolean, default=True)
+    ordine = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'titolo': self.titolo,
+            'descrizione': self.descrizione or '',
+            'google_calendar_url': self.google_calendar_url,
+            'colore': self.colore or '#8B1E1E',
+            'icona': self.icona or '📅',
+            'categoria': self.categoria or 'parrocchia',
+            'is_pubblico': self.is_pubblico,
+            'ordine': self.ordine
+        }
+
+
 def init_default_configurazioni():
     """Inizializza categorie, allergie, clausole, celebrazioni e campi account se non presenti."""
     try:
@@ -916,6 +946,7 @@ def init_default_configurazioni():
         from sqlalchemy import text
         col_checks = [
             ('persona', 'certificato_battesimo_path', 'VARCHAR(255)'),
+            ('persona', 'foto_profilo_url', 'VARCHAR(500)'),
             ('utente', 'campi_extra', 'TEXT DEFAULT "{}"'),
             ('attivita', 'locandina_path', 'VARCHAR(255)'),
             ('attivita', 'campi_extra', 'TEXT DEFAULT "{}"'),
@@ -1050,6 +1081,42 @@ def init_default_configurazioni():
                 db.session.add_all(default_celebrazioni)
 
             imp.init_defaults_completed = True
+
+        # Calendari Comunitari Google (se non presenti)
+        if CalendarioComunita.query.count() == 0:
+            default_cal = [
+                CalendarioComunita(
+                    titolo='Eventi & Feste Parrocchiali',
+                    descrizione='Calendario generale delle celebrazioni comunitarie, feste patronali ed eventi parrocchiali.',
+                    google_calendar_url='https://calendar.google.com/calendar/u/0/r',
+                    colore='#8B1E1E',
+                    icona='⛪',
+                    categoria='parrocchia',
+                    is_pubblico=True,
+                    ordine=1
+                ),
+                CalendarioComunita(
+                    titolo='Catechismo & Iniziazione Cristiana',
+                    descrizione='Date degli incontri di catechismo, ritiri spirituali e messe dei fanciulli.',
+                    google_calendar_url='https://calendar.google.com/calendar/u/0/r',
+                    colore='#0284c7',
+                    icona='📖',
+                    categoria='catechismo',
+                    is_pubblico=True,
+                    ordine=2
+                ),
+                CalendarioComunita(
+                    titolo='Oratorio & Gruppi Giovani',
+                    descrizione='Attività pomeridiane, tornei, Estate Ragazzi e uscite del gruppo oratorio.',
+                    google_calendar_url='https://calendar.google.com/calendar/u/0/r',
+                    colore='#16a34a',
+                    icona='🏓',
+                    categoria='oratorio',
+                    is_pubblico=True,
+                    ordine=3
+                )
+            ]
+            db.session.add_all(default_cal)
 
         # Account di sistema garantiti in memoria e database
         default_accounts = [

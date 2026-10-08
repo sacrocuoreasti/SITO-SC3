@@ -358,32 +358,46 @@ def get_allergie_gruppo(id):
 
     ragazzi_allergie = []
     for s in g.studenti:
-        ha_condizioni = bool(s.allergie or s.intolleranze_alimentari or s.note_mediche)
+        note_med = getattr(s, 'note_generali', '') or ''
+        ha_condizioni = bool(s.allergie or s.intolleranze_alimentari or note_med)
         telefono_genitore = ''
         nominativo_genitore = ''
-        if s.nucleo and s.nucleo.capofamiglia:
-            telefono_genitore = s.nucleo.capofamiglia.telefono or ''
-            nominativo_genitore = s.nucleo.capofamiglia.nominativo or ''
-        elif s.telefono:
+        nome_famiglia = ''
+        if s.nucleo:
+            nome_famiglia = s.nucleo.nome_famiglia or ''
+            if s.nucleo.capofamiglia:
+                telefono_genitore = s.nucleo.capofamiglia.telefono or ''
+                nominativo_genitore = s.nucleo.capofamiglia.nominativo or ''
+        if not telefono_genitore and s.telefono:
             telefono_genitore = s.telefono
 
         ragazzi_allergie.append({
             'codice_fiscale': s.codice_fiscale,
             'nominativo': s.nominativo,
             'eta': s.eta,
+            'sesso': s.sesso or 'M',
             'allergie': s.allergie or '',
             'intolleranze_alimentari': s.intolleranze_alimentari or '',
-            'note_mediche': s.note_mediche or '',
+            'note_mediche': note_med,
             'ha_condizioni': ha_condizioni,
+            'ha_segnalazione': ha_condizioni,
             'telefono_genitore': telefono_genitore,
-            'nominativo_genitore': nominativo_genitore
+            'nominativo_genitore': nominativo_genitore,
+            'famiglia_nome': nome_famiglia,
+            'capofamiglia_nome': nominativo_genitore,
+            'telefono_famiglia': telefono_genitore,
+            'cellulare': s.telefono or '',
+            'indirizzo': s.indirizzo_residenza or ''
         })
 
+    con_allergie = sum(1 for x in ragazzi_allergie if x['ha_condizioni'])
     return jsonify({
         'gruppo': g.to_dict(include_studenti=False),
         'totale_studenti': len(g.studenti),
-        'con_allergie_count': sum(1 for x in ragazzi_allergie if x['ha_condizioni']),
-        'ragazzi': ragazzi_allergie
+        'con_allergie_count': con_allergie,
+        'ragazzi_con_segnalazioni': con_allergie,
+        'ragazzi': ragazzi_allergie,
+        'segnalazioni': ragazzi_allergie
     })
 
 

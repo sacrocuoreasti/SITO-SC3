@@ -237,34 +237,72 @@ def get_allergie_gruppo_oratorio(id):
         ha_info = bool(r.allergie or r.intolleranze_alimentari or r.note_generali)
         if ha_info:
             con_allergie_count += 1
+        
+        telefono_genitore = ''
+        nominativo_genitore = ''
+        nome_famiglia = ''
+        if r.nucleo:
+            nome_famiglia = r.nucleo.nome_famiglia or ''
+            if r.nucleo.capofamiglia:
+                telefono_genitore = r.nucleo.capofamiglia.telefono or ''
+                nominativo_genitore = r.nucleo.capofamiglia.nominativo or ''
+        if not telefono_genitore and r.telefono:
+            telefono_genitore = r.telefono
+
         ragazzi_allergie.append({
             'codice_fiscale': r.codice_fiscale,
             'nominativo': r.nominativo,
             'eta': r.eta,
-            'telefono': r.telefono or (r.nucleo.capofamiglia.telefono if r.nucleo and r.nucleo.capofamiglia else ''),
-            'nome_famiglia': r.nucleo.nome_famiglia if r.nucleo else '',
+            'sesso': r.sesso or 'M',
+            'telefono': telefono_genitore,
+            'nome_famiglia': nome_famiglia,
+            'famiglia_nome': nome_famiglia,
+            'capofamiglia_nome': nominativo_genitore,
+            'telefono_famiglia': telefono_genitore,
+            'cellulare': r.telefono or '',
+            'indirizzo': r.indirizzo_residenza or '',
             'allergie': r.allergie or '',
             'intolleranze_alimentari': r.intolleranze_alimentari or '',
             'note_mediche': r.note_generali or '',
-            'ha_segnalazione': ha_info
+            'ha_segnalazione': ha_info,
+            'ha_condizioni': ha_info
         })
 
     return jsonify({
         'gruppo': g.to_dict(include_ragazzi=False),
         'totale_ragazzi': len(g.ragazzi),
         'con_allergie_count': con_allergie_count,
-        'segnalazioni': ragazzi_allergie
+        'ragazzi_con_segnalazioni': con_allergie_count,
+        'segnalazioni': ragazzi_allergie,
+        'ragazzi': ragazzi_allergie
     })
 
 @oratorio_bp.route('/miei-figli', methods=['GET'])
 def get_oratorio_miei_figli():
     """Restituisce i gruppi di oratorio (estivo e invernale) a cui sono iscritti i figli dell'utente loggato."""
+    gruppi_aperti_tutti = [g.to_dict(include_ragazzi=False) for g in GruppoOratorio.query.filter_by(stato='pubblico').all()]
+
     if not current_user.is_authenticated:
-        return jsonify({'ha_famiglia': False, 'figli': []})
+        return jsonify({'ha_famiglia': False, 'figli': [], 'gruppi_disponibili': gruppi_aperti_tutti})
 
     persona_utente = current_user.persona
     if not persona_utente or not persona_utente.nucleo_id:
-        return jsonify({'ha_famiglia': False, 'figli': []})
+        # Se utente singolo senza famiglia, usa se stesso come componente
+        if persona_utente:
+            gruppi_assegnati = [g.to_dict(include_ragazzi=False) for g in persona_utente.gruppi_oratorio]
+            gruppi_disp = [g.to_dict(include_ragazzi=False) for g in GruppoOratorio.query.filter_by(stato='pubblico').all() if g not in persona_utente.gruppi_oratorio]
+            return jsonify({
+                'ha_famiglia': False,
+                'gruppi_disponibili': gruppi_aperti_tutti,
+                'figli': [{
+                    'codice_fiscale': persona_utente.codice_fiscale,
+                    'nominativo': persona_utente.nominativo,
+                    'eta': persona_utente.eta,
+                    'gruppi': gruppi_assegnati,
+                    'gruppi_disponibili': gruppi_disp
+                }]
+            })
+        return jsonify({'ha_famiglia': False, 'figli': [], 'gruppi_disponibili': gruppi_aperti_tutti})
 
     nucleo = persona_utente.nucleo
     figli = [m for m in nucleo.componenti if m.ruolo_famiglia in ['Figlio/a', 'Figlio', 'Figlia', 'Minore', 'Nipote']]
@@ -292,6 +330,7 @@ def get_oratorio_miei_figli():
     return jsonify({
         'ha_famiglia': True,
         'nome_famiglia': nucleo.nome_famiglia,
+        'gruppi_disponibili': gruppi_aperti_tutti,
         'figli': risultati
     })
 

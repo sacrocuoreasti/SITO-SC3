@@ -69,8 +69,9 @@ async function loadPublicHomepage() {
     if (imp.segreteria_email && document.getElementById('homeSegreteriaEmail')) document.getElementById('homeSegreteriaEmail').textContent = imp.segreteria_email;
     if (imp.segreteria_orari && document.getElementById('homeSegreteriaOrari')) document.getElementById('homeSegreteriaOrari').textContent = imp.segreteria_orari;
 
-    // Carica orari celebrazioni pubbliche (Messe, Liturgia, Avvenimenti)
+    // Carica orari celebrazioni pubbliche e calendari comunitari
     await loadCelebrazioniPubbliche();
+    await loadPublicCalendari();
 
     // Render Attività Pubblicate con anteprima locandina
     const attGrid = document.getElementById('publicAttivitaGrid');
@@ -169,8 +170,21 @@ function renderAppShell() {
     document.getElementById('topUserName').textContent = nome;
     document.getElementById('topUserRole').textContent = currentUser.ruolo.toUpperCase();
     
-    const initials = nome.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'SC';
-    document.getElementById('topAvatar').textContent = initials;
+    const topAvatar = document.getElementById('topAvatar');
+    const fotoUrl = (currentUser.persona && currentUser.persona.foto_profilo_url) ? currentUser.persona.foto_profilo_url : null;
+    if (fotoUrl && fotoUrl.trim() !== '') {
+      topAvatar.innerHTML = `<img src="${fotoUrl}" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+    } else {
+      const initials = nome.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'SC';
+      topAvatar.textContent = initials;
+    }
+
+    const badge = document.querySelector('.user-profile-badge');
+    if (badge && currentUser.persona && currentUser.persona.codice_fiscale) {
+      badge.style.cursor = 'pointer';
+      badge.title = 'Clicca per visualizzare o aggiornare la tua foto profilo';
+      badge.onclick = () => openModalFotoProfilo(currentUser.persona.codice_fiscale, currentUser.persona.nominativo, currentUser.persona.foto_profilo_url || '');
+    }
 
     applyRolePermissions();
   }
@@ -579,6 +593,9 @@ async function loadDashboard() {
         document.getElementById('kpiQuoteIncassate').textContent = `€ ${stats.contabilita.totale_incassato.toFixed(2)}`;
         document.getElementById('kpiQuoteResiduo').textContent = `Da incassare: € ${stats.contabilita.saldo_residuo.toFixed(2)}`;
       }
+
+      if (document.getElementById('kpiCardCassaQuote')) document.getElementById('kpiCardCassaQuote').style.display = 'flex';
+      if (document.getElementById('kpiCardOfferteUtente')) document.getElementById('kpiCardOfferteUtente').style.display = 'none';
     } else {
       // Profilo Utente: non vede anagrafica totale parrocchiale ma solo i dati della sua famiglia
       const [famRes, iscRes, attRes] = await Promise.all([
@@ -594,14 +611,7 @@ async function loadDashboard() {
       const membriCount = famData.nucleo ? (famData.nucleo.componenti || []).length : 1;
       const mieIscrizioni = iscData.iscrizioni || [];
 
-      let totDovuto = 0, totPagato = 0;
-      mieIscrizioni.forEach(i => {
-        totDovuto += i.importo_dovuto || 0;
-        totPagato += i.importo_pagato || 0;
-      });
-      const residuo = Math.max(0, totDovuto - totPagato);
-
-      // Aggiorna KPI personalizzati per la famiglia
+      // Aggiorna KPI personalizzati per la famiglia (senza mostrare quote/cassa)
       const kpiCard1 = document.querySelector('#dashKpiGrid .kpi-card:nth-child(1)');
       if (kpiCard1) {
         kpiCard1.querySelector('span').textContent = 'La Mia Famiglia';
@@ -616,13 +626,13 @@ async function loadDashboard() {
       }
       const kpiCard3 = document.querySelector('#dashKpiGrid .kpi-card:nth-child(3)');
       if (kpiCard3) {
-        kpiCard3.querySelector('span').textContent = 'Quote Iscrizione';
-        kpiCard3.querySelector('strong').textContent = `€ ${totDovuto.toFixed(2)}`;
-        kpiCard3.querySelector('small').textContent = `Versato: € ${totPagato.toFixed(2)}`;
+        kpiCard3.querySelector('span').textContent = 'Comunità Parrocchiale';
+        kpiCard3.querySelector('strong').textContent = 'Sacro Cuore';
+        kpiCard3.querySelector('small').textContent = 'Anno Pastorale 2025/2026';
       }
 
-      document.getElementById('kpiQuoteIncassate').textContent = residuo === 0 ? 'In Regola ✓' : `€ ${residuo.toFixed(2)}`;
-      document.getElementById('kpiQuoteResiduo').textContent = residuo === 0 ? 'Tutte le quote saldate' : 'Saldo residuo da versare';
+      if (document.getElementById('kpiCardCassaQuote')) document.getElementById('kpiCardCassaQuote').style.display = 'none';
+      if (document.getElementById('kpiCardOfferteUtente')) document.getElementById('kpiCardOfferteUtente').style.display = 'flex';
     }
 
     const container = document.getElementById('dashAttivitaList');
@@ -718,9 +728,8 @@ async function loadDashboard() {
           avvisiCont.innerHTML = '<p style="font-size: 13px; color: var(--ink-500);">Nessun avviso straordinario al momento.</p>';
         }
       }
-    } catch (e) {
-      console.warn('Errore caricamento messe e avvisi dashboard:', e);
-    }
+    // Carica calendari parrocchiali per la dashboard personale
+    await loadUserCalendari();
   } catch (err) {
     console.error('Errore caricamento dashboard:', err);
   }
@@ -764,11 +773,14 @@ async function loadFamiglia() {
     } else {
       membersGrid.innerHTML = cacheMembriFamiglia.map(m => {
         const isCapo = m.codice_fiscale === n.codice_fiscale_capofamiglia;
+        const fotoUrl = m.foto_profilo_url;
         return `
           <div class="family-member-card">
             <div class="member-top" style="cursor: pointer;" onclick="apriSchedaVisualizzazionePersona('${m.codice_fiscale}')" title="Clicca per visualizzare la scheda anagrafica completa">
               <div style="display: flex; gap: 12px; align-items: center;">
-                <div class="member-avatar">${escapeHtml(m.nome[0] || 'F')}</div>
+                <div class="member-avatar" style="overflow: hidden; padding: 0;">
+                  ${fotoUrl ? `<img src="${fotoUrl}" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover;">` : escapeHtml(m.nome[0] || 'F')}
+                </div>
                 <div class="member-title">
                   <h4 style="color: var(--primary);">${escapeHtml(m.nominativo)}</h4>
                   <span class="member-cf">${escapeHtml(m.codice_fiscale)}</span>
@@ -804,8 +816,11 @@ async function loadFamiglia() {
             ` : ''}
 
             <div style="margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border-light); display: flex; gap: 8px;">
-              <button class="btn btn-sm btn-primary" style="width: 100%; display: flex; justify-content: center; align-items: center; gap: 6px;" onclick="openModalModificaPersona('${m.codice_fiscale}')">
-                ✏️ Modifica Scheda Anagrafica
+              <button class="btn btn-sm btn-primary" style="flex: 1; display: flex; justify-content: center; align-items: center; gap: 6px;" onclick="openModalModificaPersona('${m.codice_fiscale}')">
+                ✏️ Modifica
+              </button>
+              <button class="btn btn-sm btn-secondary" style="display: flex; justify-content: center; align-items: center; gap: 4px;" onclick="openModalFotoProfilo('${m.codice_fiscale}', '${escapeHtml(m.nominativo)}', '${m.foto_profilo_url || ''}')" title="Carica o modifica foto profilo">
+                📸 Foto
               </button>
             </div>
           </div>
@@ -1610,7 +1625,8 @@ async function openModalIscriviFiglioOratorio(cf, nominativo) {
   try {
     const res = await fetch('/api/oratorio/miei-figli');
     const data = await res.json();
-    cacheGruppiIscrizioneFiglioOra = data.gruppi_disponibili || [];
+    const child = (data.figli || []).find(f => f.codice_fiscale === cf);
+    cacheGruppiIscrizioneFiglioOra = (child && child.gruppi_disponibili && child.gruppi_disponibili.length) ? child.gruppi_disponibili : (data.gruppi_disponibili || []);
 
     if (!cacheGruppiIscrizioneFiglioOra.length) {
       sel.innerHTML = '<option value="">Nessun gruppo oratorio aperto alle iscrizioni</option>';
@@ -4142,11 +4158,22 @@ async function loadImpostazioniHomepage() {
     if (document.getElementById('inputSegreteriaTitolo')) {
       document.getElementById('inputSegreteriaTitolo').value = imp.segreteria_titolo || 'Segreteria & Recapiti';
       document.getElementById('inputSegreteriaSottotitolo').value = imp.segreteria_sottotitolo || 'Siamo a tua disposizione per informazioni su catechesi, certificati e attività parrocchiali';
-      document.getElementById('inputSegreteriaIndirizzo').value = imp.segreteria_indirizzo || 'Parrocchia Sacro Cuore di Gesù\nCorso Genova 34, 14100 Asti (AT)';
+      document.getElementById('inputSegreteriaIndirizzo').value = imp.segreteria_indirizzo || 'Parrocchia Sacro Cuore di Gesù\nVia Pier Santi Mattarella 2, 14100 Asti (AT)';
       document.getElementById('inputSegreteriaTelefono').value = imp.segreteria_telefono || '0141 355150';
       document.getElementById('inputSegreteriaEmail').value = imp.segreteria_email || 'sacrocuoreasti@gmail.com';
       document.getElementById('inputSegreteriaOrari').value = imp.segreteria_orari || 'Martedì e Giovedì: 16:00 - 18:30\nSabato mattina: 09:30 - 11:30\nDomenica: dopo le Sante Messe';
     }
+
+    // Campi Coordinate Offerte & Donazioni (IBAN e Satispay)
+    if (document.getElementById('inputOfferteIban')) {
+      document.getElementById('inputOfferteIban').value = imp.iban || 'IT60X0542811101000000123456';
+      document.getElementById('inputOfferteSatispay').value = imp.satispay_url || 'https://tag.satispay.com/sacrocuoreasti';
+      document.getElementById('inputOfferteIntestatario').value = imp.intestatario_offerte || 'Parrocchia Sacro Cuore di Gesù - Asti';
+      document.getElementById('inputOfferteCausale').value = imp.causale_predefinita_offerte || 'Offerta liberale per le attività parrocchiali';
+    }
+
+    // Carica calendari Google della segreteria
+    await loadSegreteriaCalendari();
   } catch (err) {
     console.error('Errore caricamento impostazioni:', err);
   }
@@ -4172,6 +4199,13 @@ async function salvaImpostazioniHomepage() {
     payload.segreteria_telefono = document.getElementById('inputSegreteriaTelefono').value.trim();
     payload.segreteria_email = document.getElementById('inputSegreteriaEmail').value.trim();
     payload.segreteria_orari = document.getElementById('inputSegreteriaOrari').value.trim();
+  }
+
+  if (document.getElementById('inputOfferteIban')) {
+    payload.iban = document.getElementById('inputOfferteIban').value.trim();
+    payload.satispay_url = document.getElementById('inputOfferteSatispay').value.trim();
+    payload.intestatario_offerte = document.getElementById('inputOfferteIntestatario').value.trim();
+    payload.causale_predefinita_offerte = document.getElementById('inputOfferteCausale').value.trim();
   }
 
   try {
@@ -8096,6 +8130,322 @@ function copiaIbanOfferte() {
     showToast('IBAN copiato negli appunti! 📋', 'success');
   });
 }
+
+// ================= GESTIONE CALENDARI GOOGLE COMUNITARI =================
+let cacheSegreteriaCalendari = [];
+
+async function loadPublicCalendari() {
+  const grid = document.getElementById('publicCalendariGrid');
+  if (!grid) return;
+  try {
+    const res = await fetch('/api/impostazioni/calendari?solo_pubblici=true');
+    const data = await res.json();
+    const calendari = data.calendari || [];
+    if (!calendari.length) {
+      grid.innerHTML = `
+        <div style="grid-column: 1/-1; padding: 24px; text-align: center; color: var(--ink-500); background: #fff; border-radius: var(--radius-md); border: 1px solid var(--border-light);">
+          Nessun calendario pubblico attualmente configurato.
+        </div>
+      `;
+      return;
+    }
+    grid.innerHTML = calendari.map(c => `
+      <div class="public-card" style="border-top: 4px solid ${escapeHtml(c.colore)}; display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 24px;">${escapeHtml(c.icona || '📅')}</span>
+              <h3 style="font-size: 17px; font-weight: 700; color: var(--ink-900); margin: 0;">${escapeHtml(c.titolo)}</h3>
+            </div>
+            <span class="badge" style="background: ${escapeHtml(c.colore)}; color: #fff; font-size: 10.5px;">${escapeHtml((c.categoria || 'parrocchia').toUpperCase())}</span>
+          </div>
+          ${c.descrizione ? `<p style="font-size: 13px; color: var(--ink-700); line-height: 1.5; margin-bottom: 14px;">${escapeHtml(c.descrizione)}</p>` : ''}
+        </div>
+        <div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border-light); display: flex; gap: 8px;">
+          <a href="${escapeHtml(c.google_calendar_url)}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary" style="width: 100%; text-align: center; justify-content: center; background: ${escapeHtml(c.colore)}; border-color: ${escapeHtml(c.colore)}; font-weight: 600;">
+            📅 Apri / Aggiungi a Google Calendar ↗
+          </a>
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    console.error('Errore caricamento calendari pubblici:', err);
+  }
+}
+
+async function loadUserCalendari() {
+  const container = document.getElementById('dashUserCalendariGrid');
+  if (!container) return;
+  try {
+    const res = await fetch('/api/impostazioni/calendari?solo_pubblici=true');
+    const data = await res.json();
+    const calendari = data.calendari || [];
+    if (!calendari.length) {
+      container.innerHTML = `<div style="grid-column: 1/-1; padding: 16px; color: var(--ink-500); text-align: center;">Nessun calendario parrocchiale attivo al momento.</div>`;
+      return;
+    }
+    container.innerHTML = calendari.map(c => `
+      <div style="background: #fff; border: 1.5px solid var(--border-light); border-left: 5px solid ${escapeHtml(c.colore)}; border-radius: var(--radius-md); padding: 14px 16px; display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 20px;">${escapeHtml(c.icona || '📅')}</span>
+              <strong style="font-size: 14.5px; color: var(--ink-900);">${escapeHtml(c.titolo)}</strong>
+            </div>
+            <span class="badge" style="background: ${escapeHtml(c.colore)}; color: #fff; font-size: 10px;">${escapeHtml((c.categoria || 'parrocchia').toUpperCase())}</span>
+          </div>
+          ${c.descrizione ? `<p style="font-size: 12px; color: var(--ink-600); margin: 0 0 10px 0; line-height: 1.4;">${escapeHtml(c.descrizione)}</p>` : ''}
+        </div>
+        <div style="margin-top: 10px; display: flex; gap: 8px;">
+          <a href="${escapeHtml(c.google_calendar_url)}" target="_blank" rel="noopener noreferrer" class="btn btn-xs btn-outline-primary" style="width: 100%; text-align: center; justify-content: center; font-weight: 600;">
+            📅 Sincronizza con Google Calendar ↗
+          </a>
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    console.error('Errore calendari dashboard:', err);
+  }
+}
+
+async function loadSegreteriaCalendari() {
+  const tbody = document.getElementById('tbodySegreteriaCalendari');
+  if (!tbody) return;
+  try {
+    const res = await fetch('/api/impostazioni/calendari');
+    const data = await res.json();
+    cacheSegreteriaCalendari = data.calendari || [];
+    if (!cacheSegreteriaCalendari.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--ink-500); padding: 18px;">Nessun calendario Google configurato. Clicca "+ Nuovo Calendario".</td></tr>';
+      return;
+    }
+    tbody.innerHTML = cacheSegreteriaCalendari.map(c => `
+      <tr>
+        <td>
+          <span style="font-size: 18px; margin-right: 6px;">${escapeHtml(c.icona || '📅')}</span>
+          <strong>${escapeHtml(c.titolo)}</strong>
+          ${c.descrizione ? `<br><small style="color: var(--ink-500);">${escapeHtml(c.descrizione)}</small>` : ''}
+        </td>
+        <td><span class="badge badge-neutral">${escapeHtml((c.categoria || 'parrocchia').toUpperCase())}</span></td>
+        <td>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: ${escapeHtml(c.colore)};"></span>
+            <code>${escapeHtml(c.colore)}</code>
+          </div>
+        </td>
+        <td>
+          <a href="${escapeHtml(c.google_calendar_url)}" target="_blank" style="color: var(--primary); text-decoration: underline; font-size: 12px; word-break: break-all;">
+            Link Google Calendar ↗
+          </a>
+        </td>
+        <td>
+          ${c.is_pubblico ? '<span class="badge badge-success">Pubblico</span>' : '<span class="badge badge-warning">Nascosto</span>'}
+        </td>
+        <td>
+          <div style="display: flex; gap: 6px;">
+            <button class="btn btn-xs btn-secondary" onclick="openModalModificaCalendario(${c.id})">✏️ Modifica</button>
+            <button class="btn btn-xs btn-danger" onclick="eliminaCalendario(${c.id})">🗑 Elimina</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    console.error('Errore calendari segreteria:', err);
+  }
+}
+
+function openModalNuovoCalendario() {
+  document.getElementById('modalCalTitle').textContent = '📅 Nuovo Calendario Google Parrocchiale';
+  document.getElementById('inputCalId').value = '';
+  document.getElementById('inputCalTitolo').value = '';
+  document.getElementById('inputCalDescrizione').value = '';
+  document.getElementById('inputCalUrl').value = '';
+  document.getElementById('inputCalColore').value = '#8B1E1E';
+  document.getElementById('inputCalIcona').value = '📅';
+  document.getElementById('inputCalCategoria').value = 'parrocchia';
+  document.getElementById('inputCalOrdine').value = '0';
+  document.getElementById('inputCalPubblico').checked = true;
+  openModal('modalCalendarioComunita');
+}
+
+function openModalModificaCalendario(id) {
+  const c = cacheSegreteriaCalendari.find(x => x.id === id);
+  if (!c) return;
+  document.getElementById('modalCalTitle').textContent = `✏️ Modifica Calendario: ${c.titolo}`;
+  document.getElementById('inputCalId').value = c.id;
+  document.getElementById('inputCalTitolo').value = c.titolo;
+  document.getElementById('inputCalDescrizione').value = c.descrizione || '';
+  document.getElementById('inputCalUrl').value = c.google_calendar_url;
+  document.getElementById('inputCalColore').value = c.colore || '#8B1E1E';
+  document.getElementById('inputCalIcona').value = c.icona || '📅';
+  document.getElementById('inputCalCategoria').value = c.categoria || 'parrocchia';
+  document.getElementById('inputCalOrdine').value = c.ordine || 0;
+  document.getElementById('inputCalPubblico').checked = Boolean(c.is_pubblico);
+  openModal('modalCalendarioComunita');
+}
+
+async function handleSalvaCalendario(e) {
+  e.preventDefault();
+  const id = document.getElementById('inputCalId').value;
+  const payload = {
+    titolo: document.getElementById('inputCalTitolo').value.trim(),
+    descrizione: document.getElementById('inputCalDescrizione').value.trim(),
+    google_calendar_url: document.getElementById('inputCalUrl').value.trim(),
+    colore: document.getElementById('inputCalColore').value.trim(),
+    icona: document.getElementById('inputCalIcona').value.trim(),
+    categoria: document.getElementById('inputCalCategoria').value,
+    ordine: parseInt(document.getElementById('inputCalOrdine').value || 0),
+    is_pubblico: document.getElementById('inputCalPubblico').checked
+  };
+
+  try {
+    const url = id ? `/api/impostazioni/calendari/${id}` : '/api/impostazioni/calendari';
+    const method = id ? 'PUT' : 'POST';
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || 'Errore salvataggio calendario');
+    showToast(d.message, 'success');
+    closeModal('modalCalendarioComunita');
+    await loadSegreteriaCalendari();
+    await loadPublicCalendari();
+    await loadUserCalendari();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function eliminaCalendario(id) {
+  if (!confirm('Sei sicuro di voler eliminare questo calendario comunitario?')) return;
+  try {
+    const res = await fetch(`/api/impostazioni/calendari/${id}`, { method: 'DELETE' });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || 'Errore eliminazione calendario');
+    showToast(d.message, 'info');
+    await loadSegreteriaCalendari();
+    await loadPublicCalendari();
+    await loadUserCalendari();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+// ================= GESTIONE FOTO PROFILO (AVATAR) =================
+function openModalFotoProfilo(cf, nominativo, currentUrl) {
+  document.getElementById('fotoProfiloCF').value = cf;
+  document.getElementById('fotoProfiloNominativo').textContent = nominativo;
+  document.getElementById('fotoProfiloFileInput').value = '';
+
+  const preview = document.getElementById('fotoProfiloPreview');
+  const placeholder = document.getElementById('fotoProfiloPlaceholder');
+  const btnRimuovi = document.getElementById('btnRimuoviFotoProfilo');
+
+  if (currentUrl && currentUrl.trim() !== '') {
+    preview.src = currentUrl;
+    preview.style.display = 'block';
+    placeholder.style.display = 'none';
+    btnRimuovi.style.display = 'inline-block';
+  } else {
+    preview.src = '';
+    preview.style.display = 'none';
+    placeholder.style.display = 'block';
+    btnRimuovi.style.display = 'none';
+  }
+
+  openModal('modalFotoProfilo');
+}
+
+function previewFotoProfilo(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const preview = document.getElementById('fotoProfiloPreview');
+    const placeholder = document.getElementById('fotoProfiloPlaceholder');
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+    placeholder.style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function handleSalvaFotoProfilo(e) {
+  e.preventDefault();
+  const cf = document.getElementById('fotoProfiloCF').value;
+  const fileInput = document.getElementById('fotoProfiloFileInput');
+  if (!fileInput.files || !fileInput.files[0]) {
+    showToast('Seleziona un\'immagine prima di salvare', 'warning');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('foto', fileInput.files[0]);
+
+  const btn = document.getElementById('btnSalvaFotoProfilo');
+  btn.disabled = true;
+  btn.textContent = 'Caricamento su Drive...';
+
+  try {
+    const res = await fetch(`/api/persone/${cf}/foto-profilo`, {
+      method: 'POST',
+      body: formData
+    });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || 'Errore caricamento foto');
+
+    showToast(d.message, 'success');
+    closeModal('modalFotoProfilo');
+
+    if (currentUser && currentUser.persona && currentUser.persona.codice_fiscale === cf) {
+      currentUser.persona.foto_profilo_url = d.persona.foto_profilo_url;
+      renderAppShell();
+    }
+
+    if (document.getElementById('viewFamiglia').style.display !== 'none') {
+      await loadFamiglia();
+    }
+    if (document.getElementById('viewAnagrafica').style.display !== 'none') {
+      await loadPersone();
+    }
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Carica Foto';
+  }
+}
+
+async function handleRimuoviFotoProfilo() {
+  const cf = document.getElementById('fotoProfiloCF').value;
+  if (!confirm('Rimuovere la foto profilo?')) return;
+
+  try {
+    const res = await fetch(`/api/persone/${cf}/foto-profilo`, { method: 'DELETE' });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || 'Errore rimozione foto');
+
+    showToast(d.message, 'info');
+    closeModal('modalFotoProfilo');
+
+    if (currentUser && currentUser.persona && currentUser.persona.codice_fiscale === cf) {
+      currentUser.persona.foto_profilo_url = null;
+      renderAppShell();
+    }
+
+    if (document.getElementById('viewFamiglia').style.display !== 'none') {
+      await loadFamiglia();
+    }
+    if (document.getElementById('viewAnagrafica').style.display !== 'none') {
+      await loadPersone();
+    }
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
 
 
 

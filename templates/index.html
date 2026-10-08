@@ -29,6 +29,7 @@
         <a href="#sectionMesse">Orari Sante Messe</a>
         <a href="#sectionAttivita">Attività & Iscrizioni</a>
         <a href="#sectionAvvisi">Avvisi Parrocchiali</a>
+        <a href="#sectionCalendari">Calendari & Appuntamenti</a>
         <a href="#sectionContatti">Contatti & Segreteria</a>
       </nav>
 
@@ -107,6 +108,19 @@
       </div>
       <div class="public-grid-3" id="publicAvvisiGrid">
         <!-- Popolato dinamicamente via JS con gli avvisi pubblicati -->
+      </div>
+    </section>
+
+    <!-- Sezione Calendari Google Comunitari (Pubblici) -->
+    <section class="public-section" id="sectionCalendari" style="background: #fdfbf7; border-top: 1px solid var(--border-light); max-width: 100%;">
+      <div style="max-width: 1200px; margin: 0 auto;">
+        <div class="public-section-header">
+          <h2>📅 Calendari & Appuntamenti della Comunità</h2>
+          <p>Consulta gli incontri comunitari, la catechesi e le iniziative dell'oratorio. Puoi sincronizzarli direttamente con il tuo Google Calendar!</p>
+        </div>
+        <div class="public-grid-3" id="publicCalendariGrid">
+          <!-- Popolato dinamicamente da loadPublicCalendari() -->
+        </div>
       </div>
     </section>
 
@@ -412,12 +426,14 @@ Domenica: dopo le Sante Messe</p>
                 <small id="kpiQuoteResiduo">Saldo residuo da incassare</small>
               </div>
             </div>
-            <div class="kpi-card" id="kpiCardOfferteUtente" style="display: none; cursor: pointer; border: 1.5px solid #fecaca; background: #fffafb;" onclick="openModalOfferteDonazioni()" title="Clicca per visualizzare quadro offerte e donare con Satispay o IBAN">
+            <div class="kpi-card" id="kpiCardOfferteUtente" style="display: none; cursor: pointer; border: 1.5px solid #fecaca; background: #fffafb; padding: 14px 18px;" onclick="openModalOfferteDonazioni()" title="Clicca per donare con Satispay o Bonifico IBAN">
               <div class="kpi-icon crimson"><i>❤️</i></div>
-              <div class="kpi-content">
+              <div class="kpi-content" style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
                 <span style="color: #991b1b; font-weight: 700;">Offerte & Sostegno</span>
-                <strong id="kpiMioTotOfferto" style="color: #991b1b;">€ 0.00</strong>
-                <small style="color: #b91c1c; font-weight: 600;">Satispay · IBAN · Storico →</small>
+                <button type="button" class="btn btn-sm btn-primary" style="background: #dc2626; border-color: #dc2626; font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 20px; pointer-events: none;">
+                  ❤️ Satispay / IBAN →
+                </button>
+                <small style="color: #b91c1c; font-weight: 600;">Sostieni la parrocchia</small>
               </div>
             </div>
           </div>
@@ -450,6 +466,21 @@ Domenica: dopo le Sante Messe</p>
                 <div id="dashAvvisiContainer">
                   <p style="font-size: 13px; color: var(--ink-500);">Nessun avviso straordinario al momento.</p>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Calendari Comunitari & Personali -->
+          <div class="card" style="margin-top: 24px;">
+            <div class="card-header">
+              <div>
+                <h3 style="font-size: 16.5px; font-weight: 700;"><i>📅</i> Calendari & Appuntamenti Parrocchiali</h3>
+                <small style="color: var(--ink-500);">Aggiungi gli incontri di catechesi, oratorio e vita parrocchiale al tuo Google Calendar personale</small>
+              </div>
+            </div>
+            <div class="card-body">
+              <div id="dashUserCalendariGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px;">
+                <p style="color: var(--ink-500); font-size: 13px;">Caricamento calendari comunitari...</p>
               </div>
             </div>
           </div>
@@ -1013,10 +1044,73 @@ Domenica: dopo le Sante Messe</p>
                     <label>Orari di Apertura Segreteria</label>
                     <textarea id="inputSegreteriaOrari" class="form-control" rows="3" placeholder="Martedì e Giovedì: 16:00 - 18:30&#10;Sabato mattina: 09:30 - 11:30&#10;Domenica: dopo le Sante Messe"></textarea>
                   </div>
+
+                  <!-- Sezione Modificabile Offerte & Sostegno (IBAN, Satispay, Intestatario) -->
+                  <div style="margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border-light);">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                      <span style="font-size: 16px;">💳</span>
+                      <strong style="color: var(--ink-900); font-size: 14.5px;">Coordinate Donazioni & Offerte (Satispay & IBAN)</strong>
+                    </div>
+                    <p style="font-size: 12.5px; color: var(--ink-600); margin-bottom: 14px;">
+                      Configura l'IBAN bancario, il link Satispay ufficiale della parrocchia, l'intestatario e la causale predefinita per le donazioni dei fedeli.
+                    </p>
+
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label>IBAN Parrocchia</label>
+                        <input type="text" id="inputOfferteIban" class="form-control" placeholder="es. IT60X0542811101000000123456">
+                      </div>
+                      <div class="form-group">
+                        <label>Link Satispay Parrocchia</label>
+                        <input type="url" id="inputOfferteSatispay" class="form-control" placeholder="https://tag.satispay.com/sacrocuoreasti">
+                      </div>
+                    </div>
+
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label>Intestatario Ufficiale</label>
+                        <input type="text" id="inputOfferteIntestatario" class="form-control" placeholder="Parrocchia Sacro Cuore di Gesù - Asti">
+                      </div>
+                      <div class="form-group">
+                        <label>Causale Consigliata Offerte</label>
+                        <input type="text" id="inputOfferteCausale" class="form-control" placeholder="Offerta liberale per le attività parrocchiali">
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div style="margin-top: 20px;">
-                  <button class="btn btn-primary" onclick="salvaImpostazioniHomepage()">Salva Impostazioni Homepage</button>
+                  <button class="btn btn-primary" onclick="salvaImpostazioniHomepage()">Salva Impostazioni Homepage & Offerte</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Gestione Calendari Google Comunitari (Parrocchiali) -->
+            <div class="card" style="margin-top: 24px;">
+              <div class="card-header">
+                <div>
+                  <h3 style="font-size: 17px; font-weight: 700;"><i>📅</i> Calendari Google Parrocchiali & Comunitari</h3>
+                  <small style="color:var(--ink-500);">Aggiungi i link ai calendari Google di catechesi, oratorio e vita parrocchiale con colore e categoria dedicati</small>
+                </div>
+                <button class="btn btn-sm btn-primary" onclick="openModalNuovoCalendario()"><i>+</i> Nuovo Calendario</button>
+              </div>
+              <div class="card-body">
+                <div class="table-responsive">
+                  <table class="custom-table" id="tableSegreteriaCalendari">
+                    <thead>
+                      <tr>
+                        <th>Icona & Titolo</th>
+                        <th>Categoria</th>
+                        <th>Colore</th>
+                        <th>Link Google Calendar</th>
+                        <th>Visibilità</th>
+                        <th>Azioni</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tbodySegreteriaCalendari">
+                      <tr><td colspan="6" style="text-align: center; color: var(--ink-500); padding: 18px;">Caricamento calendari...</td></tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
@@ -4136,15 +4230,13 @@ Domenica: dopo le Sante Messe</p>
           <div>📝 <strong>Causale consigliata:</strong> <span id="offerteCausale">Offerta liberale per le attività parrocchiali</span></div>
         </div>
 
-        <!-- Quadro Aggiornato Offerte e Quote Versate dal Fedele / Famiglia -->
+        <!-- Storico Offerte Versate dal Fedele / Famiglia -->
         <div>
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+          <div style="margin-bottom: 10px;">
             <h4 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--ink-900);">
-              📊 Il Tuo Quadro Offerte & Quote Versate
+              📜 Storico Offerte & Donazioni
             </h4>
-            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-sm); padding: 4px 10px; font-size: 13px; font-weight: 700; color: #166534;">
-              Totale registrato: <span id="offerteTotaleVersato" style="font-size: 15px;">€ 0.00</span>
-            </div>
+            <small style="color: var(--ink-500);">Riepilogo delle offerte e donazioni registrate a tuo nome</small>
           </div>
 
           <div class="table-responsive" style="max-height: 220px; overflow-y: auto; border: 1px solid var(--border-light); border-radius: var(--radius-md); background: #fff;">
@@ -4169,6 +4261,110 @@ Domenica: dopo le Sante Messe</p>
       <div class="modal-footer" style="background: #f8fafc; border-top: 1px solid var(--border-light);">
         <button type="button" class="btn btn-secondary" onclick="closeModal('modalOfferteDonazioni')">Chiudi</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal Nuovo / Modifica Calendario Comunitario Google -->
+  <div class="modal-overlay" id="modalCalendarioComunita">
+    <div class="modal-window" style="max-width: 560px;">
+      <div class="modal-header">
+        <h3 id="modalCalTitle">📅 Nuovo Calendario Google Parrocchiale</h3>
+        <button class="btn-close-modal" onclick="closeModal('modalCalendarioComunita')">×</button>
+      </div>
+      <form onsubmit="handleSalvaCalendario(event)">
+        <input type="hidden" id="inputCalId">
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Titolo del Calendario *</label>
+            <input type="text" id="inputCalTitolo" class="form-control" placeholder="es. Catechismo & Incontri Fanciulli" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Categoria</label>
+              <select id="inputCalCategoria" class="form-control">
+                <option value="parrocchia">⛪ Vita Parrocchiale & Messe</option>
+                <option value="catechismo">📖 Catechismo & Sacramenti</option>
+                <option value="oratorio">🏓 Oratorio & Estate Ragazzi</option>
+                <option value="giovani">🎒 Gruppo Giovani & Animatori</option>
+                <option value="famiglie">👨‍👩‍👧 Incontri Famiglie</option>
+                <option value="altro">📌 Altro</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Icona (Emoji)</label>
+              <input type="text" id="inputCalIcona" class="form-control" value="📅" maxlength="4">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Colore Badge</label>
+              <input type="color" id="inputCalColore" class="form-control" value="#8B1E1E" style="height: 38px; padding: 2px;">
+            </div>
+            <div class="form-group">
+              <label>Ordine Visualizzazione</label>
+              <input type="number" id="inputCalOrdine" class="form-control" value="0" min="0">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Link Google Calendar (URL Pubblico / Iframe / Condivisione) *</label>
+            <input type="url" id="inputCalUrl" class="form-control" placeholder="https://calendar.google.com/calendar/u/0/r..." required>
+            <small style="color: var(--ink-500); display: block; margin-top: 4px;">Incolla il link pubblico di condivisione di Google Calendar per permettere ai parrocchiani di visualizzarlo o aggiungerlo al proprio calendario personale.</small>
+          </div>
+          <div class="form-group">
+            <label>Descrizione Breve</label>
+            <textarea id="inputCalDescrizione" class="form-control" rows="2" placeholder="Breve descrizione degli appuntamenti contenuti in questo calendario..."></textarea>
+          </div>
+          <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="inputCalPubblico" checked>
+              <span>Mostra sulla Homepage pubblica e nel profilo degli utenti</span>
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modalCalendarioComunita')">Annulla</button>
+          <button type="submit" class="btn btn-primary" id="btnSalvaCal">Salva Calendario</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Carica / Modifica Foto Profilo (Avatar) -->
+  <div class="modal-overlay" id="modalFotoProfilo">
+    <div class="modal-window" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3>📸 Aggiorna Foto Profilo</h3>
+        <button class="btn-close-modal" onclick="closeModal('modalFotoProfilo')">×</button>
+      </div>
+      <form onsubmit="handleSalvaFotoProfilo(event)">
+        <input type="hidden" id="fotoProfiloCF">
+        <div class="modal-body" style="text-align: center;">
+          <div style="margin-bottom: 16px;">
+            <p style="font-size: 13.5px; color: var(--ink-700); margin: 0 0 12px 0;">
+              Foto per: <strong id="fotoProfiloNominativo" style="color: var(--primary);"></strong>
+            </p>
+            <div style="width: 110px; height: 110px; border-radius: 50%; margin: 0 auto; overflow: hidden; border: 3px solid var(--primary-border); background: var(--bg-subtle); display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-md);">
+              <img id="fotoProfiloPreview" src="" alt="Anteprima Foto" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+              <span id="fotoProfiloPlaceholder" style="font-size: 38px; color: var(--ink-400);">👤</span>
+            </div>
+          </div>
+
+          <div class="form-group" style="text-align: left;">
+            <label>Seleziona file immagine (JPG, PNG, WebP) *</label>
+            <input type="file" id="fotoProfiloFileInput" class="form-control" accept="image/jpeg,image/png,image/webp" onchange="previewFotoProfilo(this)" required>
+            <small style="color: var(--ink-500); display: block; margin-top: 4px;">La foto verrà salvata in modo sicuro su Google Drive.</small>
+          </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: space-between;">
+          <button type="button" class="btn btn-outline-danger btn-sm" id="btnRimuoviFotoProfilo" onclick="handleRimuoviFotoProfilo()" style="display: none;">
+            🗑 Rimuovi Foto
+          </button>
+          <div style="display: flex; gap: 8px; margin-left: auto;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('modalFotoProfilo')">Annulla</button>
+            <button type="submit" class="btn btn-primary" id="btnSalvaFotoProfilo">Carica Foto</button>
+          </div>
+        </div>
+      </form>
     </div>
   </div>
 
