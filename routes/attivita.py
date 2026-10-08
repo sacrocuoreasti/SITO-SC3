@@ -148,10 +148,29 @@ def upload_locandina(id):
         return jsonify({'error': 'Formato file non supportato. Carica un\'immagine (JPG, PNG, WebP) o PDF.'}), 400
 
     filename = f"locandina_{id}_{int(datetime.utcnow().timestamp())}{ext}"
+    mimetype = file.content_type or 'application/octet-stream'
+
+    from services.google_drive import is_google_drive_configured, upload_file_to_drive, delete_file_from_drive
+
+    if is_google_drive_configured():
+        drive_res = upload_file_to_drive(file, filename, mimetype=mimetype)
+        if drive_res.get('success'):
+            if a.locandina_path:
+                delete_file_from_drive(a.locandina_path)
+            a.locandina_path = drive_res.get('direct_url') or drive_res.get('url')
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'message': f'Locandina salvata su Google Drive per "{a.titolo}"',
+                'attivita': a.to_dict()
+            })
+
+    # Fallback locale se Drive non è configurato
     filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+    file.seek(0)
     file.save(filepath)
 
-    if a.locandina_path and a.locandina_path != filename:
+    if a.locandina_path and not a.locandina_path.startswith('http') and a.locandina_path != filename:
         old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], a.locandina_path)
         if os.path.exists(old_path):
             try: os.remove(old_path)
@@ -175,10 +194,14 @@ def delete_locandina(id):
     if a.locandina_path:
         import os
         from flask import current_app
-        old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], a.locandina_path)
-        if os.path.exists(old_path):
-            try: os.remove(old_path)
-            except Exception: pass
+        from services.google_drive import delete_file_from_drive
+        if a.locandina_path.startswith('http'):
+            delete_file_from_drive(a.locandina_path)
+        else:
+            old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], a.locandina_path)
+            if os.path.exists(old_path):
+                try: os.remove(old_path)
+                except Exception: pass
         a.locandina_path = None
         db.session.commit()
 

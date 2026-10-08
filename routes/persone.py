@@ -225,11 +225,30 @@ def upload_certificato_battesimo(cf):
         return jsonify({'error': 'Formato file non supportato. Carica un PDF o un\'immagine (JPG, PNG).'}), 400
 
     filename = f"battesimo_{cf}_{int(datetime.utcnow().timestamp())}{ext}"
+    mimetype = file.content_type or 'application/octet-stream'
+
+    from services.google_drive import is_google_drive_configured, upload_file_to_drive, delete_file_from_drive
+
+    if is_google_drive_configured():
+        drive_res = upload_file_to_drive(file, filename, mimetype=mimetype)
+        if drive_res.get('success'):
+            if p.certificato_battesimo_path:
+                delete_file_from_drive(p.certificato_battesimo_path)
+            p.certificato_battesimo_path = drive_res.get('direct_url') or drive_res.get('url')
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'message': f'Certificato di battesimo salvato su Google Drive per {p.nominativo}',
+                'persona': p.to_dict()
+            })
+
+    # Fallback locale se Drive non è configurato
     filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+    file.seek(0)
     file.save(filepath)
 
-    # Rimuovi eventuale vecchio certificato
-    if p.certificato_battesimo_path and p.certificato_battesimo_path != filename:
+    # Rimuovi eventuale vecchio certificato locale
+    if p.certificato_battesimo_path and not p.certificato_battesimo_path.startswith('http') and p.certificato_battesimo_path != filename:
         old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], p.certificato_battesimo_path)
         if os.path.exists(old_path):
             try: os.remove(old_path)
@@ -254,10 +273,14 @@ def delete_certificato_battesimo(cf):
     if p.certificato_battesimo_path:
         import os
         from flask import current_app
-        old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], p.certificato_battesimo_path)
-        if os.path.exists(old_path):
-            try: os.remove(old_path)
-            except Exception: pass
+        from services.google_drive import delete_file_from_drive
+        if p.certificato_battesimo_path.startswith('http'):
+            delete_file_from_drive(p.certificato_battesimo_path)
+        else:
+            old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], p.certificato_battesimo_path)
+            if os.path.exists(old_path):
+                try: os.remove(old_path)
+                except Exception: pass
         p.certificato_battesimo_path = None
         db.session.commit()
 

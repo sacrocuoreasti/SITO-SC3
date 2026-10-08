@@ -12,6 +12,8 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Uploads and Database (optional: keep if you want initial seed, or exclude for production database separation)
-# database/sacro_cuore.db
-# uploads/*
+# Credentials & Keys
+*credentials*.json
+service_account.json
+.env
+

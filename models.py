@@ -126,7 +126,7 @@ class Persona(db.Model):
             'allergie': self.allergie or '',
             'note_generali': self.note_generali or '',
             'certificato_battesimo_path': self.certificato_battesimo_path or '',
-            'certificato_battesimo_url': f"/uploads/{self.certificato_battesimo_path}" if self.certificato_battesimo_path else None,
+            'certificato_battesimo_url': self.certificato_battesimo_path if (self.certificato_battesimo_path and self.certificato_battesimo_path.startswith('http')) else (f"/uploads/{self.certificato_battesimo_path}" if self.certificato_battesimo_path else None),
             'nucleo_id': self.nucleo_id,
             'ruolo_famiglia': self.ruolo_famiglia or 'Figlio/a',
             'has_account': bool(self.utente),
@@ -362,7 +362,7 @@ class Attivita(db.Model):
             'is_attiva': self.is_attiva,
             'is_pubblicato': self.is_pubblicato,
             'locandina_path': self.locandina_path or '',
-            'locandina_url': f"/uploads/{self.locandina_path}" if self.locandina_path else None,
+            'locandina_url': self.locandina_path if (self.locandina_path and self.locandina_path.startswith('http')) else (f"/uploads/{self.locandina_path}" if self.locandina_path else None),
             'campi_extra': self.campi_extra,
             'campi_personalizzati': self.campi_personalizzati
         }
