@@ -111,15 +111,72 @@
       </div>
     </section>
 
-    <!-- Sezione Calendari Google Comunitari (Pubblici) -->
+    <!-- Sezione Calendari Google Comunitari (Pubblici & Interattivi) -->
     <section class="public-section" id="sectionCalendari" style="background: #fdfbf7; border-top: 1px solid var(--border-light); max-width: 100%;">
       <div style="max-width: 1200px; margin: 0 auto;">
         <div class="public-section-header">
-          <h2>📅 Calendari & Appuntamenti della Comunità</h2>
-          <p>Consulta gli incontri comunitari, la catechesi e le iniziative dell'oratorio. Puoi sincronizzarli direttamente con il tuo Google Calendar!</p>
+          <div class="public-hero-badge" style="margin-bottom: 10px;">📅 Vita di Comunità & Appuntamenti</div>
+          <h2>Calendario Parrocchiale Interattivo</h2>
+          <p>Consulta gli incontri di catechesi, le celebrazioni e le attività dell'oratorio. Naviga tra vista Mese, Settimana o Agenda e aggiungili con un clic al tuo smartphone!</p>
         </div>
-        <div class="public-grid-3" id="publicCalendariGrid">
-          <!-- Popolato dinamicamente da loadPublicCalendari() -->
+
+        <!-- Widget Interattivo Google Calendar -->
+        <div class="calendar-widget-wrapper" style="background: #ffffff; border: 1.5px solid var(--border-light); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); overflow: hidden; margin-bottom: 30px;">
+          <div style="background: linear-gradient(135deg, #8B1E1E 0%, #a82424 100%); color: #ffffff; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="font-size: 28px;">🗓️</span>
+              <div>
+                <h3 style="font-size: 18px; font-weight: 700; color: #ffffff; margin: 0; line-height: 1.2;">Comunità Sacro Cuore di Gesù</h3>
+                <small style="opacity: 0.95; font-size: 12px; color: #ffe4e4;">Sincronizzato in tempo reale con Google Calendar</small>
+              </div>
+            </div>
+
+            <!-- Bottoni Cambio Vista (Mese / Settimana / Agenda) & Sincronizzazione -->
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <div class="cal-view-selector" style="display: inline-flex; background: rgba(0,0,0,0.25); padding: 3px; border-radius: 8px;">
+                <button type="button" class="btn btn-xs cal-view-btn" id="btnCalModeMonth" onclick="setPublicCalendarMode('MONTH')" style="border-radius: 6px; padding: 5px 12px; font-size: 12px; font-weight: 700; background: #ffffff; color: #8B1E1E; border: none; cursor: pointer;">Mese</button>
+                <button type="button" class="btn btn-xs cal-view-btn" id="btnCalModeWeek" onclick="setPublicCalendarMode('WEEK')" style="border-radius: 6px; padding: 5px 12px; font-size: 12px; font-weight: 600; background: transparent; color: #ffffff; border: none; cursor: pointer;">Settimana</button>
+                <button type="button" class="btn btn-xs cal-view-btn" id="btnCalModeAgenda" onclick="setPublicCalendarMode('AGENDA')" style="border-radius: 6px; padding: 5px 12px; font-size: 12px; font-weight: 600; background: transparent; color: #ffffff; border: none; cursor: pointer;">Agenda</button>
+              </div>
+
+              <a id="btnSyncGoogleCal" href="https://calendar.google.com/calendar/render?cid=c_bff35669d70591ceec1aa976821e3eea2aca33b728e666885c4162712e0275c2%40group.calendar.google.com" target="_blank" rel="noopener noreferrer" class="btn btn-xs" style="background: #ffffff; color: #8B1E1E; font-weight: 700; border: none; padding: 7px 14px; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: var(--shadow-sm);">
+                <span>➕ Sincronizza su Google Calendar ↗</span>
+              </a>
+              <a id="btnSyncIcal" href="https://calendar.google.com/calendar/ical/c_bff35669d70591ceec1aa976821e3eea2aca33b728e666885c4162712e0275c2%40group.calendar.google.com/public/basic.ics" class="btn btn-xs" style="background: rgba(255,255,255,0.18); color: #ffffff; font-weight: 600; border: 1px solid rgba(255,255,255,0.35); padding: 7px 12px; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                <span>🍏 iCal / Apple</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- Iframe Interattivo Google Calendar -->
+          <div style="position: relative; width: 100%; min-height: 620px; background: #ffffff;">
+            <iframe id="publicGoogleCalendarIframe" 
+              src="https://calendar.google.com/calendar/embed?src=c_bff35669d70591ceec1aa976821e3eea2aca33b728e666885c4162712e0275c2%40group.calendar.google.com&ctz=Europe%2FRome&mode=MONTH&showTitle=0&showNav=1&showDate=1&showPrint=0&showTabs=1&showCalendars=0&showTz=1&bgcolor=%23ffffff" 
+              style="border: 0; width: 100%; height: 620px; display: block;" 
+              frameborder="0" 
+              scrolling="no" 
+              loading="lazy">
+            </iframe>
+          </div>
+
+          <div style="background: #fafaf7; padding: 12px 22px; border-top: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; font-size: 12.5px; color: var(--ink-700);">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span>💡 <strong>Suggerimento:</strong> Clicca su qualsiasi incontro nel calendario per visualizzare orario, aula e note pastorali.</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px;">
+              <span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 50%; background: #0284c7; display: inline-block;"></span> Catechismo</span>
+              <span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 50%; background: #16a34a; display: inline-block;"></span> Oratorio</span>
+              <span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 50%; background: #8B1E1E; display: inline-block;"></span> Liturgia & Feste</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Selettori Canali & Calendari Specifici -->
+        <div style="margin-top: 20px;">
+          <h4 style="font-size: 15px; font-weight: 700; color: var(--ink-900); margin-bottom: 14px;">Canali e Calendari Comunitari:</h4>
+          <div class="public-grid-3" id="publicCalendariGrid">
+            <!-- Popolato dinamicamente da loadPublicCalendari() -->
+          </div>
         </div>
       </div>
     </section>
@@ -331,6 +388,9 @@ Domenica: dopo le Sante Messe</p>
         </a>
         <a class="nav-item role-nav admin-nav" data-view="utenti" onclick="navigateTo('utenti')">
           <i>⚙</i> Utenti & Privilegi
+        </a>
+        <a href="https://whatsapp-bot-5vi7.onrender.com/login" target="_blank" rel="noopener noreferrer" class="nav-item role-nav staff-nav whatsapp-nav" style="color: #16a34a; font-weight: 700;">
+          <i>💬</i> Bot WhatsApp ↗
         </a>
       </nav>
 
@@ -1081,6 +1141,30 @@ Domenica: dopo le Sante Messe</p>
 
                 <div style="margin-top: 20px;">
                   <button class="btn btn-primary" onclick="salvaImpostazioniHomepage()">Salva Impostazioni Homepage & Offerte</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Collegamento Bot WhatsApp Parrocchiale (Render) -->
+            <div class="card" style="margin-top: 24px; border: 1.5px solid #86efac; background: #f0fdf4;">
+              <div class="card-body" style="padding: 22px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap;">
+                  <div style="display: flex; align-items: center; gap: 16px;">
+                    <div style="width: 50px; height: 50px; border-radius: 50%; background: #22c55e; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.35);">
+                      💬
+                    </div>
+                    <div>
+                      <h3 style="font-size: 17px; font-weight: 700; color: #14532d; margin: 0 0 4px 0;">Bot WhatsApp Parrocchiale</h3>
+                      <p style="font-size: 13px; color: #166534; margin: 0;">
+                        Gestisci le comunicazioni, le notifiche automatiche e le risposte del bot WhatsApp della comunità parrocchiale.
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    <a href="https://whatsapp-bot-5vi7.onrender.com/login" target="_blank" rel="noopener noreferrer" class="btn" style="background: #22c55e; color: #ffffff; border: none; font-weight: 700; font-size: 13.5px; padding: 10px 22px; border-radius: var(--radius-md); display: inline-flex; align-items: center; gap: 8px; text-decoration: none; box-shadow: 0 2px 8px rgba(34,197,94,0.3);">
+                      <span>💬 Accedi al Bot WhatsApp ↗</span>
+                    </a>
+                  </div>
                 </div>
               </div>
             </div>

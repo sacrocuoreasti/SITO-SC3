@@ -63,6 +63,20 @@ def create_app(config_class=Config):
     def health():
         return jsonify({'status': 'ok', 'app': 'Parrocchia Sacro Cuore Asti'})
 
+    @app.errorhandler(500)
+    def handle_500(e):
+        from flask import request
+        if request.path.startswith('/api/'):
+            return jsonify({'error': 'Errore interno del server. I dati sono al sicuro. Riprova tra poco.', 'success': False}), 500
+        return 'Errore interno del server', 500
+
+    @app.errorhandler(404)
+    def handle_404(e):
+        from flask import request
+        if request.path.startswith('/api/'):
+            return jsonify({'error': 'Risorsa API non trovata', 'success': False}), 404
+        return render_template('index.html')
+
     @app.route('/template_anagrafica_sacro_cuore.xlsx')
     def serve_template():
         return send_from_directory(app.root_path, 'template_anagrafica_sacro_cuore.xlsx')

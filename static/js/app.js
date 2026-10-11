@@ -15,6 +15,62 @@ let cacheUtenti = [];
 let selectedListaId = null;
 let debounceTimer = null;
 
+// ================= ERROR SHIELD & STABILITY =================
+window.addEventListener('unhandledrejection', (event) => {
+  console.warn('Protezione Stabilità Render: Promessa non gestita intercettata:', event.reason);
+  event.preventDefault();
+});
+window.addEventListener('error', (event) => {
+  console.warn('Protezione Stabilità Render: Errore globale intercettato:', event.message);
+});
+
+async function safeFetchJson(url, options = {}, fallback = {}) {
+  try {
+    const res = await fetch(url, options);
+    if (!res.ok) {
+      console.warn(`Chiamata API a ${url} ha restituito stato ${res.status}`);
+      return fallback;
+    }
+    const ct = res.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) {
+      console.warn(`Risposta non-JSON da ${url}`);
+      return fallback;
+    }
+    return await res.json();
+  } catch (err) {
+    console.warn(`Network/Parse warning per ${url}:`, err);
+    return fallback;
+  }
+}
+
+// ================= GESTIONE CALENDARIO GOOGLE PUBBLICO =================
+let currentPublicCalMode = 'MONTH';
+const SHARED_GOOGLE_CAL_SRC = 'c_bff35669d70591ceec1aa976821e3eea2aca33b728e666885c4162712e0275c2@group.calendar.google.com';
+
+function setPublicCalendarMode(mode) {
+  currentPublicCalMode = mode;
+  const iframe = document.getElementById('publicGoogleCalendarIframe');
+  if (iframe) {
+    const encSrc = encodeURIComponent(SHARED_GOOGLE_CAL_SRC);
+    iframe.src = `https://calendar.google.com/calendar/embed?src=${encSrc}&ctz=Europe%2FRome&mode=${mode}&showTitle=0&showNav=1&showDate=1&showPrint=0&showTabs=1&showCalendars=0&showTz=1&bgcolor=%23ffffff`;
+  }
+
+  document.querySelectorAll('.cal-view-btn').forEach(btn => {
+    btn.classList.remove('active');
+    btn.style.background = 'transparent';
+    btn.style.color = '#ffffff';
+    btn.style.fontWeight = '600';
+  });
+
+  const activeBtn = document.getElementById(`btnCalMode${mode.charAt(0) + mode.slice(1).toLowerCase()}`);
+  if (activeBtn) {
+    activeBtn.classList.add('active');
+    activeBtn.style.background = '#ffffff';
+    activeBtn.style.color = '#8B1E1E';
+    activeBtn.style.fontWeight = '700';
+  }
+}
+
 // ================= INITIALIZATION =================
 document.addEventListener('DOMContentLoaded', async () => {
   setupDropzone();
@@ -37,31 +93,42 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ================= PUBLIC HOMEPAGE =================
 async function loadPublicHomepage() {
   try {
-    const res = await fetch('/api/impostazioni/dati-pubblici');
-    const data = await res.json();
+    const data = await safeFetchJson('/api/impostazioni/dati-pubblici', {}, { impostazioni: {}, attivita: [], avvisi: [], calendari: [] });
     const imp = data.impostazioni || {};
 
-    // Hero Customization
-    if (imp.titolo_hero) document.getElementById('publicHeroTitle').innerHTML = escapeHtml(imp.titolo_hero).replace('Sacro Cuore', '<span>Sacro Cuore</span>');
-    if (imp.sottotitolo_hero) document.getElementById('publicHeroSubtitle').textContent = imp.sottotitolo_hero;
-    if (imp.testo_benvenuto) document.getElementById('publicHeroDescription').textContent = imp.testo_benvenuto;
+    // Hero Customization (defensivo)
+    const titleEl = document.getElementById('publicHeroTitle');
+    if (titleEl && imp.titolo_hero) {
+      titleEl.innerHTML = escapeHtml(imp.titolo_hero).replace('Sacro Cuore', '<span>Sacro Cuore</span>');
+    }
+    const subEl = document.getElementById('publicHeroSubtitle');
+    if (subEl && imp.sottotitolo_hero) subEl.textContent = imp.sottotitolo_hero;
+    const descEl = document.getElementById('publicHeroDescription');
+    if (descEl && imp.testo_benvenuto) descEl.textContent = imp.testo_benvenuto;
 
     // Banner alert
     const bannerEl = document.getElementById('publicBannerAlert');
-    if (imp.mostra_banner && imp.testo_banner) {
-      bannerEl.style.display = 'flex';
-      document.getElementById('publicBannerText').textContent = imp.testo_banner;
-    } else {
-      bannerEl.style.display = 'none';
+    if (bannerEl) {
+      if (imp.mostra_banner && imp.testo_banner) {
+        bannerEl.style.display = 'flex';
+        const txt = document.getElementById('publicBannerText');
+        if (txt) txt.textContent = imp.testo_banner;
+      } else {
+        bannerEl.style.display = 'none';
+      }
     }
 
-    // Toggle Sezioni
-    document.getElementById('sectionMesse').style.display = imp.mostra_orari_messe ? 'block' : 'none';
-    document.getElementById('sectionAttivita').style.display = imp.mostra_attivita ? 'block' : 'none';
-    document.getElementById('sectionAvvisi').style.display = imp.mostra_avvisi ? 'block' : 'none';
-    document.getElementById('sectionContatti').style.display = imp.mostra_contatti ? 'block' : 'none';
+    // Toggle Sezioni (defensivo: mantieni sempre visibile a meno di esplicito false)
+    const secMesse = document.getElementById('sectionMesse');
+    if (secMesse) secMesse.style.display = imp.mostra_orari_messe !== false ? 'block' : 'none';
+    const secAtt = document.getElementById('sectionAttivita');
+    if (secAtt) secAtt.style.display = imp.mostra_attivita !== false ? 'block' : 'none';
+    const secAvv = document.getElementById('sectionAvvisi');
+    if (secAvv) secAvv.style.display = imp.mostra_avvisi !== false ? 'block' : 'none';
+    const secCont = document.getElementById('sectionContatti');
+    if (secCont) secCont.style.display = imp.mostra_contatti !== false ? 'block' : 'none';
 
-    // Segreteria & Recapiti Pubblici personalizzati da admin
+    // Segreteria & Recapiti Pubblici
     if (imp.segreteria_titolo && document.getElementById('homeSegreteriaTitolo')) document.getElementById('homeSegreteriaTitolo').textContent = imp.segreteria_titolo;
     if (imp.segreteria_sottotitolo && document.getElementById('homeSegreteriaSottotitolo')) document.getElementById('homeSegreteriaSottotitolo').textContent = imp.segreteria_sottotitolo;
     if (imp.segreteria_indirizzo && document.getElementById('homeSegreteriaIndirizzo')) document.getElementById('homeSegreteriaIndirizzo').textContent = imp.segreteria_indirizzo;
@@ -73,38 +140,40 @@ async function loadPublicHomepage() {
     await loadCelebrazioniPubbliche();
     await loadPublicCalendari();
 
-    // Render Attività Pubblicate con anteprima locandina
+    // Render Attività Pubblicate
     const attGrid = document.getElementById('publicAttivitaGrid');
-    if (!data.attivita || !data.attivita.length) {
-      attGrid.innerHTML = `
-        <div style="grid-column: 1/-1; padding: 30px; text-align: center; color: var(--ink-500); background: var(--bg-subtle); border-radius: var(--radius-md);">
-          Nessuna attività aperta al momento. Torna presto a trovarci!
-        </div>
-      `;
-    } else {
-      attGrid.innerHTML = data.attivita.map(a => `
-        <div class="public-card">
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
-            <h3 style="font-size: 18px; font-weight: 700; color: var(--ink-900); margin: 0;">${escapeHtml(a.titolo)}</h3>
-            <span class="badge badge-info">${escapeHtml(a.categoria.toUpperCase())}</span>
+    if (attGrid) {
+      if (!data.attivita || !data.attivita.length) {
+        attGrid.innerHTML = `
+          <div style="grid-column: 1/-1; padding: 30px; text-align: center; color: var(--ink-500); background: var(--bg-subtle); border-radius: var(--radius-md);">
+            Nessuna attività aperta al momento. Torna presto a trovarci!
           </div>
-          ${a.locandina_url ? `
-            <div style="margin: 10px 0; border-radius: 8px; overflow: hidden; max-height: 150px; cursor: pointer; border: 1px solid var(--border-light); background: #f8fafc;" onclick="openPreviewLocandina('${a.locandina_url}', ${a.id})">
-              <img src="${a.locandina_url}" alt="Locandina ${escapeHtml(a.titolo)}" style="width: 100%; height: 150px; object-fit: cover; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'" onerror="this.parentElement.style.display='none'">
-              <div style="font-size: 11px; padding: 3px 6px; background: rgba(0,0,0,0.65); color: #fff; text-align: center; margin-top: -24px; position: relative;">🔍 Ingrandisci Locandina</div>
+        `;
+      } else {
+        attGrid.innerHTML = data.attivita.map(a => `
+          <div class="public-card">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+              <h3 style="font-size: 18px; font-weight: 700; color: var(--ink-900); margin: 0;">${escapeHtml(a.titolo)}</h3>
+              <span class="badge badge-info">${escapeHtml(a.categoria.toUpperCase())}</span>
             </div>
-          ` : ''}
-          <p style="font-size: 13px; color: var(--ink-700); line-height: 1.6; margin-bottom: 14px;">${escapeHtml(a.descrizione || '')}</p>
-          <div style="font-size: 12.5px; color: var(--ink-500); display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px;">
-            <div>👶 Fascia di Età: <strong style="color:var(--ink-800);">${a.eta_min} - ${a.eta_max} anni</strong></div>
-            <div>📅 Periodo: ${a.data_inizio_it || 'In corso'} ${a.data_fine_it ? `al ${a.data_fine_it}` : ''}</div>
-            <div>💶 Quota: <strong style="color:var(--primary); font-size:15px;">€ ${a.quota_iscrizione.toFixed(2)}</strong></div>
+            ${a.locandina_url ? `
+              <div style="margin: 10px 0; border-radius: 8px; overflow: hidden; max-height: 150px; cursor: pointer; border: 1px solid var(--border-light); background: #f8fafc;" onclick="openPreviewLocandina('${a.locandina_url}', ${a.id})">
+                <img src="${a.locandina_url}" alt="Locandina ${escapeHtml(a.titolo)}" style="width: 100%; height: 150px; object-fit: cover; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'" onerror="this.parentElement.style.display='none'">
+                <div style="font-size: 11px; padding: 3px 6px; background: rgba(0,0,0,0.65); color: #fff; text-align: center; margin-top: -24px; position: relative;">🔍 Ingrandisci Locandina</div>
+              </div>
+            ` : ''}
+            <p style="font-size: 13px; color: var(--ink-700); line-height: 1.6; margin-bottom: 14px;">${escapeHtml(a.descrizione || '')}</p>
+            <div style="font-size: 12.5px; color: var(--ink-500); display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px;">
+              <div>👶 Fascia di Età: <strong style="color:var(--ink-800);">${a.eta_min} - ${a.eta_max} anni</strong></div>
+              <div>📅 Periodo: ${a.data_inizio_it || 'In corso'} ${a.data_fine_it ? `al ${a.data_fine_it}` : ''}</div>
+              <div>💶 Quota: <strong style="color:var(--primary); font-size:15px;">€ ${a.quota_iscrizione.toFixed(2)}</strong></div>
+            </div>
+            <button class="btn btn-primary btn-sm" style="width: 100%;" onclick="showAuthModal('register')">
+              Iscriviti Online →
+            </button>
           </div>
-          <button class="btn btn-primary btn-sm" style="width: 100%;" onclick="showAuthModal('register')">
-            Iscriviti Online →
-          </button>
-        </div>
-      `).join('');
+        `).join('');
+      }
     }
 
     // Render Avvisi Pubblicati
@@ -542,8 +611,19 @@ function navigateTo(viewName) {
   const current = viewMap[viewName];
   if (current) {
     const el = document.getElementById(current.id);
-    if (el) el.style.display = 'block';
-    if (current.fn) current.fn();
+    if (el) {
+      el.style.display = 'block';
+      if (current.fn) {
+        try {
+          const p = current.fn();
+          if (p && typeof p.catch === 'function') {
+            p.catch(err => console.warn(`Avviso caricamento vista ${viewName}:`, err));
+          }
+        } catch (err) {
+          console.warn(`Avviso sincrono vista ${viewName}:`, err);
+        }
+      }
+    }
   }
 
   document.getElementById('sidebar').classList.remove('open');

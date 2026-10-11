@@ -1084,13 +1084,14 @@ def init_default_configurazioni():
 
             imp.init_defaults_completed = True
 
-        # Calendari Comunitari Google (se non presenti)
+        # Calendari Comunitari Google (con calendario condiviso)
+        shared_cal_url = 'https://calendar.google.com/calendar/embed?src=c_bff35669d70591ceec1aa976821e3eea2aca33b728e666885c4162712e0275c2%40group.calendar.google.com&ctz=Europe%2FRome'
         if CalendarioComunita.query.count() == 0:
             default_cal = [
                 CalendarioComunita(
                     titolo='Eventi & Feste Parrocchiali',
                     descrizione='Calendario generale delle celebrazioni comunitarie, feste patronali ed eventi parrocchiali.',
-                    google_calendar_url='https://calendar.google.com/calendar/u/0/r',
+                    google_calendar_url=shared_cal_url,
                     colore='#8B1E1E',
                     icona='⛪',
                     categoria='parrocchia',
@@ -1100,7 +1101,7 @@ def init_default_configurazioni():
                 CalendarioComunita(
                     titolo='Catechismo & Iniziazione Cristiana',
                     descrizione='Date degli incontri di catechismo, ritiri spirituali e messe dei fanciulli.',
-                    google_calendar_url='https://calendar.google.com/calendar/u/0/r',
+                    google_calendar_url=shared_cal_url,
                     colore='#0284c7',
                     icona='📖',
                     categoria='catechismo',
@@ -1110,7 +1111,7 @@ def init_default_configurazioni():
                 CalendarioComunita(
                     titolo='Oratorio & Gruppi Giovani',
                     descrizione='Attività pomeridiane, tornei, Estate Ragazzi e uscite del gruppo oratorio.',
-                    google_calendar_url='https://calendar.google.com/calendar/u/0/r',
+                    google_calendar_url=shared_cal_url,
                     colore='#16a34a',
                     icona='🏓',
                     categoria='oratorio',
@@ -1119,6 +1120,11 @@ def init_default_configurazioni():
                 )
             ]
             db.session.add_all(default_cal)
+        else:
+            # Aggiorna eventuali calendari che hanno ancora il link fittizio
+            for cal in CalendarioComunita.query.all():
+                if not cal.google_calendar_url or 'calendar/u/0/r' in cal.google_calendar_url:
+                    cal.google_calendar_url = shared_cal_url
 
         # Gruppi Oratorio di default (Estivo e Invernale)
         gruppi_oratorio_count = GruppoOratorio.query.count()
