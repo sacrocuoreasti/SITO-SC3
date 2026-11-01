@@ -3,16 +3,18 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import os
 
-SMTP_SERVER = 'smtp.gmail.com'
-SMTP_PORT = 587
-SMTP_USER = 'noreply@sacrocuoreasti.com'
-SMTP_PASS = 'llkjugsocuyqkokl'  # App password Gmail configurata
+SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
+SMTP_USER = os.environ.get('SMTP_USER', 'noreply@sacrocuoreasti.com')
+SMTP_PASS = os.environ.get('SMTP_PASS', '')
 
 def invia_email(destinatario, oggetto, corpo_html, corpo_testo=None):
     """
     Invia un'email tramite account istituzionale Gmail SMTP.
     Ritorna True se inviata con successo, False altrimenti.
     """
+    if not SMTP_PASS:
+        return False, 'Servizio email non configurato'
     if not destinatario:
         return False, "Destinatario non specificato"
 
@@ -29,11 +31,10 @@ def invia_email(destinatario, oggetto, corpo_html, corpo_testo=None):
         part2 = MIMEText(corpo_html, 'html', 'utf-8')
         msg.attach(part2)
 
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=12)
-        server.starttls()
-        server.login(SMTP_USER, SMTP_PASS)
-        server.sendmail(SMTP_USER, destinatario, msg.as_string())
-        server.quit()
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=12) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASS)
+            server.sendmail(SMTP_USER, destinatario, msg.as_string())
         return True, "Email inviata con successo"
     except Exception as e:
         print(f"Errore invio email a {destinatario}:", e)

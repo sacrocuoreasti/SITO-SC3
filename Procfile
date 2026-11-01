@@ -1,1 +1,1 @@
-web: gunicorn "app:create_app()" --workers 1 --threads 4 --timeout 120 --bind 0.0.0.0:$PORT
+web: gunicorn --config gunicorn.conf.py "app:create_app()"

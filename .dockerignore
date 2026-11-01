@@ -1,0 +1,12 @@
+.git
+.venv
+venv
+__pycache__
+*.pyc
+.env
+.env.*
+*credentials*.json
+service_account.json
+tests
+
+database/.session-key

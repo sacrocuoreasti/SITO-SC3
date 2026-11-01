@@ -976,15 +976,12 @@ def init_default_configurazioni():
             ('impostazioni_sito', 'causale_predefinita_offerte', 'VARCHAR(150) DEFAULT "Offerta liberale per le attività parrocchiali"'),
             ('impostazioni_sito', 'init_defaults_completed', 'BOOLEAN DEFAULT 0')
         ]
-        for table, col, col_type in col_checks:
-            try:
+        if db.engine.dialect.name == 'sqlite':
+            for table, col, col_type in col_checks:
                 res = db.session.execute(text(f"PRAGMA table_info({table})")).fetchall()
-                existing_cols = [r[1] for r in res]
-                if col not in existing_cols:
+                if col not in [r[1] for r in res]:
                     db.session.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
                     db.session.commit()
-            except Exception:
-                db.session.rollback()
 
         imp = ImpostazioniSito.query.first()
         if not imp:
@@ -1148,39 +1145,9 @@ def init_default_configurazioni():
                 stato='pubblico'
             )
             db.session.add_all([g_estivo, g_invernale])
-        else:
-            # Se tutti i gruppi oratorio esistenti risultano chiusi, apri quelli disponibili
-            aperti = GruppoOratorio.query.filter(GruppoOratorio.stato != 'chiuso').count()
-            if aperti == 0:
-                for g in GruppoOratorio.query.all():
-                    g.stato = 'pubblico'
-
-        # Account di sistema garantiti in memoria e database
-        default_accounts = [
-            ('admin@sacrocuoreasti.com', 'Admin123', 'admin', '["admin", "parroco", "segreteria", "catechista", "oratorio"]'),
-            ('oratorio@sacrocuoreasti.com', 'orat123', 'oratorio', '["oratorio"]'),
-            ('catechismo@sacrocuoreasti.com', 'cate123', 'catechista', '["catechista"]')
-        ]
-        for acc_email, acc_pw, acc_role, acc_extra in default_accounts:
-            user = Utente.query.filter_by(email=acc_email).first()
-            if not user:
-                user = Utente(
-                    email=acc_email,
-                    ruolo=acc_role,
-                    privilegi_extra=acc_extra,
-                    is_attivo=True
-                )
-                user.set_password(acc_pw)
-                db.session.add(user)
-            else:
-                user.ruolo = acc_role
-                user.privilegi_extra = acc_extra
-                user.is_attivo = True
-                if not user.check_password(acc_pw):
-                    user.set_password(acc_pw)
-
+        # Il bootstrap amministratore è esplicito; non reimpostare mai credenziali o ruoli.
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        print('Nota su init_default_configurazioni:', e)
+        raise RuntimeError('Inizializzazione database fallita') from e
 

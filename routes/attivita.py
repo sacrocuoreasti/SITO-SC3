@@ -38,7 +38,11 @@ def get_attivita_detail(id):
         return jsonify({'error': 'Attività non trovata'}), 404
 
     d = a.to_dict()
-    d['iscritti'] = [i.to_dict() for i in a.iscrizioni]
+    is_staff = current_user.is_authenticated and current_user.has_role('segreteria', 'admin', 'parroco')
+    if not is_staff and (not a.is_pubblicato or not a.is_attiva):
+        return jsonify(error='Attività non trovata'), 404
+    if is_staff:
+        d['iscritti'] = [i.to_dict() for i in a.iscrizioni]
     return jsonify({'attivita': d})
 
 @attivita_bp.route('', methods=['POST'])

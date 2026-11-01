@@ -18,7 +18,6 @@ let debounceTimer = null;
 // ================= ERROR SHIELD & STABILITY =================
 window.addEventListener('unhandledrejection', (event) => {
   console.warn('Protezione Stabilità Render: Promessa non gestita intercettata:', event.reason);
-  event.preventDefault();
 });
 window.addEventListener('error', (event) => {
   console.warn('Protezione Stabilità Render: Errore globale intercettato:', event.message);
@@ -26,17 +25,19 @@ window.addEventListener('error', (event) => {
 
 async function safeFetchJson(url, options = {}, fallback = {}) {
   try {
-    const res = await fetch(url, options);
-    if (!res.ok) {
-      console.warn(`Chiamata API a ${url} ha restituito stato ${res.status}`);
-      return fallback;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    let res;
+    try {
+      res = await fetch(url, { ...options, signal: options.signal || controller.signal });
+      // Il timer include la lettura del corpo della risposta.
+      if (!res.ok) throw new Error(`Risposta HTTP ${res.status}`);
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) throw new Error('Risposta non JSON');
+      return await res.json();
+    } finally {
+      clearTimeout(timer);
     }
-    const ct = res.headers.get('content-type') || '';
-    if (!ct.includes('application/json')) {
-      console.warn(`Risposta non-JSON da ${url}`);
-      return fallback;
-    }
-    return await res.json();
   } catch (err) {
     console.warn(`Network/Parse warning per ${url}:`, err);
     return fallback;
@@ -74,8 +75,7 @@ function setPublicCalendarMode(mode) {
 // ================= INITIALIZATION =================
 document.addEventListener('DOMContentLoaded', async () => {
   setupDropzone();
-  await loadPublicHomepage();
-  await checkAuthStatus();
+  await Promise.allSettled([loadPublicHomepage(), checkAuthStatus()]);
 
   // Chiusura comoda dei modali al clic sullo sfondo o tasto ESC
   document.addEventListener('click', (e) => {
@@ -217,8 +217,7 @@ function showAuthModal(tab = 'login') {
 // ================= AUTHENTICATION & SESSIONS =================
 async function checkAuthStatus() {
   try {
-    const res = await fetch('/api/auth/me');
-    const data = await res.json();
+    const data = await safeFetchJson('/api/auth/me', {}, { authenticated: false });
     if (data.authenticated && data.user) {
       currentUser = data.user;
       renderAppShell();

@@ -97,10 +97,9 @@ def register():
         persona.nucleo_id = nucleo.id
         persona.ruolo_famiglia = 'Capofamiglia'
 
-    # Se è il primissimo utente registrato in un database vuoto, diventa automaticamente Amministratore Parrocchiale
-    is_first_user = Utente.query.count() == 0
-    ruolo_assegnato = 'admin' if is_first_user else 'utente'
-    privilegi_assegnati = ['admin', 'segreteria', 'parroco', 'catechista', 'oratorio', 'utente'] if is_first_user else ['utente']
+    # La registrazione pubblica non può assegnare privilegi amministrativi.
+    ruolo_assegnato = 'utente'
+    privilegi_assegnati = ['utente']
 
     campi_extra_data = data.get('campi_extra', {})
 
@@ -118,7 +117,7 @@ def register():
 
     login_user(nuovo_utente, remember=True)
 
-    msg = 'Account Amministratore Parrocchiale creato con successo!' if is_first_user else 'Registrazione completata con successo!'
+    msg = 'Registrazione completata con successo!'
 
     return jsonify({
         'success': True,
@@ -154,7 +153,7 @@ def richiedi_recupero_password():
     Invia via email (noreply@sacrocuoreasti.com) un codice di sicurezza OTP a 6 cifre
     per consentire all'utente di reimpostare la propria password.
     """
-    import random
+    import secrets
     from datetime import datetime, timedelta
     from models import PasswordResetToken
     from services.email_service import invia_codice_recupero_password
@@ -173,7 +172,7 @@ def richiedi_recupero_password():
         return jsonify({'error': 'Questo account risulta disattivato. Contatta la segreteria parrocchiale.'}), 403
 
     # Genera codice numerico casuale a 6 cifre
-    codice = str(random.randint(100000, 999999))
+    codice = str(secrets.randbelow(900000) + 100000)
     expires_at = datetime.utcnow() + timedelta(minutes=15)
 
     # Invalida vecchi token pendenti
@@ -192,8 +191,9 @@ def richiedi_recupero_password():
     ok, msg = invia_codice_recupero_password(email, codice, nominativo)
 
     if not ok:
-        # Fallback informativo se il server SMTP non dovesse rispondere
-        print("Nota invio email recupero:", msg)
+        token.is_used = True
+        db.session.commit()
+        return jsonify(error='Invio email temporaneamente non disponibile. Contatta la segreteria.'), 503
 
     return jsonify({
         'success': True,

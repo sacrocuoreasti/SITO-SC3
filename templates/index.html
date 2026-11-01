@@ -64,32 +64,34 @@
 
     <!-- Sezione 1: Orari Sante Messe, Liturgia & Avvenimenti (Personalizzabile) -->
     <section class="public-section" id="sectionMesse">
-      <div class="public-section-header">
-        <h2>Celebrazioni & Orari</h2>
-        <p>Sante Messe, momenti di preghiera liturgica e avvenimenti comunitari nella Chiesa del Sacro Cuore</p>
-      </div>
-
-      <!-- Tab Selettori Celebrazioni Pubbliche -->
-      <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 22px; flex-wrap: wrap;">
-        <button class="btn btn-sm btn-primary pill-celebrazione-btn active" id="pillMesseBtn" onclick="cambiaTabCelebrazioniPubbliche('messe')">⛪ Sante Messe</button>
-        <button class="btn btn-sm btn-secondary pill-celebrazione-btn" id="pillLiturgiaBtn" onclick="cambiaTabCelebrazioniPubbliche('liturgia')">🕊️ Liturgia & Preghiera</button>
-        <button class="btn btn-sm btn-secondary pill-celebrazione-btn" id="pillAvvenimentiBtn" onclick="cambiaTabCelebrazioniPubbliche('avvenimenti')">🔔 Avvenimenti & Feste</button>
-      </div>
-
-      <div style="max-width: 820px; margin: 0 auto;" class="public-mass-box">
-        <div class="public-mass-header">
-          <span id="publicCelebrazioniTitle">Orari Sante Messe Parrocchiali</span>
-          <small style="font-size: 12px; font-weight: normal; opacity: 0.9;">Via P.S. Mattarella 2, Asti</small>
+      <div class="public-container">
+        <div class="public-section-header">
+          <h2>Celebrazioni & Orari</h2>
+          <p>Sante Messe, momenti di preghiera liturgica e avvenimenti comunitari nella Chiesa del Sacro Cuore</p>
         </div>
-        <div class="public-mass-body" id="publicCelebrazioniList">
-          <!-- Popolato dinamicamente via JS da GET /api/celebrazioni -->
+
+        <!-- Tab Selettori Celebrazioni Pubbliche -->
+        <div style="display: flex; justify-content: center; gap: 8px; margin-bottom: 22px; flex-wrap: wrap;">
+          <button class="btn btn-sm btn-primary pill-celebrazione-btn active" id="pillMesseBtn" onclick="cambiaTabCelebrazioniPubbliche('messe')">⛪ Sante Messe</button>
+          <button class="btn btn-sm btn-secondary pill-celebrazione-btn" id="pillLiturgiaBtn" onclick="cambiaTabCelebrazioniPubbliche('liturgia')">🕊️ Liturgia & Preghiera</button>
+          <button class="btn btn-sm btn-secondary pill-celebrazione-btn" id="pillAvvenimentiBtn" onclick="cambiaTabCelebrazioniPubbliche('avvenimenti')">🔔 Avvenimenti & Feste</button>
+        </div>
+
+        <div style="max-width: 820px; margin: 0 auto;" class="public-mass-box">
+          <div class="public-mass-header">
+            <span id="publicCelebrazioniTitle">Orari Sante Messe Parrocchiali</span>
+            <small style="font-size: 12px; font-weight: normal; opacity: 0.9;">Via P.S. Mattarella 2, Asti</small>
+          </div>
+          <div class="public-mass-body" id="publicCelebrazioniList">
+            <!-- Popolato dinamicamente via JS da GET /api/celebrazioni -->
+          </div>
         </div>
       </div>
     </section>
 
     <!-- Sezione 2: Attività Aperte al Pubblico (Personalizzabile) -->
-    <section class="public-section" id="sectionAttivita" style="background: #ffffff; border-top: 1px solid var(--border-light); border-bottom: 1px solid var(--border-light); max-width: 100%;">
-      <div style="max-width: 1200px; margin: 0 auto;">
+    <section class="public-section public-section-alt" id="sectionAttivita">
+      <div class="public-container">
         <div class="public-section-header">
           <h2>Attività & Percorsi Parrocchiali</h2>
           <p>Le iscrizioni avvengono comodamente online. Iscrivi i tuoi figli dopo aver registrato il nucleo familiare.</p>
@@ -102,18 +104,20 @@
 
     <!-- Sezione 3: Avvisi Parrocchiali (Personalizzabile) -->
     <section class="public-section" id="sectionAvvisi">
-      <div class="public-section-header">
-        <h2>Vita di Comunità & Avvisi</h2>
-        <p>Comunicazioni del Parroco e appuntamenti pastorali della settimana</p>
-      </div>
-      <div class="public-grid-3" id="publicAvvisiGrid">
-        <!-- Popolato dinamicamente via JS con gli avvisi pubblicati -->
+      <div class="public-container">
+        <div class="public-section-header">
+          <h2>Vita di Comunità & Avvisi</h2>
+          <p>Comunicazioni del Parroco e appuntamenti pastorali della settimana</p>
+        </div>
+        <div class="public-grid-3" id="publicAvvisiGrid">
+          <!-- Popolato dinamicamente via JS con gli avvisi pubblicati -->
+        </div>
       </div>
     </section>
 
     <!-- Sezione Calendari Google Comunitari (Pubblici & Interattivi) -->
-    <section class="public-section" id="sectionCalendari" style="background: #fdfbf7; border-top: 1px solid var(--border-light); max-width: 100%;">
-      <div style="max-width: 1200px; margin: 0 auto;">
+    <section class="public-section public-section-alt" id="sectionCalendari">
+      <div class="public-container">
         <div class="public-section-header">
           <div class="public-hero-badge" style="margin-bottom: 10px;">📅 Vita di Comunità & Appuntamenti</div>
           <h2>Calendario Parrocchiale Interattivo</h2>
@@ -121,7 +125,7 @@
         </div>
 
         <!-- Widget Interattivo Google Calendar -->
-        <div class="calendar-widget-wrapper" style="background: #ffffff; border: 1.5px solid var(--border-light); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); overflow: hidden; margin-bottom: 30px;">
+        <div class="calendar-widget-wrapper">
           <div style="background: linear-gradient(135deg, #8B1E1E 0%, #a82424 100%); color: #ffffff; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
             <div style="display: flex; align-items: center; gap: 12px;">
               <span style="font-size: 28px;">🗓️</span>
@@ -148,20 +152,25 @@
             </div>
           </div>
 
-          <!-- Iframe Interattivo Google Calendar -->
-          <div style="position: relative; width: 100%; min-height: 620px; background: #ffffff;">
+          <!-- Iframe Interattivo Google Calendar con Overlay di Caricamento Antiglitch -->
+          <div class="calendar-iframe-container">
+            <div id="calendarLoadingOverlay" class="calendar-loading-overlay">
+              <div class="spinner" style="width: 32px; height: 32px; border: 3px solid #e2e8f0; border-top-color: #8B1E1E; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+              <span style="font-size: 13.5px; color: var(--ink-700); font-weight: 600;">Caricamento appuntamenti parrocchiali...</span>
+            </div>
             <iframe id="publicGoogleCalendarIframe" 
-              src="https://calendar.google.com/calendar/embed?src=c_bff35669d70591ceec1aa976821e3eea2aca33b728e666885c4162712e0275c2%40group.calendar.google.com&ctz=Europe%2FRome&mode=MONTH&showTitle=0&showNav=1&showDate=1&showPrint=0&showTabs=1&showCalendars=0&showTz=1&bgcolor=%23ffffff" 
-              style="border: 0; width: 100%; height: 620px; display: block;" 
+              src="https://calendar.google.com/calendar/embed?src=c_bff35669d70591ceec1aa976821e3eea2aca33b728e666885c4162712e0275c2%40group.calendar.google.com&ctz=Europe%2FRome&mode=MONTH&showTitle=0&showNav=1&showDate=1&showPrint=0&showTabs=1&showCalendars=0&showTz=1&bgcolor=%23fafafa"
+              style="border: 0; width: 100%; height: 100%; display: block;"
               frameborder="0" 
               scrolling="no" 
-              loading="lazy">
+              loading="lazy"
+              onload="onCalendarIframeLoaded()">
             </iframe>
           </div>
 
           <div style="background: #fafaf7; padding: 12px 22px; border-top: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; font-size: 12.5px; color: var(--ink-700);">
             <div style="display: flex; align-items: center; gap: 8px;">
-              <span>💡 <strong>Suggerimento:</strong> Clicca su qualsiasi incontro nel calendario per visualizzare orario, aula e note pastorali.</span>
+              <span>💡 <strong>Suggerimento:</strong> Clicca su qualsiasi incontro per orario e aula. Se il tuo browser blocca i cookie di Google, <a href="https://calendar.google.com/calendar/embed?src=c_bff35669d70591ceec1aa976821e3eea2aca33b728e666885c4162712e0275c2%40group.calendar.google.com&ctz=Europe%2FRome" target="_blank" rel="noopener noreferrer" style="color: var(--primary); font-weight: 700; text-decoration: underline;">aprilo a schermo intero ↗</a>.</span>
             </div>
             <div style="display: flex; align-items: center; gap: 16px;">
               <span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 50%; background: #0284c7; display: inline-block;"></span> Catechismo</span>
@@ -182,8 +191,8 @@
     </section>
 
     <!-- Sezione 4: Contatti & Segreteria (Personalizzabile) -->
-    <section class="public-section" id="sectionContatti" style="background: var(--bg-subtle); border-top: 1px solid var(--border-light); max-width: 100%;">
-      <div style="max-width: 1200px; margin: 0 auto;">
+    <section class="public-section" id="sectionContatti">
+      <div class="public-container">
         <div class="public-section-header">
           <h2 id="homeSegreteriaTitolo">Segreteria & Recapiti</h2>
           <p id="homeSegreteriaSottotitolo">Siamo a tua disposizione per informazioni su catechesi, certificati e attività parrocchiali</p>

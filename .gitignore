@@ -17,3 +17,11 @@ Thumbs.db
 service_account.json
 .env
 
+
+# Runtime privato: non aggiungere database o documenti personali ai commit
+/database/*.db*
+/uploads/
+.env.*
+!.env.example
+
+/database/.session-key

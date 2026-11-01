@@ -18,4 +18,4 @@ RUN mkdir -p database uploads
 ENV PORT=5001
 EXPOSE 5001
 
-CMD ["gunicorn", "app:create_app()", "--workers", "2", "--bind", "0.0.0.0:5001"]
+CMD ["gunicorn", "--config", "gunicorn.conf.py", "app:create_app()"]
