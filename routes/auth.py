@@ -1,7 +1,7 @@
-import os
 from flask import Blueprint, request, jsonify, session
 from flask_login import login_user, logout_user, current_user, login_required
 from models import db, Utente, Persona, NucleoFamiliare, RichiestaNucleo
+from services.quick_login import QUICK_LOGIN_ALIASES, quick_login_enabled
 from services.family_service import FAMILY_ROLES, HEALTH_PRESETS, REGISTRATION_CONSENTS, consent_record
 from services.cf_validator import normalizza_cf, valida_cf, estrai_dati_cf
 import json
@@ -12,15 +12,25 @@ auth_bp = Blueprint('auth_bp', __name__, url_prefix='/api/auth')
 @auth_bp.route('/login', methods=['POST'])
 def login():
     data = request.get_json() or {}
+    if not isinstance(data.get('email', ''), str) or not isinstance(data.get('password', ''), str):
+        return jsonify(error='Formato delle credenziali non valido'), 400
     email = data.get('email', '').strip().lower()
     password = data.get('password', '')
 
-    if (email == 'a' and not password and os.environ.get('LOCAL_QUICK_LOGIN') == '1'
-            and not os.environ.get('RENDER') and request.remote_addr in {'127.0.0.1', '::1'}):
-        utente = Utente.query.filter_by(email='admin@sacrocuoreasti.com').first()
-        if utente and utente.is_attivo and utente.has_role('admin'):
-            login_user(utente, remember=False)
-            return jsonify(success=True, message='Accesso effettuato', user=utente.to_dict())
+    if email in QUICK_LOGIN_ALIASES and not password and quick_login_enabled():
+        utente = Utente.query.filter_by(email=QUICK_LOGIN_ALIASES[email]).first()
+        if not utente:
+            return jsonify(error='Account non disponibile per l’accesso rapido'), 404
+        if not utente.is_attivo:
+            return jsonify(error='Questo account è disattivato'), 403
+        # Collegamento al profilo esistente, senza cambiare ruoli o password.
+        logout_user()
+        session.clear()
+        utente.last_login = datetime.utcnow()
+        db.session.commit()
+        login_user(utente, remember=False)
+        session['_remember'] = 'clear'
+        return jsonify(success=True, message='Accesso effettuato', user=utente.to_dict())
 
     if not email or not password:
         return jsonify({'error': 'Email e password sono obbligatorie'}), 400

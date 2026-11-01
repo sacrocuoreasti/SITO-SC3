@@ -7,7 +7,7 @@
   <meta name="description" content="Portale ufficiale della Parrocchia Sacro Cuore di Asti per la gestione delle iscrizioni alle attività parrocchiali, catechismo, Estate Ragazzi e vita comunitaria.">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=asset_version) }}">
 </head>
-<body data-version="{{ app_version }}" data-local-quick-login="{{ 'true' if local_quick_login else 'false' }}">
+<body data-version="{{ app_version }}" data-quick-login="{{ 'true' if quick_login_enabled else 'false' }}">
 
   <!-- ================= HOMEPAGE PUBBLICA (PRIMA DELL'ACCESSO) ================= -->
   <div class="public-homepage" id="publicHomepage">

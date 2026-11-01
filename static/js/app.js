@@ -126,11 +126,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   loadPublicHomepage();
   checkAuthStatus();
   const loginEmail = document.getElementById('inputLoginEmail');
-  if (loginEmail) loginEmail.addEventListener('input', () => {
-    document.getElementById('inputLoginPassword').required = !(
-      document.body.dataset.localQuickLogin === 'true' && loginEmail.value.trim() === 'a'
-    );
-  });
+  if (loginEmail) {
+    loginEmail.addEventListener('input', updateQuickLoginRequirement);
+    loginEmail.addEventListener('change', updateQuickLoginRequirement);
+    updateQuickLoginRequirement();
+  }
 
   // Chiusura comoda dei modali al clic sullo sfondo o tasto ESC
   document.addEventListener('click', (e) => {
@@ -271,6 +271,7 @@ function showAuthModal(tab = 'login') {
   document.getElementById('appShell').style.display = 'none';
   document.getElementById('loginScreenView').style.display = 'grid';
   showAuthTab(tab);
+  updateQuickLoginRequirement();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -388,6 +389,13 @@ function applyRolePermissions() {
   if (famigliaNav) {
     famigliaNav.style.display = isGestionePura ? 'none' : 'flex';
   }
+}
+
+function updateQuickLoginRequirement() {
+  const email = document.getElementById('inputLoginEmail');
+  const password = document.getElementById('inputLoginPassword');
+  if (!email || !password) return;
+  password.required = !(document.body.dataset.quickLogin === 'true' && ['a', 'u'].includes(email.value.trim().toLowerCase()));
 }
 
 async function handleLoginSubmit(e) {

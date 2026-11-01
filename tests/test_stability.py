@@ -17,6 +17,7 @@ class StabilityTests(unittest.TestCase):
 
         class TestConfig(Config):
             TESTING = True
+            PUBLIC_QUICK_LOGIN = False
             SECRET_KEY = 'test-only-key'
             SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(self.directory.name, 'test.db')
             SQLALCHEMY_ENGINE_OPTIONS = {'connect_args': {'timeout': 1}}
@@ -220,7 +221,7 @@ class StabilityTests(unittest.TestCase):
             self.assertTrue(response.json['configured'])
             self.assertNotIn('test-private-key', response.data.decode())
 
-    def test_quick_login_is_local_opt_in_and_always_disabled_on_render(self):
+    def test_local_quick_login_with_public_shortcuts_disabled(self):
         with self.app.app_context():
             user = Utente.query.filter_by(email='admin@example.test').first()
             user.email = 'admin@sacrocuoreasti.com'

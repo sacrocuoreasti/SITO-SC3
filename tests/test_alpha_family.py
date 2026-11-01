@@ -26,6 +26,7 @@ class AlphaFamilyTests(unittest.TestCase):
         self.directory = Path(self.temporary.name)
         class TestConfig(Config):
             TESTING = True
+            PUBLIC_QUICK_LOGIN = False
             SECRET_KEY = 'test-key'
             SQLALCHEMY_DATABASE_URI = 'sqlite:///' + str(self.directory / 'test.db')
             SQLALCHEMY_ENGINE_OPTIONS = {'connect_args': {'timeout': 5}}

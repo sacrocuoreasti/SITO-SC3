@@ -8,6 +8,7 @@ if DATABASE_URL.startswith('postgres://'):
 
 
 class Config:
+    PUBLIC_QUICK_LOGIN = os.environ.get('PUBLIC_QUICK_LOGIN', '1') == '1'
     # In produzione impostare una chiave stabile, condivisa tra riavvii.
     SECRET_KEY = os.environ.get('SECRET_KEY')
     SQLALCHEMY_DATABASE_URI = DATABASE_URL

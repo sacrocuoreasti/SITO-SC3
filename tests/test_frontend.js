@@ -73,3 +73,23 @@ assert.ok(overlay.innerHTML.includes('Apri il calendario'));
 calendar.retryPublicCalendar();
 assert.equal(iframe.loads, 3);
 console.log('Calendario: caricamento su richiesta, timeout, cambio vista e riprova verificati.');
+
+const loginFields = {inputLoginEmail:{value:''},inputLoginPassword:{required:true}};
+const loginDocument = {body:{dataset:{quickLogin:'true'}},getElementById:id=>loginFields[id]};
+const loginContext = vm.createContext({document:loginDocument});
+const loginStart = source.indexOf('function updateQuickLoginRequirement()');
+const loginEnd = source.indexOf('async function handleLoginSubmit',loginStart);
+vm.runInContext(source.slice(loginStart,loginEnd),loginContext);
+for(const alias of ['a','u',' A ','U']) {
+  loginFields.inputLoginEmail.value=alias;
+  loginContext.updateQuickLoginRequirement();
+  assert.equal(loginFields.inputLoginPassword.required,false);
+}
+loginFields.inputLoginEmail.value='person@example.test';
+loginContext.updateQuickLoginRequirement();
+assert.equal(loginFields.inputLoginPassword.required,true);
+loginDocument.body.dataset.quickLogin='false';
+loginFields.inputLoginEmail.value='a';
+loginContext.updateQuickLoginRequirement();
+assert.equal(loginFields.inputLoginPassword.required,true);
+console.log('Accesso rapido: password facoltativa soltanto per gli alias abilitati.');

@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from werkzeug.exceptions import HTTPException
 from config import Config
 from models import db, Utente
+from services.quick_login import quick_login_enabled
 
 @lru_cache(maxsize=8)
 def compressed_asset(data):
@@ -167,8 +168,7 @@ def create_app(config_class=Config):
     @app.route('/')
     def index():
         version = os.environ.get('RENDER_GIT_COMMIT') or str(max(os.stat(app.static_folder + '/' + name).st_mtime_ns for name in ['css/style.css', 'js/app.js']))
-        local_quick_login = os.environ.get('LOCAL_QUICK_LOGIN') == '1' and not os.environ.get('RENDER') and request.remote_addr in {'127.0.0.1', '::1'}
-        return render_template('index.html', asset_version=version, local_quick_login=local_quick_login)
+        return render_template('index.html', asset_version=version, quick_login_enabled=quick_login_enabled())
 
     @app.route('/health')
     def health():
