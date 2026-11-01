@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, session
 from flask_login import login_user, logout_user, current_user, login_required
 from models import db, Utente, Persona, NucleoFamiliare, RichiestaNucleo
+from services.documents_service import prepare_documents, save_documents, remove_document_files
 from services.quick_login import QUICK_LOGIN_ALIASES, quick_login_enabled
 from services.family_service import FAMILY_ROLES, HEALTH_PRESETS, REGISTRATION_CONSENTS, consent_record
 from services.cf_validator import normalizza_cf, valida_cf, estrai_dati_cf
@@ -59,12 +60,21 @@ def registration_options():
 
 @auth_bp.route('/register', methods=['POST'])
 def register():
-    data = request.get_json() or {}
-    fields = ('email', 'password', 'nome', 'cognome', 'codice_fiscale', 'telefono', 'nome_famiglia', 'codice_invito', 'ruolo_famiglia')
+    try:
+        data = request.get_json() if request.is_json else json.loads(request.form.get('data', '{}'))
+    except (ValueError, TypeError):
+        return jsonify(error='Dati di registrazione non validi'),400
+    if not isinstance(data,dict):
+        return jsonify(error='Dati di registrazione non validi'),400
+
+    fields = ('email', 'password', 'conferma_password', 'nome', 'cognome', 'codice_fiscale', 'telefono', 'nome_famiglia', 'codice_invito', 'ruolo_famiglia')
     if any(not isinstance(data.get(field, ''), str) for field in fields):
         return jsonify(error='Formato dei campi di registrazione non valido'), 400
     email = data.get('email', '').strip().lower()
     password = data.get('password', '')
+    if not password or data.get('conferma_password') != password:
+        return jsonify(error='Le password non coincidono'),400
+    drafts = prepare_documents(request.files, data)
     nome = data.get('nome', '').strip()
     cognome = data.get('cognome', '').strip()
     cf = normalizza_cf(data.get('codice_fiscale', ''))
@@ -114,7 +124,13 @@ def register():
     db.session.flush()
     if invited_family:
         db.session.add(RichiestaNucleo(nucleo_id=invited_family.id, utente_id=nuovo.id))
-    db.session.commit()
+    records = save_documents(persona, drafts)
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        remove_document_files(records)
+        raise
     login_user(nuovo, remember=True)
     message = 'Account creato. La richiesta di ingresso nel nucleo attende l’approvazione del capofamiglia.' if invited_family else 'Registrazione completata con successo!'
     return jsonify(success=True, message=message, user=nuovo.to_dict()), 201

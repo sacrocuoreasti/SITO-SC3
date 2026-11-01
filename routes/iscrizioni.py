@@ -115,18 +115,25 @@ def _register_participant(data):
                 'error': f'Età non idonea: {persona.nominativo} ha {eta} anni, ma l\'attività "{attivita.titolo}" è riservata a ragazzi fino a {attivita.eta_max} anni.'
             }), 400
 
-    # Controllo clausole d'iscrizione (obbligatorie vs facoltative personalizzabili da segreteria)
+    # Le nuove iscrizioni non chiedono clausole aggiuntive. Non inventare consensi.
     import json
-    from models import ClausolaIscrizione
-    clausole_attive = ClausolaIscrizione.query.filter_by(is_attiva=True).all()
-    clausole_input = data.get('clausole_accettate', {})
-    if not isinstance(clausole_input, dict):
-        clausole_input = {}
-
-    for c in clausole_attive:
-        accettata = bool(clausole_input.get(str(c.id)) or clausole_input.get(c.id) or clausole_input.get(f'clausola_{c.id}'))
-        if c.is_obbligatoria and not accettata:
-            return jsonify({'error': f'È obbligatorio accettare la clausola: "{c.titolo}" per procedere con l\'iscrizione.'}), 400
+    clausole_input = {}
+    consents = {}
+    from models import Utente
+    account = Utente.query.filter_by(codice_fiscale=persona.codice_fiscale).first()
+    if not account and persona.nucleo:
+        account = Utente.query.filter_by(codice_fiscale=persona.nucleo.codice_fiscale_capofamiglia).first()
+    if account:
+        try: consents = json.loads(account.consensi_registrazione or '{}').get('consensi', {})
+        except (ValueError, TypeError, AttributeError): pass
+    from services.group_age_service import validate_member_age
+    from models import GruppoCatechismo, GruppoOratorio, GruppoDoposcuola
+    for key, model, collection in [('gruppo_catechismo_id', GruppoCatechismo, 'ragazzi'), ('gruppo_oratorio_id', GruppoOratorio, 'ragazzi'), ('gruppo_doposcuola_id', GruppoDoposcuola, 'studenti')]:
+        if data.get(key):
+            try: group = db.session.get(model,int(data[key]))
+            except (ValueError, TypeError): return jsonify(error='Gruppo non valido'),400
+            if not group: return jsonify(error='Gruppo non trovato'),404
+            if persona not in getattr(group,collection): validate_member_age(group,persona)
 
     # Controlla se è già iscritto a questa attività
     esistente = Iscrizione.query.filter_by(
@@ -164,9 +171,9 @@ def _register_participant(data):
         importo_pagato=0.0,
         note_iscrizione=data.get('note_iscrizione', '').strip(),
         squadra=data.get('squadra', '').strip(),
-        consenso_privacy=data.get('consenso_privacy', True),
-        consenso_foto=data.get('consenso_foto', True),
-        consenso_uscite=data.get('consenso_uscite', True),
+        consenso_privacy=consents.get('privacy', {}).get('accettato') is True,
+        consenso_foto=consents.get('foto_video', {}).get('accettato') is True,
+        consenso_uscite=False,
         clausole_accettate=json.dumps(clausole_input),
         campi_personalizzati=json.dumps(campi_pers_input)
     )

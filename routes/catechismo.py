@@ -1,3 +1,4 @@
+from services.group_age_service import apply_age_range, register_age_guard
 from flask import Blueprint, request, jsonify
 from flask_login import current_user
 from models import db, Attivita, Iscrizione, Persona, Presenza, GruppoCatechismo
@@ -5,6 +6,8 @@ from services.cf_validator import normalizza_cf
 from datetime import date, datetime
 
 catechismo_bp = Blueprint('catechismo_bp', __name__, url_prefix='/api/catechismo')
+register_age_guard(catechismo_bp, GruppoCatechismo, 'ragazzi')
+
 
 @catechismo_bp.route('/catechisti', methods=['GET'])
 def get_catechisti():
@@ -116,6 +119,7 @@ def create_gruppo():
         if nomi:
             nuovo.catechista_nome = ", ".join(nomi)
 
+    apply_age_range(nuovo, data)
     db.session.add(nuovo)
     db.session.commit()
 
@@ -132,6 +136,7 @@ def update_gruppo(id):
         return jsonify({'error': 'Gruppo non trovato'}), 404
 
     data = request.get_json() or {}
+    apply_age_range(g, data)
     if 'nome' in data: g.nome = data['nome'].strip()
     if 'anno_pastorale' in data: g.anno_pastorale = data['anno_pastorale'].strip()
     if 'anno_catechismo' in data: g.anno_catechismo = data['anno_catechismo'].strip()

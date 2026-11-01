@@ -1,3 +1,4 @@
+from services.group_age_service import apply_age_range, register_age_guard
 from flask import Blueprint, request, jsonify
 from flask_login import current_user
 from models import db, Attivita, Persona, Presenza, GruppoDoposcuola, Utente
@@ -5,6 +6,8 @@ from services.cf_validator import normalizza_cf
 from datetime import date, datetime
 
 doposcuola_bp = Blueprint('doposcuola_bp', __name__, url_prefix='/api/doposcuola')
+register_age_guard(doposcuola_bp, GruppoDoposcuola, 'studenti')
+
 
 @doposcuola_bp.route('/educatori', methods=['GET'])
 def get_educatori():
@@ -59,6 +62,7 @@ def create_gruppo():
         stato=data.get('stato', 'pubblico').strip(),
         attivita_id=data.get('attivita_id')
     )
+    apply_age_range(nuovo, data)
     db.session.add(nuovo)
     db.session.commit()
 
@@ -75,6 +79,7 @@ def update_gruppo(id):
         return jsonify({'error': 'Gruppo doposcuola non trovato'}), 404
 
     data = request.get_json() or {}
+    apply_age_range(g, data)
     if 'nome' in data: g.nome = data['nome'].strip()
     if 'anno_scolastico' in data: g.anno_scolastico = data['anno_scolastico'].strip()
     if 'anno_pastorale' in data: g.anno_scolastico = data['anno_pastorale'].strip()

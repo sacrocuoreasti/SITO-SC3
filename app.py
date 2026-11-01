@@ -148,6 +148,8 @@ def create_app(config_class=Config):
     from routes.doposcuola import doposcuola_bp
 
     from routes.backup import backup_bp
+    from routes.documenti import documenti_bp
+    app.register_blueprint(documenti_bp)
     app.register_blueprint(backup_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(persone_bp)
@@ -239,6 +241,8 @@ def create_app(config_class=Config):
 
     @app.route('/uploads/<path:filename>')
     def serve_upload(filename):
+        if __import__('posixpath').normpath(filename).split('/')[0].lower() == 'private':
+            abort(404)
         return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
     with app.app_context():

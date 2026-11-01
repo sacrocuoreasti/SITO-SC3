@@ -22,7 +22,7 @@ const fixtures = {
 const context = vm.createContext({
   console, AbortController, setTimeout, clearTimeout,
   window:{addEventListener(){}},
-  document:{addEventListener(){},getElementById:nodes,querySelectorAll(selector){
+  document:{addEventListener(){},querySelector(){return null;},getElementById:nodes,querySelectorAll(selector){
     if(selector==='.family-participant:checked')return selected.map(value=>({value}));
     if(selector==='#iscrizioneClausoleContainer .clause-checkbox')return [{dataset:{id:'1',req:'true'},checked:true}];
     return [];
@@ -33,6 +33,7 @@ const context = vm.createContext({
   },
 });
 vm.runInContext(fs.readFileSync('static/js/app.js','utf8'),context);
+const loadDashboardOriginal=context.loadDashboard;
 vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['utente'],is_capofamiglia:true}; showToast=()=>{}; loadDashboard=async()=>{};",context);
 (async()=>{
   await context.openModalNuovaIscrizione(7);
@@ -51,6 +52,17 @@ vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['
   assert.equal(posted.length,1);
   assert.deepEqual(JSON.parse(posted[0].options.body).partecipanti,people.map(p=>p.codice_fiscale));
   assert.equal(JSON.parse(posted[0].options.body).attivita_id,7);
+  assert.ok(!('clausole_accettate' in JSON.parse(posted[0].options.body)));
+  assert.ok(!requests.some(r=>r.url==='/api/configurazioni/clausole'));
+  nodes('regPassword').value='password-test-123';
+  nodes('regConfermaPassword').value='diversa';
+  assert.equal(context.passwordMismatch(),true);
+  nodes('regConfermaPassword').value='password-test-123';
+  assert.equal(context.passwordMismatch(),false);
+  context.setGroupAges('test',{eta_min:0,eta_max:14});
+  assert.deepEqual(JSON.parse(JSON.stringify(context.readGroupAges('test'))),{eta_min:0,eta_max:14});
+  context.setGroupAges('test',{});
+  assert.deepEqual(JSON.parse(JSON.stringify(context.readGroupAges('test'))),{eta_min:null,eta_max:null});
   await context.renderRegistrationConsents('registrationConsents');
   const html=nodes('registrationConsents').innerHTML;
   assert.equal((html.match(/type="checkbox"/g)||[]).length,2);
@@ -60,5 +72,12 @@ vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['
   await context.renderHealthSections('membro');
   assert.equal(nodes('membroAllergie').value,'Allergia preesistente');
   assert.ok(nodes('membroTerapiePills').innerHTML.includes('Terapia prescritta'));
+  fixtures['/api/attivita']={attivita:[]};
+  fixtures['/api/impostazioni/dati-pubblici']={impostazioni:{},avvisi:[]};
+  fixtures['/api/celebrazioni?sezione=messe']={messe:[]};
+  fixtures['/api/impostazioni/calendari?solo_pubblici=true']={calendari:[]};
+  await loadDashboardOriginal();
+  assert.ok(requests.some(r=>r.url==='/api/impostazioni/calendari?solo_pubblici=true'));
+  assert.ok(nodes('dashUserCalendariGrid').innerHTML.includes('Nessun calendario'));
   console.log('Alpha famiglia: attività fissata, selezione multipla, quota, invio unico, consensi e salute verificati.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

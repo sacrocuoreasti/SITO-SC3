@@ -7,10 +7,13 @@ from sqlalchemy import inspect
 
 def backup_sqlite(engine):
     expected = {'persona': {'terapie_medicinali'}, 'nucleo_familiare': {'codice_invito'},
-                'utente': {'consensi_registrazione', 'gestito_da_id'}}
+                'utente': {'consensi_registrazione', 'gestito_da_id'},
+                'gruppo_oratorio': {'eta_min','eta_max'}, 'gruppo_catechismo': {'eta_min','eta_max'},
+                'gruppo_doposcuola': {'eta_min','eta_max'}}
     inspector = inspect(engine)
     tables = set(inspector.get_table_names())
     missing = any(table in tables and not columns.issubset({c['name'] for c in inspector.get_columns(table)}) for table, columns in expected.items())
+    missing = missing or ('persona' in tables and 'documento_persona' not in tables)
     if not missing or not engine.url.database or engine.url.database == ':memory:':
         return None
     directory = os.path.join(os.path.dirname(os.path.abspath(engine.url.database)), 'backups')

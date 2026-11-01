@@ -163,7 +163,7 @@ class StabilityTests(unittest.TestCase):
             db.session.commit()
         with patch('routes.auth.valida_cf', return_value=True), patch('routes.auth.estrai_dati_cf', return_value={}):
             response = self.client.post('/api/auth/register', json={
-                'email': 'first@example.test', 'password': 'test-password-123',
+                'email': 'first@example.test', 'password': 'test-password-123', 'conferma_password': 'test-password-123',
                 'nome': 'Persona', 'cognome': 'Test', 'codice_fiscale': 'RSSMRA80A01H501U',
                 'ruolo': 'admin', 'privilegi': ['admin'], 'consensi_registrazione': {'privacy': True, 'foto_video': True},
             })

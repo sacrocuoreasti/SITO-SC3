@@ -1697,3 +1697,5 @@ input:checked + .slider:before {
 .family-participants .choice-row { border: 1px solid var(--border-light); border-radius: 8px; }
 .family-invite-code { font-family: monospace; font-size: 24px; letter-spacing: 5px; }
 .release-version { white-space: nowrap; }
+
+.dashboard-columns{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:24px;align-items:start}.dashboard-aside{min-width:0}.dashboard-columns>.card{min-width:0}@media(max-width:1000px){.dashboard-columns{grid-template-columns:1fr}}

@@ -70,7 +70,7 @@ class AlphaFamilyTests(unittest.TestCase):
         self.temporary.cleanup()
 
     def registration(self, **extra):
-        return dict({'nome':'New', 'cognome':'Test', 'codice_fiscale':fiscal_code('VRDLGI90A01H501'), 'email':'new@example.test', 'password':'password-test-123', 'ruolo_famiglia':'Madre', 'consensi_registrazione':{'privacy':True, 'foto_video':True}}, **extra)
+        return dict({'nome':'New', 'cognome':'Test', 'codice_fiscale':fiscal_code('VRDLGI90A01H501'), 'email':'new@example.test', 'password':'password-test-123', 'conferma_password':'password-test-123', 'ruolo_famiglia':'Madre', 'consensi_registrazione':{'privacy':True, 'foto_video':True}}, **extra)
 
     def test_version_and_family_head_independent_of_role(self):
         self.assertIn((Path(__file__).resolve().parents[1]/'VERSION').read_text().strip().encode(), self.client.get('/').data)

@@ -161,7 +161,7 @@
               frameborder="0" 
               scrolling="no" 
               loading="lazy"
-              onload="onCalendarIframeLoaded()" hidden>
+              onload="if (window.onCalendarIframeLoaded) onCalendarIframeLoaded()" hidden>
             </iframe>
           </div>
 
@@ -194,7 +194,7 @@
           <h2 id="homeSegreteriaTitolo">Segreteria & Recapiti</h2>
           <p id="homeSegreteriaSottotitolo">Siamo a tua disposizione per informazioni su catechesi, certificati e attività parrocchiali</p>
         </div>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr)); gap: 24px;">
           <div class="public-card">
             <h3 style="font-size: 16px; margin-bottom: 8px;">📍 Indirizzo</h3>
             <p id="homeSegreteriaIndirizzo" style="color: var(--ink-700); font-size: 14px; line-height: 1.6; white-space: pre-line;">Parrocchia Sacro Cuore di Gesù
@@ -306,12 +306,8 @@ Domenica: dopo le Sante Messe</p>
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>Cellulare / Telefono *</label>
+              <label>Cellulare *</label>
               <input type="tel" id="regTelefono" class="form-control" placeholder="333 1234567" required>
-            </div>
-            <div class="form-group">
-              <label>Nome Famiglia</label>
-              <input type="text" id="regNomeFamiglia" class="form-control" placeholder="Famiglia ...">
             </div>
           </div>
           <div class="form-row">
@@ -326,6 +322,8 @@ Domenica: dopo le Sante Messe</p>
             <label>Password di Accesso *</label>
             <input type="password" id="regPassword" class="form-control" minlength="8" autocomplete="new-password" placeholder="Minimo 8 caratteri" required>
           </div>
+          <div class="form-group"><label for="regConfermaPassword">Conferma password *</label><input type="password" id="regConfermaPassword" class="form-control" minlength="8" autocomplete="new-password" required></div>
+          <div id="regDocumenti"></div>
           <!-- Campi Personalizzati Dinamici configurati da Segreteria -->
           <div id="regCampiPersonalizzatiContainer"></div>
           <div id="registrationConsents" class="registration-consents"></div>
@@ -400,9 +398,6 @@ Domenica: dopo le Sante Messe</p>
         </a>
         <a class="nav-item role-nav admin-nav" data-view="utenti" onclick="navigateTo('utenti')">
           <i>⚙</i> Utenti & Privilegi
-        </a>
-        <a href="https://whatsapp-bot-5vi7.onrender.com/login" target="_blank" rel="noopener noreferrer" class="nav-item role-nav staff-nav whatsapp-nav" style="color: #16a34a; font-weight: 700;">
-          <i>💬</i> Bot WhatsApp ↗
         </a>
       </nav>
 
@@ -512,7 +507,7 @@ Domenica: dopo le Sante Messe</p>
             </div>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1.4fr 1fr; gap: 24px;">
+          <div class="dashboard-columns">
             <!-- Attività Aperte in primo piano -->
             <div class="card">
               <div class="card-header">
@@ -524,6 +519,7 @@ Domenica: dopo le Sante Messe</p>
               </div>
             </div>
 
+            <aside class="dashboard-aside">
             <!-- Avvisi ed Eventi -->
             <div class="card">
               <div class="card-header">
@@ -542,7 +538,6 @@ Domenica: dopo le Sante Messe</p>
                 </div>
               </div>
             </div>
-          </div>
 
           <!-- Calendari Comunitari & Personali -->
           <div class="card" style="margin-top: 24px;">
@@ -553,10 +548,12 @@ Domenica: dopo le Sante Messe</p>
               </div>
             </div>
             <div class="card-body">
-              <div id="dashUserCalendariGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px;">
+              <div id="dashUserCalendariGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(min(250px, 100%), 1fr)); gap: 14px;">
                 <p style="color: var(--ink-500); font-size: 13px;">Caricamento calendari comunitari...</p>
               </div>
             </div>
+          </div>
+            </aside>
           </div>
         </section>
 
@@ -1159,31 +1156,6 @@ Domenica: dopo le Sante Messe</p>
                 </div>
               </div>
             </div>
-
-            <!-- Collegamento Bot WhatsApp Parrocchiale (Render) -->
-            <div class="card" style="margin-top: 24px; border: 1.5px solid #86efac; background: #f0fdf4;">
-              <div class="card-body" style="padding: 22px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap;">
-                  <div style="display: flex; align-items: center; gap: 16px;">
-                    <div style="width: 50px; height: 50px; border-radius: 50%; background: #22c55e; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.35);">
-                      💬
-                    </div>
-                    <div>
-                      <h3 style="font-size: 17px; font-weight: 700; color: #14532d; margin: 0 0 4px 0;">Bot WhatsApp Parrocchiale</h3>
-                      <p style="font-size: 13px; color: #166534; margin: 0;">
-                        Gestisci le comunicazioni, le notifiche automatiche e le risposte del bot WhatsApp della comunità parrocchiale.
-                      </p>
-                    </div>
-                  </div>
-                  <div>
-                    <a href="https://whatsapp-bot-5vi7.onrender.com/login" target="_blank" rel="noopener noreferrer" class="btn" style="background: #22c55e; color: #ffffff; border: none; font-weight: 700; font-size: 13.5px; padding: 10px 22px; border-radius: var(--radius-md); display: inline-flex; align-items: center; gap: 8px; text-decoration: none; box-shadow: 0 2px 8px rgba(34,197,94,0.3);">
-                      <span>💬 Accedi al Bot WhatsApp ↗</span>
-                    </a>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             <!-- Gestione Calendari Google Comunitari (Parrocchiali) -->
             <div class="card" style="margin-top: 24px;">
               <div class="card-header">
@@ -1854,15 +1826,6 @@ Domenica: dopo le Sante Messe</p>
             <div id="iscrizioneCampiEventoContainer" style="background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; gap: 10px;">
             </div>
           </div>
-
-          <div style="margin-top: 16px;">
-            <label style="font-size: 13px; font-weight: 700; color: var(--ink-800); display: block; margin-bottom: 6px;">
-              Consensi & Clausole di Iscrizione:
-            </label>
-            <div id="iscrizioneClausoleContainer" class="clauses-container">
-              <!-- Caricate dinamicamente da /api/configurazioni/clausole -->
-            </div>
-          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal('modalNuovaIscrizione')">Annulla</button>
@@ -2152,7 +2115,7 @@ Domenica: dopo le Sante Messe</p>
         <button class="btn-close-modal" onclick="closeModal('modalNuovoGruppoCatechismo')">×</button>
       </div>
       <form onsubmit="handleSalvaGruppoCatechismo(event)">
-        <div class="modal-body">
+        <div class="modal-body"><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="catEtaMin">Età minima (anni)</label><input id="catEtaMin" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="catEtaMax">Età massima (anni)</label><input id="catEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset>
           <div class="form-group">
             <label>Nome del Gruppo *</label>
             <input type="text" id="catNomeGruppo" class="form-control" placeholder="es. 1° Anno Comunione - Gruppo A" required>
@@ -2654,7 +2617,8 @@ Domenica: dopo le Sante Messe</p>
           <fieldset class="family-section"><legend>Allergie</legend><div id="modPersonaAllergiePills" class="allergy-chips-container"></div><label for="modPersonaAllergie">Allergie note e altre informazioni</label><textarea id="modPersonaAllergie" class="form-control" rows="2" placeholder="Indica le allergie; puoi aggiungere voci non presenti tra i suggerimenti."></textarea></fieldset>
           <fieldset class="family-section"><legend>Intolleranze alimentari</legend><div id="modPersonaIntolleranzePills" class="allergy-chips-container"></div><label for="modPersonaIntolleranze">Intolleranze e altre esigenze alimentari</label><input id="modPersonaIntolleranze" class="form-control" placeholder="Specificare eventuali altre intolleranze"></fieldset>
           <fieldset class="family-section"><legend>Terapie e medicinali</legend><div id="modPersonaTerapiePills" class="allergy-chips-container"></div><label for="modPersonaTerapie">Terapie / medicinali prescritti e altre indicazioni</label><textarea id="modPersonaTerapie" class="form-control" rows="3" placeholder="Nome del medicinale, indicazioni prescritte e contatto del referente, se necessario."></textarea><small>I suggerimenti classificano le informazioni: non sono prescrizioni né autorizzano la somministrazione.</small></fieldset>
-          <div class="form-group">
+          <div id="profiloDocumenti"></div><div id="profiloDocumentiElenco"></div>
+<div class="form-group">
             <label>Note Generali o Particolari</label>
             <textarea id="modPersonaNoteGenerali" class="form-control" rows="2" placeholder="Note o annotazioni particolari..."></textarea>
           </div>
@@ -3170,7 +3134,7 @@ Domenica: dopo le Sante Messe</p>
       </div>
       <form onsubmit="handleSalvaModificaGruppoCatechismo(event)">
         <input type="hidden" id="modCatGruppoId">
-        <div class="modal-body">
+        <div class="modal-body"><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="modCatEtaMin">Età minima (anni)</label><input id="modCatEtaMin" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="modCatEtaMax">Età massima (anni)</label><input id="modCatEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset>
           <div class="form-group">
             <label>Nome del Gruppo *</label>
             <input type="text" id="modCatNomeGruppo" class="form-control" required>
@@ -3290,7 +3254,7 @@ Domenica: dopo le Sante Messe</p>
         <button class="btn-close-modal" onclick="closeModal('modalNuovoGruppoDoposcuola')">×</button>
       </div>
       <form onsubmit="handleSalvaGruppoDoposcuola(event)">
-        <div class="modal-body">
+        <div class="modal-body"><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="dopEtaMin">Età minima (anni)</label><input id="dopEtaMin" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="dopEtaMax">Età massima (anni)</label><input id="dopEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset>
           <div class="form-group">
             <label>Nome del Gruppo *</label>
             <input type="text" id="dopNomeGruppo" class="form-control" placeholder="es. Primaria - Compiti e Studio" required>
@@ -3358,7 +3322,7 @@ Domenica: dopo le Sante Messe</p>
       </div>
       <form onsubmit="handleSalvaModificaGruppoDoposcuola(event)">
         <input type="hidden" id="modDopGruppoId">
-        <div class="modal-body">
+        <div class="modal-body"><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="modDopEtaMin">Età minima (anni)</label><input id="modDopEtaMin" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="modDopEtaMax">Età massima (anni)</label><input id="modDopEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset>
           <div class="form-group">
             <label>Nome del Gruppo *</label>
             <input type="text" id="modDopNomeGruppo" class="form-control" required>
@@ -3938,7 +3902,7 @@ Domenica: dopo le Sante Messe</p>
         <button class="btn-close-modal" onclick="closeModal('modalNuovoGruppoOratorio')">×</button>
       </div>
       <form onsubmit="handleSalvaNuovoGruppoOratorio(event)">
-        <div class="modal-body">
+        <div class="modal-body"><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="nuovoOratorioEtaMin">Età minima (anni)</label><input id="nuovoOratorioEtaMin" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="nuovoOratorioEtaMax">Età massima (anni)</label><input id="nuovoOratorioEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset>
           <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
             <div class="form-group">
               <label>Stagione Oratorio *</label>
@@ -4007,7 +3971,7 @@ Domenica: dopo le Sante Messe</p>
       </div>
       <form onsubmit="handleSalvaModificaGruppoOratorio(event)">
         <input type="hidden" id="modOratorioId">
-        <div class="modal-body">
+        <div class="modal-body"><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="modOratorioEtaMin">Età minima (anni)</label><input id="modOratorioEtaMin" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="modOratorioEtaMax">Età massima (anni)</label><input id="modOratorioEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset>
           <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
             <div class="form-group">
               <label>Stagione Oratorio *</label>

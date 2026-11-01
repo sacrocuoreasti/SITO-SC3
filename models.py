@@ -94,6 +94,7 @@ class Persona(db.Model):
     nucleo = db.relationship('NucleoFamiliare', back_populates='componenti', foreign_keys=[nucleo_id])
     iscrizioni = db.relationship('Iscrizione', back_populates='partecipante', cascade='all, delete-orphan')
     utente = db.relationship('Utente', back_populates='persona', uselist=False, cascade='all, delete-orphan')
+    documenti = db.relationship('DocumentoPersona', back_populates='persona', order_by='DocumentoPersona.id')
     liste = db.relationship('Lista', secondary=persona_lista, back_populates='membri')
 
     @property
@@ -108,6 +109,14 @@ class Persona(db.Model):
         return today.year - self.data_nascita.year - (
             (today.month, today.day) < (self.data_nascita.month, self.data_nascita.day)
         )
+
+    def visible_documents(self):
+        from flask import has_request_context
+        from flask_login import current_user
+        from services.family_service import staff_user, can_manage_family
+        if has_request_context() and current_user.is_authenticated and (staff_user() or current_user.codice_fiscale == self.codice_fiscale or (self.nucleo and can_manage_family(self.nucleo))):
+            return [document.to_dict() for document in self.documenti]
+        return []
 
     def to_dict(self, include_family=True):
         d = {
@@ -138,6 +147,7 @@ class Persona(db.Model):
             'nucleo_id': self.nucleo_id,
             'ruolo_famiglia': self.ruolo_famiglia or 'Figlio/a',
             'has_account': bool(self.utente),
+            'documenti': self.visible_documents(),
             'liste': [{'id': l.id, 'nome': l.nome, 'colore': l.colore or '#8B1E1E', 'icona': getattr(l, 'icona', '🏅') or '🏅', 'descrizione': l.descrizione or ''} for l in self.liste],
             'badges': [{'id': l.id, 'nome': l.nome, 'colore': l.colore or '#8B1E1E', 'icona': getattr(l, 'icona', '🏅') or '🏅', 'descrizione': l.descrizione or ''} for l in self.liste]
         }
@@ -148,6 +158,28 @@ class Persona(db.Model):
             d['nome_famiglia'] = None
             d['cf_capofamiglia'] = None
         return d
+
+
+class DocumentoPersona(db.Model):
+    __tablename__ = 'documento_persona'
+    id = db.Column(db.Integer, primary_key=True)
+    codice_fiscale = db.Column(db.String(16), db.ForeignKey('persona.codice_fiscale'), nullable=False, index=True)
+    tipo = db.Column(db.String(30), nullable=False)
+    nome_originale = db.Column(db.String(255), nullable=False)
+    percorso = db.Column(db.String(255), nullable=False)
+    numero_documento = db.Column(db.String(100), nullable=True)
+    rilasciato_da = db.Column(db.String(200), nullable=True)
+    data_rilascio = db.Column(db.Date, nullable=True)
+    data_scadenza = db.Column(db.Date, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    persona = db.relationship('Persona', back_populates='documenti')
+
+    def to_dict(self):
+        return {'id':self.id,'tipo':self.tipo,'nome_originale':self.nome_originale,
+                'numero_documento':self.numero_documento or '', 'rilasciato_da':self.rilasciato_da or '',
+                'data_rilascio':self.data_rilascio.isoformat() if self.data_rilascio else '',
+                'data_scadenza':self.data_scadenza.isoformat() if self.data_scadenza else '',
+                'download_url':f'/api/documenti/{self.id}/download'}
 
 
 class NucleoFamiliare(db.Model):
@@ -529,6 +561,8 @@ class Lista(db.Model):
 # ================= GRUPPI CATECHISMO =================
 class GruppoCatechismo(db.Model):
     __tablename__ = 'gruppo_catechismo'
+    eta_min = db.Column(db.Integer, nullable=True)
+    eta_max = db.Column(db.Integer, nullable=True)
 
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(120), nullable=False)  # es. "3ª Elementare - Gruppo A"
@@ -575,6 +609,8 @@ class GruppoCatechismo(db.Model):
 
         d = {
             'id': self.id,
+            'eta_min': self.eta_min,
+            'eta_max': self.eta_max,
             'nome': self.nome,
             'anno_pastorale': self.anno_pastorale or '2026/2027',
             'anno_catechismo': self.anno_catechismo or '',
@@ -600,6 +636,8 @@ class GruppoCatechismo(db.Model):
 # ================= GRUPPI DOPOSCUOLA =================
 class GruppoDoposcuola(db.Model):
     __tablename__ = 'gruppo_doposcuola'
+    eta_min = db.Column(db.Integer, nullable=True)
+    eta_max = db.Column(db.Integer, nullable=True)
 
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(120), nullable=False)  # es. "Doposcuola Primaria - Compiti e Studio"
@@ -624,6 +662,8 @@ class GruppoDoposcuola(db.Model):
     def to_dict(self, include_studenti=True):
         d = {
             'id': self.id,
+            'eta_min': self.eta_min,
+            'eta_max': self.eta_max,
             'nome': self.nome,
             'anno_scolastico': self.anno_scolastico or '2026/2027',
             'anno_pastorale': self.anno_scolastico or '2026/2027',
@@ -650,6 +690,8 @@ class GruppoDoposcuola(db.Model):
 # ================= GRUPPI ORATORIO (ESTIVO & INVERNALE) =================
 class GruppoOratorio(db.Model):
     __tablename__ = 'gruppo_oratorio'
+    eta_min = db.Column(db.Integer, nullable=True)
+    eta_max = db.Column(db.Integer, nullable=True)
 
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(120), nullable=False)  # es. "Squadra Gialla - Estivo", "Oratorio Invernale Medie"
@@ -695,6 +737,8 @@ class GruppoOratorio(db.Model):
 
         d = {
             'id': self.id,
+            'eta_min': self.eta_min,
+            'eta_max': self.eta_max,
             'nome': self.nome,
             'anno_pastorale': self.anno_pastorale or '2026/2027',
             'tipo_oratorio': self.tipo_oratorio or 'estivo',
@@ -993,6 +1037,12 @@ def init_default_configurazioni():
         # Verifica ed aggiunta colonne mancanti per SQLite
         from sqlalchemy import text
         col_checks = [
+            ('gruppo_oratorio', 'eta_min', 'INTEGER'),
+            ('gruppo_oratorio', 'eta_max', 'INTEGER'),
+            ('gruppo_catechismo', 'eta_min', 'INTEGER'),
+            ('gruppo_catechismo', 'eta_max', 'INTEGER'),
+            ('gruppo_doposcuola', 'eta_min', 'INTEGER'),
+            ('gruppo_doposcuola', 'eta_max', 'INTEGER'),
             ('persona', 'terapie_medicinali', 'TEXT'),
             ('nucleo_familiare', 'codice_invito', 'VARCHAR(3)'),
             ('utente', 'consensi_registrazione', 'TEXT'),

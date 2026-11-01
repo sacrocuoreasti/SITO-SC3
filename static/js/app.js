@@ -431,7 +431,7 @@ async function renderCustomRegistrationFields() {
   try {
     const res = await fetch('/api/configurazioni/campi-account');
     const data = await res.json();
-    cacheCampiAccount = (data.campi || []).filter(c => c.is_attivo !== false);
+    cacheCampiAccount = (data.campi || []).filter(c => c.is_attivo !== false && !/professione|volontari|telefono.?fisso/i.test(c.chiave + ' ' + c.nome));
     if (!cacheCampiAccount.length) {
       container.innerHTML = '';
       return;
@@ -493,7 +493,8 @@ async function handleRegisterSubmit(e) {
   const cognome = document.getElementById('regCognome').value;
   const cf = document.getElementById('regCF').value.toUpperCase().trim();
   const telefono = document.getElementById('regTelefono').value;
-  const nomeFamiglia = document.getElementById('regNomeFamiglia').value;
+  const confermaPassword = document.getElementById('regConfermaPassword').value;
+  if (passwordMismatch()) return showToast('Le password non coincidono', 'warning');
   const email = document.getElementById('regEmail').value;
   const password = document.getElementById('regPassword').value;
 
@@ -510,16 +511,15 @@ async function handleRegisterSubmit(e) {
   }
 
   try {
-    const res = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        nome, cognome, codice_fiscale: cf, telefono, nome_famiglia: nomeFamiglia, email, password,
+    const form = collectDocuments('regDocumenti');
+    form.append('data', JSON.stringify({
+        nome, cognome, codice_fiscale: cf, telefono, email, password, conferma_password: confermaPassword,
+        ...Object.fromEntries([...form.entries()].filter(([key,value])=> typeof value === 'string')),
         campi_extra: extraFields, ruolo_famiglia: document.getElementById('regRuoloFamiglia').value,
         codice_invito: document.getElementById('regCodiceInvito').value.trim(),
         consensi_registrazione: readRegistrationConsents('registrationConsents')
-      })
-    });
+      }));
+    const res = await fetch('/api/auth/register', {method:'POST', body:form});
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Errore registrazione');
 
@@ -557,6 +557,7 @@ function showAuthTab(tab) {
   } else {
     formLogin.style.display = 'none';
     formReg.style.display = 'block';
+    if (!document.getElementById('regDocumenti').innerHTML) renderDocuments('regDocumenti');
     btnLogin.className = 'btn btn-sm btn-secondary';
     btnReg.className = 'btn btn-sm btn-primary';
     renderCustomRegistrationFields();
@@ -809,9 +810,7 @@ async function loadDashboard() {
       container.innerHTML = `<div style="padding: 16px; color: var(--ink-500); text-align: center;">
         ${!isStaff ? 'Nessuna attività attualmente aperta per la fascia d\'età del tuo nucleo familiare.' : 'Nessuna attività registrata. Crea una nuova attività!'}
       </div>`;
-      return;
-    }
-
+    } else {
     container.innerHTML = dashAttivita.slice(0, 4).map(a => `
       <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-light);">
         <div>
@@ -830,6 +829,8 @@ async function loadDashboard() {
         </div>
       </div>
     `).join('');
+
+    }
 
     // Carica orari messe e avvisi parrocchiali aggiornati con le impostazioni
     try {
@@ -1517,6 +1518,7 @@ async function openModalNuovoGruppoOratorio(tipoPredefinito = 'estivo') {
     console.error('Errore caricamento persone per animatori:', err);
   }
 
+  setGroupAges('nuovoOratorio', {});
   openModal('modalNuovoGruppoOratorio');
 }
 
@@ -1526,6 +1528,7 @@ async function handleSalvaNuovoGruppoOratorio(e) {
   const animatoriIds = Array.from(animatoriSel.selectedOptions).map(o => parseInt(o.value)).filter(Boolean);
 
   const payload = {
+    ...readGroupAges('nuovoOratorio'),
     tipo_oratorio: document.getElementById('nuovoOratorioTipo').value,
     anno_pastorale: document.getElementById('nuovoOratorioAnno').value.trim(),
     nome: document.getElementById('nuovoOratorioNome').value.trim(),
@@ -1585,6 +1588,7 @@ async function openModalModificaGruppoOratorio(id) {
     console.error('Errore animatori:', err);
   }
 
+  setGroupAges('modOratorio', g);
   openModal('modalModificaGruppoOratorio');
 }
 
@@ -1596,6 +1600,7 @@ async function handleSalvaModificaGruppoOratorio(e) {
   const animatoriIds = Array.from(animatoriSel.selectedOptions).map(o => parseInt(o.value)).filter(Boolean);
 
   const payload = {
+    ...readGroupAges('modOratorio'),
     tipo_oratorio: document.getElementById('modOratorioTipo').value,
     anno_pastorale: document.getElementById('modOratorioAnno').value.trim(),
     nome: document.getElementById('modOratorioNome').value.trim(),
@@ -2559,6 +2564,7 @@ async function openModalNuovoGruppoCatechismo() {
   if (document.getElementById('catGoogleCalendarUrl')) document.getElementById('catGoogleCalendarUrl').value = '';
   document.getElementById('catNote').value = '';
   await loadCatechistiCheckboxes('catNuovoCatechistiContainer', []);
+  setGroupAges('cat', {});
   openModal('modalNuovoGruppoCatechismo');
 }
 
@@ -2580,6 +2586,7 @@ async function handleSalvaGruppoCatechismo(e) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        ...readGroupAges('cat'),
         nome,
         anno_pastorale: annoPastorale,
         stato,
@@ -2642,6 +2649,7 @@ async function openModalModificaGruppoCatechismo(id) {
     console.error('Errore attivita select:', err);
   }
 
+  setGroupAges('modCat', g);
   openModal('modalModificaGruppoCatechismo');
 }
 
@@ -2666,6 +2674,7 @@ async function handleSalvaModificaGruppoCatechismo(e) {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        ...readGroupAges('modCat'),
         nome,
         anno_pastorale: annoPastorale,
         stato,
@@ -3287,6 +3296,7 @@ async function openModalNuovoGruppoDoposcuola() {
   document.getElementById('dopAula').value = '';
   document.getElementById('dopNote').value = '';
   await loadEducatoriDoposcuolaSelect('dopSelectEducatore');
+  setGroupAges('dop', {});
   openModal('modalNuovoGruppoDoposcuola');
 }
 
@@ -3310,6 +3320,7 @@ async function handleSalvaGruppoDoposcuola(e) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        ...readGroupAges('dop'),
         nome,
         anno_scolastico: anno,
         stato,
@@ -3359,6 +3370,7 @@ async function openModalModificaGruppoDoposcuola(id) {
     }
   }
 
+  setGroupAges('modDop', g);
   openModal('modalModificaGruppoDoposcuola');
 }
 
@@ -3383,6 +3395,7 @@ async function handleSalvaModificaGruppoDoposcuola(e) {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        ...readGroupAges('modDop'),
         nome,
         anno_scolastico: anno,
         stato,
@@ -5739,9 +5752,9 @@ async function saveMemberAccount(event) {
 async function openModalNuovaIscrizione(defaultAttivitaId = null, defaultCF = null) {
   try {
     const staff = currentUser && currentUser.tutti_i_ruoli.some(r => ['admin','segreteria','parroco'].includes(r));
-    const [activities, family, existing, clauses] = await Promise.all([
+    const [activities, family, existing] = await Promise.all([
       apiJson(staff ? '/api/attivita?include_bozze=true' : '/api/attivita'),
-      apiJson('/api/famiglie/mia'), apiJson('/api/iscrizioni?solo_mie=true'), apiJson('/api/configurazioni/clausole')
+      apiJson('/api/famiglie/mia'), apiJson('/api/iscrizioni?solo_mie=true')
     ]);
     cacheAttivita = activities.attivita || [];
     enrollmentPeople = family.nucleo ? family.nucleo.componenti : [];
@@ -5758,8 +5771,6 @@ async function openModalNuovaIscrizione(defaultAttivitaId = null, defaultCF = nu
     title.hidden = !defaultAttivitaId;
     title.textContent = defaultAttivitaId ? cacheAttivita.find(a => String(a.id) === String(defaultAttivitaId)).titolo : '';
     document.getElementById('iscrizioneNote').value = '';
-    const container = document.getElementById('iscrizioneClausoleContainer');
-    container.innerHTML = (clauses.clausole || []).filter(c => c.is_attiva !== false).map(c => `<label class="clause-card ${c.obbligatoria ? 'mandatory' : ''}"><input type="checkbox" class="clause-checkbox" data-id="${c.id}" data-req="${!!c.obbligatoria}" data-titolo="${escapeHtml(c.titolo)}" ${c.obbligatoria ? 'required' : ''}><span><strong>${escapeHtml(c.titolo)}</strong><p>${escapeHtml(c.testo)}</p></span></label>`).join('');
     document.getElementById('iscrizionePartecipantiCheckbox').innerHTML = '';
     onIscrizioneFormChange(defaultCF);
     openModal('modalNuovaIscrizione');
@@ -5819,11 +5830,6 @@ async function handleSalvaIscrizione(event) {
   event.preventDefault();
   const participants = [...document.querySelectorAll('.family-participant:checked')].map(x=>x.value);
   if (!participants.length) return showToast('Seleziona almeno un componente', 'warning');
-  const clauses = {};
-  for (const input of document.querySelectorAll('#iscrizioneClausoleContainer .clause-checkbox')) {
-    if (input.dataset.req === 'true' && !input.checked) return showToast('Accetta le clausole obbligatorie', 'warning');
-    clauses[input.dataset.id] = input.checked;
-  }
   const fields = {};
   for (const input of document.querySelectorAll('#iscrizioneCampiEventoContainer .campo-evento-input')) {
     const value = input.type === 'checkbox' ? input.checked : input.value.trim();
@@ -5834,7 +5840,7 @@ async function handleSalvaIscrizione(event) {
   const button = document.getElementById('btnConfermaIscrizione');
   button.disabled = true;
   try {
-    const data = await apiJson('/api/iscrizioni', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({attivita_id:Number(document.getElementById('iscrizioneAttivitaSelect').value), partecipanti:participants, note_iscrizione:document.getElementById('iscrizioneNote').value.trim(), clausole_accettate:clauses, campi_personalizzati_per_partecipante:fields})});
+    const data = await apiJson('/api/iscrizioni', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({attivita_id:Number(document.getElementById('iscrizioneAttivitaSelect').value), partecipanti:participants, note_iscrizione:document.getElementById('iscrizioneNote').value.trim(), campi_personalizzati_per_partecipante:fields})});
     showToast(data.message,'success'); closeModal('modalNuovaIscrizione');
     if (currentView === 'famiglia') await loadFamiglia();
     if (currentView === 'segreteria') await loadSegreteriaIscrizioni();
@@ -6560,11 +6566,11 @@ async function openModalModificaPersona(cf) {
     if (document.getElementById('modPersonaNoteGenerali')) {
       document.getElementById('modPersonaNoteGenerali').value = p.note_generali || '';
     }
-    document.getElementById('modPersonaBattesimoInput').value = '';
 
     document.getElementById('modPersonaTerapie').value = p.terapie_medicinali || '';
     await renderHealthSections('modPersona');
 
+    document.getElementById('modPersonaBattesimoBox').parentElement.hidden = !p.certificato_battesimo_url;
     const badge = document.getElementById('modPersonaBattesimoBadge');
     const link = document.getElementById('modPersonaBattesimoLink');
     const delBtn = document.getElementById('modPersonaBattesimoDelBtn');
@@ -6581,6 +6587,8 @@ async function openModalModificaPersona(cf) {
       delBtn.style.display = 'none';
     }
 
+    renderDocuments('profiloDocumenti');
+    document.getElementById('profiloDocumentiElenco').innerHTML = (p.documenti || []).map(d=>`<p><a href="${d.download_url}">${escapeHtml(documentKinds[d.tipo] || d.tipo)} — ${escapeHtml(d.nome_originale)}</a>${d.numero_documento ? `<br><small>${escapeHtml(d.numero_documento)} · ${escapeHtml(d.rilasciato_da)} · ${escapeHtml(d.data_rilascio)} – ${escapeHtml(d.data_scadenza)}</small>` : ''}</p>`).join('');
     openModal('modalModificaPersona');
   } catch (err) {
     showToast(err.message, 'error');
@@ -6606,6 +6614,7 @@ async function handleSalvaModificaPersona(e) {
   const noteGenerali = document.getElementById('modPersonaNoteGenerali')?.value.trim() || '';
 
   try {
+    const documents = collectDocuments('profiloDocumenti');
     const res = await fetch(`/api/persone/${cf}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -6623,17 +6632,7 @@ async function handleSalvaModificaPersona(e) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Errore modifica anagrafica');
 
-    // Carica certificato battesimo se selezionato
-    const fileInput = document.getElementById('modPersonaBattesimoInput');
-    if (fileInput.files && fileInput.files[0]) {
-      const fd = new FormData();
-      fd.append('certificato', fileInput.files[0]);
-      await fetch(`/api/persone/${cf}/certificato-battesimo`, {
-        method: 'POST',
-        body: fd
-      });
-    }
-
+    if ([...documents.values()].some(value=>value instanceof File)) await apiJson(`/api/persone/${cf}/documenti`, {method:'POST',body:documents});
     showToast('Scheda anagrafica aggiornata con successo', 'success');
     closeModal('modalModificaPersona');
 
@@ -8592,3 +8591,34 @@ async function handleRimuoviFotoProfilo() {
 
 
 
+
+// Documenti personali: file e dati inviati insieme, senza URL pubblici.
+const documentKinds = {identita:"Carta d’identità",battesimo:'Certificato di battesimo',comunione:'Certificato di comunione',cresima:'Certificato di cresima',matrimonio:'Certificato di matrimonio'};
+function passwordMismatch() { return document.getElementById('regPassword').value !== document.getElementById('regConfermaPassword').value; }
+function renderDocuments(containerId) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = `<fieldset class="family-section"><legend>Documenti e certificati</legend><p>Allegati facoltativi. PDF, JPG, PNG o WebP: massimo 5 MB per file e 16 MB complessivi.</p>${Object.entries(documentKinds).map(([kind,label])=>`<div class="form-group"><label for="${containerId}_${kind}">${label}</label><input type="file" id="${containerId}_${kind}" name="documento_${kind}" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.webp" ${kind==='identita' ? `onchange="toggleIdentityMetadata('${containerId}')"` : ''}></div>${kind==='identita' ? `<div data-identity-fields>${[['numero_documento','Numero documento','text'],['rilasciato_da','Rilasciato da','text'],['data_rilascio','Data rilascio','date'],['data_scadenza','Data scadenza','date']].map(([key,label,type])=>`<div class="form-group"><label for="${containerId}_${key}">${label}</label><input id="${containerId}_${key}" name="documento_${key}" class="form-control" type="${type}" ${type==='text' ? `maxlength="${key==='numero_documento' ? 100 : 200}"` : ''}></div>`).join('')}</div>` : ''}`).join('')}</fieldset>`;
+  toggleIdentityMetadata(containerId);
+}
+function toggleIdentityMetadata(id) {
+  const selected = !!document.getElementById(id+'_identita').files.length;
+  document.getElementById(id).querySelectorAll('[data-identity-fields] input').forEach(input=>{input.required=selected;input.disabled=!selected;});
+}
+function collectDocuments(id) {
+  const form = new FormData(); let size = 0;
+  document.getElementById(id).querySelectorAll('input').forEach(input=>{
+    if (input.type==='file') {
+      const file = input.files[0];
+      if(file) {if(file.size>5*1024*1024) throw new Error('Ogni documento deve essere inferiore a 5 MB'); size+=file.size; form.append(input.name,file);}
+    } else if (!input.disabled) form.append(input.name,input.value.trim());
+  });
+  if(size>16*1024*1024) throw new Error('I documenti superano il limite complessivo di 16 MB');
+  return form;
+}
+function setGroupAges(prefix,group) {
+  document.getElementById(prefix+'EtaMin').value = group.eta_min ?? '';
+  document.getElementById(prefix+'EtaMax').value = group.eta_max ?? '';
+}
+function readGroupAges(prefix) {
+  return Object.fromEntries(['Min','Max'].map(key=>{const value=document.getElementById(prefix+'Eta'+key).value;return ['eta_'+key.toLowerCase(),value==='' ? null : Number(value)];}));
+}

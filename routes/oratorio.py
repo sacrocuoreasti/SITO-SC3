@@ -1,3 +1,4 @@
+from services.group_age_service import apply_age_range, register_age_guard
 from flask import Blueprint, request, jsonify
 from flask_login import current_user
 from models import db, Attivita, Iscrizione, Persona, Presenza, GruppoOratorio, Utente
@@ -5,6 +6,8 @@ from services.cf_validator import normalizza_cf
 from datetime import date, datetime
 
 oratorio_bp = Blueprint('oratorio_bp', __name__, url_prefix='/api/oratorio')
+register_age_guard(oratorio_bp, GruppoOratorio, 'ragazzi')
+
 
 @oratorio_bp.route('/animatori', methods=['GET'])
 def get_animatori():
@@ -96,6 +99,7 @@ def create_gruppo_oratorio():
             if u and u not in nuovo.animatori:
                 nuovo.animatori.append(u)
 
+    apply_age_range(nuovo, data)
     db.session.add(nuovo)
     db.session.commit()
 
@@ -119,6 +123,7 @@ def update_gruppo_oratorio(id):
         return jsonify({'error': 'Gruppo Oratorio non trovato'}), 404
 
     data = request.get_json() or {}
+    apply_age_range(g, data)
     if 'nome' in data: g.nome = data['nome'].strip()
     if 'anno_pastorale' in data: g.anno_pastorale = data['anno_pastorale'].strip()
     if 'tipo_oratorio' in data:
