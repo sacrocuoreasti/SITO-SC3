@@ -19,6 +19,7 @@ def export_backup():
     try:
         create_backup(db.engine.url.database, current_app.config['UPLOAD_FOLDER'], path, current_app.config['APP_VERSION'])
         response = send_file(path, as_attachment=True, download_name='cuoreinrete-backup.zip', mimetype='application/zip')
+        response.direct_passthrough = False
         response.call_on_close(temporary.cleanup)
         return response
     except Exception:

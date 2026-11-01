@@ -194,6 +194,8 @@ class StabilityTests(unittest.TestCase):
             self.assertEqual(gzip.decompress(compressed.data), plain.data)
             self.assertLess(len(compressed.data), len(plain.data) * 0.35)
             self.assertIn('Accept-Encoding', compressed.headers['Vary'])
+            plain.close()
+            compressed.close()
         self.assertNotIn('Content-Encoding', self.client.get('/api/auth/me', headers={'Accept-Encoding': 'gzip'}).headers)
         self.assertNotIn('Content-Encoding', self.client.get('/', headers={'Accept-Encoding': 'gzip;q=0'}).headers)
 
