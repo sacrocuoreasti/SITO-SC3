@@ -34,7 +34,7 @@ class ReleaseClient:
 
     def request(self, path, data=None, binary=False):
         request = urllib.request.Request(self.url + path, data=json.dumps(data).encode() if data is not None else None,
-                                         headers={'Content-Type': 'application/json'})
+                                         headers={'Content-Type': 'application/json'} if data is not None else {})
         with self.opener.open(request, timeout=120) as response:
             return response.read() if binary else json.load(response)
 

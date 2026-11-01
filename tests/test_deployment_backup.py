@@ -134,6 +134,23 @@ class DeploymentBackupTests(unittest.TestCase):
         self.assertTrue(finished.is_set())
         gate.resume(); self.assertTrue(gate.admit()); gate.leave()
 
+    def test_release_client_get_requests_work_with_json_api_validation(self):
+        from scripts.release import ReleaseClient
+        import urllib.error
+        client = ReleaseClient('https://example.test', 'admin@example.test', 'unused')
+        flask_client = self.app.test_client()
+        class Opener:
+            def open(self, request, timeout):
+                response = flask_client.open(request.selector, method=request.get_method(), data=request.data, headers=dict(request.header_items()))
+                if response.status_code >= 400:
+                    raise urllib.error.HTTPError(request.full_url,response.status_code,'API error',{},None)
+                return io.BytesIO(response.data)
+        client.opener = Opener()
+        self.assertIn('consensi',client.request('/api/auth/registration-options'))
+        client.email, client.password = 'admin@example.test', 'password-test-123'
+        client.login()
+        self.assertTrue(client.request('/api/auth/me')['authenticated'])
+
     def test_only_admin_can_prepare_and_missing_secret_does_not_freeze(self):
         self.assertEqual(self.client.post('/api/backup/prepare-release',json={'target_version':self.target()}).status_code,403)
         self.login('admin@example.test')
