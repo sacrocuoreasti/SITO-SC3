@@ -2142,7 +2142,7 @@ Domenica: dopo le Sante Messe</p>
           <div class="form-group">
             <label>📅 Link Google Calendar (opzionale)</label>
             <input type="url" id="catGoogleCalendarUrl" class="form-control" placeholder="https://calendar.google.com/calendar/u/0?cid=...">
-            <small style="color: var(--ink-500); font-size: 11.5px;">I genitori potranno cliccare per aggiungere il calendario degli incontri al proprio smartphone o account Google.</small>
+            <small style="color: var(--ink-500); font-size: 11.5px;">Usa il link di un calendario Google pubblico: gli incontri appariranno nella vista mensile e nelle date del registro.</small>
           </div>
 
           <div class="form-group">
@@ -2875,7 +2875,7 @@ Domenica: dopo le Sante Messe</p>
             <div style="display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap;">
               <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                 <label for="appelloDataIncontro" style="margin: 0; font-weight: 700; font-size: 13px; color: var(--ink-800);">📅 Data Incontro:</label>
-                <input type="date" id="appelloDataIncontro" class="form-control" style="width: 160px; font-weight: 600;" onchange="onDataIncontroCatechismoChanged()" required>
+                <input type="date" id="appelloDataIncontro" class="form-control" style="width: 160px; font-weight: 600;" onchange="onDataIncontroCatechismoChanged()" required><div class="calendar-meeting-picker" id="appelloGoogleDateBox" style="display:none"><label for="appelloGoogleDate">Incontri dal calendario Google</label><select id="appelloGoogleDate" class="form-control" onchange="chooseCalendarMeeting(this,'appello')"></select><small>Un solo appello per gruppo e giornata. Le presenze si salvano nel sito.</small></div>
                 <button type="button" class="btn btn-sm btn-secondary" onclick="impostaOggiDataCatechismo()">Oggi</button>
               </div>
               <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; justify-content: flex-end;">
@@ -3098,7 +3098,7 @@ Domenica: dopo le Sante Messe</p>
           <div class="form-group">
             <label>📅 Link Google Calendar (opzionale)</label>
             <input type="url" id="modCatGoogleCalendarUrl" class="form-control" placeholder="https://calendar.google.com/calendar/u/0?cid=...">
-            <small style="color: var(--ink-500); font-size: 11.5px;">Incolla il link pubblico o di condivisione di Google Calendar per sincronizzare gli incontri con il calendario dei genitori.</small>
+            <small style="color: var(--ink-500); font-size: 11.5px;">Incolla il link di un calendario Google pubblico. Date e titoli degli incontri si aggiornano nel sito; le presenze si segnano nel registro.</small>
           </div>
 
           <div class="form-group">
@@ -3166,7 +3166,7 @@ Domenica: dopo le Sante Messe</p>
         <button class="btn-close-modal" onclick="closeModal('modalNuovoGruppoDoposcuola')">×</button>
       </div>
       <form onsubmit="handleSalvaGruppoDoposcuola(event)">
-        <div class="modal-body"><div class="form-group"><label for="dopGoogleCalendarUrl">Link Google Calendar</label><input id="dopGoogleCalendarUrl" type="url" class="form-control" placeholder="https://calendar.google.com/calendar/embed?src=..."></div><p>Il calendario deve essere condiviso con i partecipanti. Gli appuntamenti si aggiornano da Google.</p><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="dopEtaMin">Età minima (anni)</label><input id="dopEtaMin" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="dopEtaMax">Età massima (anni)</label><input id="dopEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset>
+        <div class="modal-body"><div class="form-group"><label for="dopGoogleCalendarUrl">Link Google Calendar</label><input id="dopGoogleCalendarUrl" type="url" class="form-control" placeholder="https://calendar.google.com/calendar/embed?src=..."></div><p>Usa un calendario Google pubblico per gli appuntamenti. Le presenze si registrano nel sito.</p><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="dopEtaMin">Età minima (anni)</label><input id="dopEtaMin" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="dopEtaMax">Età massima (anni)</label><input id="dopEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset>
           <div class="form-group">
             <label>Nome del Gruppo *</label>
             <input type="text" id="dopNomeGruppo" class="form-control" placeholder="es. Primaria - Compiti e Studio" required>
@@ -3234,7 +3234,7 @@ Domenica: dopo le Sante Messe</p>
       </div>
       <form onsubmit="handleSalvaModificaGruppoDoposcuola(event)">
         <input type="hidden" id="modDopGruppoId">
-        <div class="modal-body"><div class="form-group"><label for="modDopGoogleCalendarUrl">Link Google Calendar</label><input id="modDopGoogleCalendarUrl" type="url" class="form-control" placeholder="https://calendar.google.com/calendar/embed?src=..."></div><p>Il calendario deve essere condiviso con i partecipanti. Gli appuntamenti si aggiornano da Google.</p><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="modDopEtaMin">Età minima (anni)</label><input id="modDopEtaMin" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="modDopEtaMax">Età massima (anni)</label><input id="modDopEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset>
+        <div class="modal-body"><div class="form-group"><label for="modDopGoogleCalendarUrl">Link Google Calendar</label><input id="modDopGoogleCalendarUrl" type="url" class="form-control" placeholder="https://calendar.google.com/calendar/embed?src=..."></div><p>Usa un calendario Google pubblico per gli appuntamenti. Le presenze si registrano nel sito.</p><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="modDopEtaMin">Età minima (anni)</label><input id="modDopEtaMin" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="modDopEtaMax">Età massima (anni)</label><input id="modDopEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset>
           <div class="form-group">
             <label>Nome del Gruppo *</label>
             <input type="text" id="modDopNomeGruppo" class="form-control" required>
@@ -3323,7 +3323,7 @@ Domenica: dopo le Sante Messe</p>
           <div style="display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; background: #fff; border: 1px solid var(--border-light); padding: 12px 16px; border-radius: var(--radius-md); margin-bottom: 16px;">
             <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
               <label for="appelloDopDataIncontro" style="margin: 0; font-weight: 700; font-size: 13px; color: var(--ink-800);">📅 Data Pomeriggio:</label>
-              <input type="date" id="appelloDopDataIncontro" class="form-control" style="width: 170px; font-weight: 600;" onchange="onDataIncontroDoposcuolaChanged()" required>
+              <input type="date" id="appelloDopDataIncontro" class="form-control" style="width: 170px; font-weight: 600;" onchange="onDataIncontroDoposcuolaChanged()" required><div class="calendar-meeting-picker" id="appelloDopGoogleDateBox" style="display:none"><label for="appelloDopGoogleDate">Incontri dal calendario Google</label><select id="appelloDopGoogleDate" class="form-control" onchange="chooseCalendarMeeting(this,'appelloDop')"></select><small>Un solo appello per gruppo e giornata. Le presenze si salvano nel sito.</small></div>
               <button type="button" class="btn btn-sm btn-secondary" onclick="impostaOggiDataDoposcuola()">Oggi</button>
             </div>
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
@@ -3756,7 +3756,7 @@ Domenica: dopo le Sante Messe</p>
         <button class="btn-close-modal" onclick="closeModal('modalNuovoGruppoOratorio')">×</button>
       </div>
       <form onsubmit="handleSalvaNuovoGruppoOratorio(event)">
-        <div class="modal-body"><div class="form-group"><label for="nuovoOratorioGoogleCalendarUrl">Link Google Calendar</label><input id="nuovoOratorioGoogleCalendarUrl" type="url" class="form-control" placeholder="https://calendar.google.com/calendar/embed?src=..."></div><p>Il calendario deve essere condiviso con i partecipanti. Gli appuntamenti si aggiornano da Google.</p><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="nuovoOratorioEtaMin">Età minima (anni)</label><input id="nuovoOratorioEtaMin" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="nuovoOratorioEtaMax">Età massima (anni)</label><input id="nuovoOratorioEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset>
+        <div class="modal-body"><div class="form-group"><label for="nuovoOratorioGoogleCalendarUrl">Link Google Calendar</label><input id="nuovoOratorioGoogleCalendarUrl" type="url" class="form-control" placeholder="https://calendar.google.com/calendar/embed?src=..."></div><p>Usa un calendario Google pubblico per gli appuntamenti. Le presenze si registrano nel sito.</p><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="nuovoOratorioEtaMin">Età minima (anni)</label><input id="nuovoOratorioEtaMin" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="nuovoOratorioEtaMax">Età massima (anni)</label><input id="nuovoOratorioEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset>
           <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
             <div class="form-group">
               <label>Stagione Oratorio *</label>
@@ -3825,7 +3825,7 @@ Domenica: dopo le Sante Messe</p>
       </div>
       <form onsubmit="handleSalvaModificaGruppoOratorio(event)">
         <input type="hidden" id="modOratorioId">
-        <div class="modal-body"><div class="form-group"><label for="modOratorioGoogleCalendarUrl">Link Google Calendar</label><input id="modOratorioGoogleCalendarUrl" type="url" class="form-control" placeholder="https://calendar.google.com/calendar/embed?src=..."></div><p>Il calendario deve essere condiviso con i partecipanti. Gli appuntamenti si aggiornano da Google.</p><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="modOratorioEtaMin">Età minima (anni)</label><input id="modOratorioEtaMin" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="modOratorioEtaMax">Età massima (anni)</label><input id="modOratorioEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset>
+        <div class="modal-body"><div class="form-group"><label for="modOratorioGoogleCalendarUrl">Link Google Calendar</label><input id="modOratorioGoogleCalendarUrl" type="url" class="form-control" placeholder="https://calendar.google.com/calendar/embed?src=..."></div><p>Usa un calendario Google pubblico per gli appuntamenti. Le presenze si registrano nel sito.</p><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="modOratorioEtaMin">Età minima (anni)</label><input id="modOratorioEtaMin" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="modOratorioEtaMax">Età massima (anni)</label><input id="modOratorioEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset>
           <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
             <div class="form-group">
               <label>Stagione Oratorio *</label>
@@ -3903,7 +3903,7 @@ Domenica: dopo le Sante Messe</p>
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; background: var(--bg-subtle); padding: 10px 14px; border-radius: var(--radius-sm);">
             <div style="display: flex; align-items: center; gap: 8px;">
               <label style="font-weight: 700; font-size: 13px;">Data Incontro:</label>
-              <input type="date" id="registroOratorioData" class="form-control" style="width: auto; padding: 4px 8px;" onchange="caricaPresenzeOratorioData()">
+              <input type="date" id="registroOratorioData" class="form-control" style="width: auto; padding: 4px 8px;" onchange="caricaPresenzeOratorioData()"><div class="calendar-meeting-picker" id="registroOratorioGoogleDateBox" style="display:none"><label for="registroOratorioGoogleDate">Incontri dal calendario Google</label><select id="registroOratorioGoogleDate" class="form-control" onchange="chooseCalendarMeeting(this,'registroOratorio')"></select><small>Un solo appello per gruppo e giornata. Le presenze si salvano nel sito.</small></div>
             </div>
             <div style="display: flex; gap: 8px;">
               <button type="button" class="btn btn-xs btn-outline-primary" onclick="segnaTuttiPresenzeOratorio(true)">Tutti Presenti</button>
@@ -4261,6 +4261,7 @@ Domenica: dopo le Sante Messe</p>
   <!-- Toast Notification Container -->
   <div class="toast-container" id="toastContainer"></div>
 
+  <script src="{{ url_for('static', filename='js/group-calendar.js', v=asset_version) }}" defer></script>
   <script src="{{ url_for('static', filename='js/app.js', v=asset_version) }}" defer></script>
 
 <div class="modal-overlay" id="modalPartecipantiEvento"><div class="modal-window"><div class="modal-header"><h3>Iscritti e disiscrizioni</h3><button type="button" class="btn-close-modal" onclick="closeModal('modalPartecipantiEvento')">×</button></div><div class="modal-body" id="partecipantiEventoElenco"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="closeModal('modalPartecipantiEvento')">Chiudi</button></div></div></div>

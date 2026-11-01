@@ -1207,7 +1207,7 @@ async function loadOratorio() {
     if (parentSec) parentSec.style.display = 'block';
     const titleEl = document.getElementById('oratorioPageTitle');
     const descEl = document.getElementById('oratorioPageDesc');
-    if (titleEl) titleEl.textContent = 'Oratorio & Estate Ragazzi dei Tuoi Figli';
+    if (titleEl) titleEl.textContent = 'Oratorio: gruppi e presenze';
     if (descEl) descEl.textContent = 'Consulta i gruppi assegnati a tuo figlio/a per l\'Oratorio Estivo o Invernale, gli animatori di riferimento e il registro presenze.';
     await loadOratorioParentView();
     return;
@@ -1403,80 +1403,8 @@ function renderGruppiOratorioGrid() {
   }).join('');
 }
 
-async function loadOratorioAssignedView() {
-  const container = document.getElementById('oratorioAssignedContainer');
-  if (!container) return;
-  container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--ink-500);">Caricamento oratorio dei tuoi figli...</div>';
+async function loadOratorioAssignedView() {return loadAssignedGroupRegisters('oratorio');}
 
-  try {
-    const res = await fetch('/api/oratorio/miei-figli');
-    const data = await res.json();
-    data.figli = (data.figli || []).filter(f=>f.is_assegnato);
-    if (!data.figli.length) {container.innerHTML='';return;}
-    if (!data.ha_famiglia || !data.figli || !data.figli.length) {
-      container.innerHTML = `
-        <div class="card" style="padding: 30px; text-align: center;">
-          <h3 style="font-size: 16px; margin-bottom: 8px;">Nessun componente registrato nel nucleo familiare</h3>
-          <p style="color: var(--ink-500); font-size: 13.5px; margin-bottom: 16px;">
-            Aggiungi i tuoi figli nella sezione "La Mia Famiglia" per visualizzare e gestire le iscrizioni all'Oratorio Estivo o Invernale.
-          </p>
-          <button class="btn btn-primary" onclick="navigateTo('famiglia')">Vai a La Mia Famiglia →</button>
-        </div>
-      `;
-      return;
-    }
-
-    container.innerHTML = data.figli.map(figlio => {
-      const isAssegnato = figlio.is_assegnato;
-      const gruppi = figlio.gruppi || [];
-
-      return `
-        <div class="card" style="border-left: 4px solid var(--primary); padding: 22px; margin-bottom: 20px;">
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; border-bottom: 1px solid var(--border-light); padding-bottom: 14px;">
-            <div>
-              <span class="badge ${isAssegnato ? 'badge-success' : 'badge-neutral'}" style="font-size: 11px; margin-bottom: 6px;">
-                ${isAssegnato ? 'ISCRITTO ALL\'ORATORIO' : 'NON ANCORA ISCRITTO'}
-              </span>
-              <h2 style="font-size: 20px; font-weight: 700; color: var(--ink-900); margin: 0;">${escapeHtml(figlio.nominativo)}</h2>
-              <div style="font-size: 13px; color: var(--ink-600); margin-top: 4px;">
-                Età: <strong>${figlio.eta !== null ? figlio.eta + ' anni' : 'N/D'}</strong> · Data Nascita: <strong>${figlio.data_nascita_it || 'N/D'}</strong> · CF: <code>${figlio.codice_fiscale}</code>
-              </div>
-            </div>
-            <div>
-
-            </div>
-          </div>
-
-          ${gruppi.length > 0 ? `
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px;">
-              ${gruppi.map(g => `
-                <div style="background: var(--bg-subtle); border-radius: var(--radius-md); padding: 14px; border: 1px solid var(--border-light);">
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                    <strong style="font-size: 15px; color: var(--primary);">
-                      ${g.tipo_oratorio === 'estivo' ? '☀️ Oratorio Estivo' : '❄️ Oratorio Invernale'}: ${escapeHtml(g.nome)}
-                    </strong>
-                    <span class="badge badge-info" style="font-size: 11px;">${escapeHtml(g.anno_pastorale)}</span>
-                  </div>
-                  <div style="font-size: 12.5px; color: var(--ink-700); line-height: 1.5;">
-                    <div>🕒 <strong>Orario:</strong> ${escapeHtml(g.orario_incontri || 'Sabato / Pomeriggio')}</div>
-                    <div>📍 <strong>Luogo:</strong> ${escapeHtml(g.luogo || 'Oratorio Sacro Cuore')}</div>
-                    <div>👤 <strong>Animatori:</strong> ${escapeHtml(g.animatori_nomi || 'In definizione')}</div>
-                  </div>
-                </div>
-              `).join('')}
-            </div>
-          ` : `
-            <div style="background: #f8fafc; border: 1px dashed var(--border-light); padding: 14px; border-radius: var(--radius-sm); font-size: 13px; color: var(--ink-600); text-align: center;">
-              Nessun gruppo assegnato attualmente. Clicca su "+ Iscrivi a Oratorio" per registrare tuo figlio.
-            </div>
-          `}
-        </div>
-      `;
-    }).join('');
-  } catch (err) {
-    console.error('Errore oratorio parent view:', err);
-  }
-}
 
 async function openModalNuovoGruppoOratorio(tipoPredefinito = 'estivo') {
   document.getElementById('nuovoOratorioTipo').value = tipoPredefinito;
@@ -1635,7 +1563,7 @@ async function handleEliminaGruppoOratorioCorrente() {
   }
 }
 
-async function openModalRegistroPresenzeOratorio(gruppoId) {
+async function openModalRegistroPresenzeOratorio(gruppoId, selectedDay = null) {
   document.getElementById('registroOratorioGruppoId').value = gruppoId;
   const g = cacheGruppiOratorio.find(x => x.id === gruppoId);
   if (!g) return;
@@ -1643,8 +1571,8 @@ async function openModalRegistroPresenzeOratorio(gruppoId) {
   document.getElementById('registroOratorioTitle').textContent = `📋 Registro Presenze: ${g.nome}`;
   document.getElementById('registroOratorioSubTitle').textContent = `${g.tipo_oratorio === 'estivo' ? '☀️ Oratorio Estivo' : '❄️ Oratorio Invernale'} · Anno ${g.anno_pastorale}`;
 
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('registroOratorioData').value = today;
+  const today = GroupCalendar.localDate();
+  document.getElementById('registroOratorioData').value = selectedDay || today;
 
   await caricaPresenzeOratorioData();
   openModal('modalRegistroPresenzeOratorio');
@@ -1662,6 +1590,7 @@ async function caricaPresenzeOratorioData() {
     const res = await fetch(`/api/oratorio/gruppi/${gruppoId}/presenze?data=${data}`);
     const resData = await res.json();
     cacheRegistroOratorio = resData;
+    renderCalendarMeetingSelect(resData.incontri_calendario || [],'registroOratorio');
 
     const ragazzi = resData.ragazzi || [];
     if (!ragazzi.length) {
@@ -1914,8 +1843,8 @@ async function loadCatechismo() {
     if (parentSec) parentSec.style.display = 'block';
     const titleEl = document.getElementById('catechismoPageTitle');
     const descEl = document.getElementById('catechismoPageDesc');
-    if (titleEl) titleEl.textContent = 'Gruppi Catechismo disponibili';
-    if (descEl) descEl.textContent = 'Scegli un gruppo e seleziona i figli da iscrivere. Qui trovi anche i dettagli delle iscrizioni già effettuate.';
+    if (titleEl) titleEl.textContent = 'Catechismo: gruppi e presenze';
+    if (descEl) descEl.textContent = 'Consulta gli incontri, le presenze salvate e i gruppi disponibili per la tua famiglia.';
     await loadCatechismoParentView();
     return;
   }
@@ -1950,153 +1879,8 @@ async function loadCatechismo() {
   }
 }
 
-async function loadCatechismoAssignedView() {
-  const container = document.getElementById('catechismoAssignedContainer');
-  if (!container) return;
-  container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--ink-500);">Caricamento dati catechismo dei tuoi figli...</div>';
+async function loadCatechismoAssignedView() {return loadAssignedGroupRegisters('catechismo');}
 
-  try {
-    const res = await fetch('/api/catechismo/miei-figli');
-    const data = await res.json();
-    data.figli = (data.figli || []).filter(f=>f.is_assegnato);
-    if (!data.figli.length) {container.innerHTML='';return;}
-    if (!data.ha_famiglia || !data.figli || !data.figli.length) {
-      container.innerHTML = `
-        <div class="card" style="padding: 30px; text-align: center;">
-          <h3 style="font-size: 16px; margin-bottom: 8px;">Nessun figlio registrato nel nucleo familiare</h3>
-          <p style="color: var(--ink-500); font-size: 13.5px; margin-bottom: 16px;">
-            Aggiungi i componenti della tua famiglia nella sezione "La Mia Famiglia" per poter visualizzare e gestire le iscrizioni al catechismo.
-          </p>
-          <button class="btn btn-primary" onclick="navigateTo('famiglia')">Vai a La Mia Famiglia →</button>
-        </div>
-      `;
-      return;
-    }
-
-    container.innerHTML = data.figli.map(figlio => {
-      if (figlio.is_assegnato && figlio.gruppo) {
-        const g = figlio.gruppo;
-        const stats = figlio.statistiche || { totale_incontri: 0, presenti: 0, assenti: 0, percentuale: 0 };
-        const presenze = figlio.storico_presenze || [];
-        const catNomi = g.catechisti && g.catechisti.length > 0
-          ? g.catechisti.map(c => `<strong>${escapeHtml(c.nominativo)}</strong>${c.email ? ` (${escapeHtml(c.email)})` : ''}${c.telefono ? ` · Tel: ${escapeHtml(c.telefono)}` : ''}`).join('<br>')
-          : `<strong>${escapeHtml(g.catechista_nome)}</strong>`;
-
-        return `
-          <div class="card" style="border-left: 4px solid var(--primary); padding: 22px;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; border-bottom: 1px solid var(--border-light); padding-bottom: 14px;">
-              <div>
-                <span class="badge badge-success" style="font-size: 11px; margin-bottom: 6px;">ISCRITTO / ASSEGNATO</span>
-                <h2 style="font-size: 20px; font-weight: 700; color: var(--ink-900); margin: 0;">${escapeHtml(figlio.nominativo)}</h2>
-                <div style="font-size: 13px; color: var(--ink-600); margin-top: 4px;">
-                  Età: <strong>${figlio.eta !== null ? figlio.eta + ' anni' : 'N/D'}</strong> · Data di Nascita: <strong>${figlio.data_nascita_it || 'N/D'}</strong> · CF: <code>${figlio.codice_fiscale}</code>
-                </div>
-              </div>
-              <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
-                <span style="font-size: 13px; font-weight: 700; color: var(--wine-700); background: #fdf2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 4px 10px;">
-                  📖 ${escapeHtml(g.nome)} (${escapeHtml(g.anno_pastorale)})
-                </span>
-                ${g.google_calendar_url ? `
-                  <a href="${escapeHtml(g.google_calendar_url)}" target="_blank" rel="noopener noreferrer" class="btn btn-xs btn-outline-primary" style="font-weight: 700; display: inline-flex; align-items: center; gap: 4px; background: #fff;">
-                    📅 Aggiungi al mio Google Calendar ↗
-                  </a>
-                ` : ''}
-              </div>
-            </div>
-
-            <!-- Dettagli Gruppo & Catechista -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 20px; background: var(--bg-subtle); padding: 14px; border-radius: var(--radius-md);">
-              <div>
-                <div style="font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-500); font-weight: 700; margin-bottom: 4px;">Catechista di Riferimento</div>
-                <div style="font-size: 13.5px; color: var(--ink-800); line-height: 1.5;">${catNomi}</div>
-              </div>
-              <div>
-                <div style="font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-500); font-weight: 700; margin-bottom: 4px;">Orario Incontri & Aula</div>
-                <div style="font-size: 13.5px; color: var(--ink-800);">
-                  🕒 <strong>${escapeHtml(g.orario_incontri || 'In definizione')}</strong><br>
-                  🏫 Aula: <strong>${escapeHtml(g.aula || 'Chiesa / Oratorio')}</strong>
-                </div>
-              </div>
-              <div>
-                <div style="font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-500); font-weight: 700; margin-bottom: 4px;">Presenze agli Incontri</div>
-                <div style="font-size: 13.5px; color: var(--ink-800);">
-                  <strong style="color: var(--primary); font-size: 17px;">${stats.percentuale}%</strong> di frequenza<br>
-                  <span>${stats.presenti} presenti, ${stats.assenti} assenti su ${stats.totale_incontri} incontri</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Registro Incontri del Singolo Figlio -->
-            <h4 style="font-size: 14px; font-weight: 700; color: var(--ink-800); margin-bottom: 10px;">
-              📅 Registro Personale Incontri & Presenze
-            </h4>
-            ${!presenze.length ? `
-              <p style="font-size: 13px; color: var(--ink-500); font-style: italic;">
-                Nessun appello ancora registrato per questo gruppo nell'anno pastorale in corso.
-              </p>
-            ` : `
-              <div class="table-responsive" style="max-height: 220px; overflow-y: auto; border: 1px solid var(--border-light); border-radius: var(--radius-sm);">
-                <table class="custom-table" style="font-size: 12.5px;">
-                  <thead>
-                    <tr>
-                      <th>Data Incontro</th>
-                      <th>Esito Presenza</th>
-                      <th>Note Incontro / Titolo</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${presenze.map(p => `
-                      <tr>
-                        <td>
-                          <strong>${p.data_it}</strong>
-                          ${p.concorre_percentuale === false ? '<br><span class="badge badge-neutral" style="font-size: 10px;">Non concorre a %</span>' : ''}
-                        </td>
-                        <td>
-                          ${p.presente
-                            ? '<span class="badge badge-success">✓ Presente</span>'
-                            : '<span class="badge badge-danger">✗ Assente</span>'}
-                        </td>
-                        <td style="color: var(--ink-600);">
-                          ${p.titolo_incontro ? `<strong>${escapeHtml(p.titolo_incontro)}</strong> ` : ''}
-                          ${p.note ? escapeHtml(p.note) : (!p.titolo_incontro ? '-' : '')}
-                        </td>
-                      </tr>
-                    `).join('')}
-                  </tbody>
-                </table>
-              </div>
-            `}
-          </div>
-        `;
-      } else {
-        // Figlio non ancora iscritto
-        return `
-          <div class="card" style="border-left: 4px solid var(--accent-gold); padding: 22px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap;">
-              <div>
-                <span class="badge badge-warning" style="font-size: 11px; margin-bottom: 6px;">NON ANCORA ISCRITTO</span>
-                <h2 style="font-size: 19px; font-weight: 700; color: var(--ink-900); margin: 0;">${escapeHtml(figlio.nominativo)}</h2>
-                <div style="font-size: 13px; color: var(--ink-600); margin-top: 4px;">
-                  Età: <strong>${figlio.eta !== null ? figlio.eta + ' anni' : 'N/D'}</strong> · Data di Nascita: <strong>${figlio.data_nascita_it || 'N/D'}</strong>
-                </div>
-                <p style="font-size: 13px; color: var(--ink-700); margin: 8px 0 0;">
-                  Questo fanciullo non risulta ancora assegnato ad un gruppo di catechesi per l'anno in corso.
-                </p>
-              </div>
-              <div>
-                <button class="btn btn-primary" onclick="openModalIscriviFiglioCatechismo('${figlio.codice_fiscale}', '${escapeHtml(figlio.nominativo)}')">
-                  + Iscrivi al Gruppo Catechismo
-                </button>
-              </div>
-            </div>
-          </div>
-        `;
-      }
-    }).join('');
-  } catch (err) {
-    container.innerHTML = `<div style="color: var(--danger); padding: 20px;">Errore: ${escapeHtml(err.message)}</div>`;
-  }
-}
 
 function selezionaAnnoCatechismo(anno) {
   currentCatechismoAnnoFilter = anno;
@@ -2221,18 +2005,18 @@ function renderGruppiCatechismoGrid() {
   }).join('');
 }
 
-async function openModalAppelloCatechismo(gruppoId) {
+async function openModalAppelloCatechismo(gruppoId, selectedDay = null) {
   const g = cacheGruppiCatechismo.find(x => x.id === gruppoId);
   if (!g) return;
 
   document.getElementById('appelloGruppoId').value = g.id;
-  document.getElementById('appelloAttivitaId').value = g.attivita_id || g.id;
+  document.getElementById('appelloAttivitaId').value = g.attivita_id || '';
   document.getElementById('appelloGruppoNome').textContent = g.nome;
   document.getElementById('appelloGruppoDettaglio').textContent =
     `Catechista: ${g.catechista_nome || 'Non assegnato'} · Anno: ${g.anno_pastorale || '2026/2027'} ${g.aula ? '· Aula: ' + g.aula : ''}`;
 
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('appelloDataIncontro').value = today;
+  const today = GroupCalendar.localDate();
+  document.getElementById('appelloDataIncontro').value = selectedDay || today;
 
   openModal('modalAppelloCatechismo');
 
@@ -2240,14 +2024,16 @@ async function openModalAppelloCatechismo(gruppoId) {
   bodyEl.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--ink-500);"><div class="spinner" style="margin:0 auto 10px;"></div>Caricamento registro elettronico e presenze passate in corso...</td></tr>`;
 
   try {
-    const res = await fetch(`/api/catechismo/gruppi/${gruppoId}/registro`);
+    const res = await fetch(`/api/catechismo/gruppi/${gruppoId}/registro?mese=${document.getElementById('appelloDataIncontro').value.slice(0,7)}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Errore caricamento registro');
 
     cacheRegistroCatechismo = data;
+    renderCalendarMeetingSelect(data.date_incontri, 'appello');
+    if(data.avviso_calendario) showToast(data.avviso_calendario,'warning');
     const statsBadge = document.getElementById('appelloStatsGruppo');
     if (statsBadge) {
-      statsBadge.textContent = `${data.totale_date} incontri registrati · ${data.studenti.length} iscritti`;
+      statsBadge.textContent = `${data.incontri_registrati} incontri registrati · ${data.studenti.length} iscritti`;
     }
 
     aggiornaCampiIncontroCorrente();
@@ -2270,7 +2056,7 @@ function aggiornaCampiIncontroCorrente() {
   if (found) {
     if (titoloInput) titoloInput.value = found.titolo_incontro || '';
     if (concorreChk) concorreChk.checked = found.concorre_percentuale !== false;
-    if (btnCanc) btnCanc.style.display = 'inline-flex';
+    if (btnCanc) btnCanc.style.display = found.registrato ? 'inline-flex':'none';
   } else {
     if (titoloInput) titoloInput.value = '';
     if (concorreChk) concorreChk.checked = true;
@@ -2293,12 +2079,16 @@ function inizializzaStatoPresenzeCatechismo() {
 }
 
 function impostaOggiDataCatechismo() {
-  const today = new Date().toISOString().split('T')[0];
+  const today = GroupCalendar.localDate();
   document.getElementById('appelloDataIncontro').value = today;
   onDataIncontroCatechismoChanged();
 }
 
-function onDataIncontroCatechismoChanged() {
+async function onDataIncontroCatechismoChanged() {
+  const day=document.getElementById('appelloDataIncontro').value;
+  if(cacheRegistroCatechismo && cacheRegistroCatechismo.mese!==day.slice(0,7)) {
+    try {cacheRegistroCatechismo=await apiJson(`/api/catechismo/gruppi/${document.getElementById('appelloGruppoId').value}/registro?mese=${day.slice(0,7)}`);renderCalendarMeetingSelect(cacheRegistroCatechismo.date_incontri,'appello');} catch(error){showToast(error.message,'error');return;}
+  }
   aggiornaCampiIncontroCorrente();
   inizializzaStatoPresenzeCatechismo();
   renderTabellaRegistroCatechismo();
@@ -2394,7 +2184,7 @@ function renderTabellaRegistroCatechismo() {
   if (!bodyEl || !cacheRegistroCatechismo) return;
 
   const studenti = cacheRegistroCatechismo.studenti || [];
-  const dateIncontri = cacheRegistroCatechismo.date_incontri || [];
+  const dateIncontri = (cacheRegistroCatechismo.date_incontri || []).filter(day=>day.registrato);
   const dataSel = document.getElementById('appelloDataIncontro').value;
 
   if (!studenti.length) {
@@ -3013,8 +2803,8 @@ async function loadDoposcuola() {
     if (parentSec) parentSec.style.display = 'block';
     const titleEl = document.getElementById('doposcuolaPageTitle');
     const descEl = document.getElementById('doposcuolaPageDesc');
-    if (titleEl) titleEl.textContent = 'Gruppi Doposcuola disponibili';
-    if (descEl) descEl.textContent = 'Scegli un gruppo di studio e seleziona i figli da iscrivere.';
+    if (titleEl) titleEl.textContent = 'Doposcuola: gruppi e presenze';
+    if (descEl) descEl.textContent = 'Consulta i gruppi di studio, il calendario e le presenze dei tuoi figli.';
     await loadDoposcuolaParentView();
     return;
   }
@@ -3040,106 +2830,8 @@ async function loadDoposcuola() {
   }
 }
 
-async function loadDoposcuolaAssignedView() {
-  const container = document.getElementById('doposcuolaAssignedContainer');
-  if (!container) return;
-  container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--ink-500);">Caricamento dati doposcuola dei tuoi figli...</div>';
+async function loadDoposcuolaAssignedView() {return loadAssignedGroupRegisters('doposcuola');}
 
-  try {
-    const res = await fetch('/api/doposcuola/miei-figli');
-    const data = await res.json();
-    data.figli = (data.figli || []).filter(f=>f.is_assegnato);
-    if (!data.figli.length) {container.innerHTML='';return;}
-    if (!data.ha_famiglia || !data.figli || !data.figli.length) {
-      container.innerHTML = `
-        <div class="card" style="padding: 30px; text-align: center;">
-          <h3 style="font-size: 16px; margin-bottom: 8px;">Nessun figlio registrato nel nucleo familiare</h3>
-          <p style="color: var(--ink-500); font-size: 13.5px; margin-bottom: 16px;">
-            Aggiungi i componenti della tua famiglia nella sezione "La Mia Famiglia" per poter visualizzare e gestire le iscrizioni al doposcuola.
-          </p>
-          <button class="btn btn-primary" onclick="navigateTo('famiglia')">Vai a La Mia Famiglia →</button>
-        </div>
-      `;
-      return;
-    }
-
-    container.innerHTML = data.figli.map(figlio => {
-      if (figlio.is_assegnato && figlio.gruppo) {
-        const g = figlio.gruppo;
-        const stats = figlio.statistiche || { totale_incontri: 0, presenti: 0, assenti: 0, percentuale: 0 };
-        const presenze = figlio.storico_presenze || [];
-
-        return `
-          <div class="card" style="border-left: 4px solid #0284c7; padding: 22px;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; border-bottom: 1px solid var(--border-light); padding-bottom: 14px;">
-              <div>
-                <span class="badge badge-success" style="font-size: 11px; margin-bottom: 6px;">ISCRITTO / ASSEGNATO</span>
-                <h2 style="font-size: 20px; font-weight: 700; color: var(--ink-900); margin: 0;">${escapeHtml(figlio.nominativo)}</h2>
-                <div style="font-size: 13px; color: var(--ink-600); margin-top: 4px;">
-                  Età: <strong>${figlio.eta !== null ? figlio.eta + ' anni' : 'N/D'}</strong> · Data di Nascita: <strong>${figlio.data_nascita_it || 'N/D'}</strong> · CF: <code>${figlio.codice_fiscale}</code>
-                </div>
-              </div>
-              <div style="text-align: right;">
-                <span style="font-size: 13px; font-weight: 700; color: #0284c7; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 4px 10px;">
-                  📚 ${escapeHtml(g.nome)} (${escapeHtml(g.anno_scolastico)})
-                </span>
-              </div>
-            </div>
-
-            <!-- Dettagli Doposcuola & Educatore -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 20px; background: var(--bg-subtle); padding: 14px; border-radius: var(--radius-md);">
-              <div>
-                <div style="font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-500); font-weight: 700; margin-bottom: 4px;">Educatore / Volontario</div>
-                <div style="font-size: 13.5px; color: var(--ink-800); line-height: 1.5;">
-                  <strong>${escapeHtml(g.educatore_nome || 'In assegnazione')}</strong>
-                </div>
-              </div>
-              <div>
-                <div style="font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-500); font-weight: 700; margin-bottom: 4px;">Giorni, Orario & Aula</div>
-                <div style="font-size: 13.5px; color: var(--ink-800);">
-                  🕒 <strong>${escapeHtml(g.giorni_orari || 'Pomeriggio')}</strong><br>
-                  🏫 Aula: <strong>${escapeHtml(g.aula || 'Salone Studio')}</strong>
-                </div>
-              </div>
-              <div>
-                <div style="font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-500); font-weight: 700; margin-bottom: 4px;">Informazioni Attività</div>
-                <div style="font-size: 13.5px; color: var(--ink-800);">
-                  <span class="badge badge-info" style="font-size: 11.5px;">${escapeHtml(g.fascia_eta || 'Tutte le età')}</span>
-                  ${g.note ? `<div style="font-size: 12px; color: var(--ink-600); margin-top: 4px;">${escapeHtml(g.note)}</div>` : ''}
-                </div>
-              </div>
-            </div>
-          </div>
-        `;
-      } else {
-        // Figlio non ancora iscritto al doposcuola
-        return `
-          <div class="card" style="border-left: 4px solid var(--accent-gold); padding: 22px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap;">
-              <div>
-                <span class="badge badge-warning" style="font-size: 11px; margin-bottom: 6px;">NON ISCRITTO AL DOPOSCUOLA</span>
-                <h2 style="font-size: 19px; font-weight: 700; color: var(--ink-900); margin: 0;">${escapeHtml(figlio.nominativo)}</h2>
-                <div style="font-size: 13px; color: var(--ink-600); margin-top: 4px;">
-                  Età: <strong>${figlio.eta !== null ? figlio.eta + ' anni' : 'N/D'}</strong> · Data di Nascita: <strong>${figlio.data_nascita_it || 'N/D'}</strong>
-                </div>
-                <p style="font-size: 13px; color: var(--ink-700); margin: 8px 0 0;">
-                  Questo fanciullo non risulta iscritto ad alcun gruppo di doposcuola o supporto allo studio.
-                </p>
-              </div>
-              <div>
-                <button class="btn btn-primary" onclick="openModalIscriviFiglioDoposcuola('${figlio.codice_fiscale}', '${escapeHtml(figlio.nominativo)}')">
-                  + Iscrivi al Doposcuola
-                </button>
-              </div>
-            </div>
-          </div>
-        `;
-      }
-    }).join('');
-  } catch (err) {
-    container.innerHTML = `<div style="color: var(--danger); padding: 20px;">Errore: ${escapeHtml(err.message)}</div>`;
-  }
-}
 
 function selezionaAnnoDoposcuola(anno) {
   currentDoposcuolaAnnoFilter = anno;
@@ -3431,18 +3123,18 @@ async function eliminaGruppoDoposcuola(id) {
 }
 
 // Registro Elettronico Doposcuola
-async function openModalAppelloDoposcuola(gruppoId) {
+async function openModalAppelloDoposcuola(gruppoId, selectedDay = null) {
   const g = cacheGruppiDoposcuola.find(x => x.id === gruppoId);
   if (!g) return;
 
   document.getElementById('appelloDopGruppoId').value = g.id;
-  document.getElementById('appelloDopAttivitaId').value = g.attivita_id || g.id;
+  document.getElementById('appelloDopAttivitaId').value = g.attivita_id || '';
   document.getElementById('appelloDopGruppoNome').textContent = g.nome;
   document.getElementById('appelloDopGruppoDettaglio').textContent =
     `Educatore: ${g.educatore_nome || 'Da assegnare'} · Anno: ${g.anno_scolastico || '2025/2026'} ${g.aula ? '· Aula: ' + g.aula : ''}`;
 
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('appelloDopDataIncontro').value = today;
+  const today = GroupCalendar.localDate();
+  document.getElementById('appelloDopDataIncontro').value = selectedDay || today;
 
   openModal('modalAppelloDoposcuola');
 
@@ -3450,14 +3142,16 @@ async function openModalAppelloDoposcuola(gruppoId) {
   bodyEl.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--ink-500);">Caricamento registro doposcuola...</td></tr>`;
 
   try {
-    const res = await fetch(`/api/doposcuola/gruppi/${gruppoId}/registro`);
+    const res = await fetch(`/api/doposcuola/gruppi/${gruppoId}/registro?mese=${document.getElementById('appelloDopDataIncontro').value.slice(0,7)}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Errore');
 
     cacheRegistroDoposcuola = data;
+    renderCalendarMeetingSelect(data.date_incontri, 'appelloDop');
+    if(data.avviso_calendario) showToast(data.avviso_calendario,'warning');
     const statsBadge = document.getElementById('appelloDopStatsGruppo');
     if (statsBadge) {
-      statsBadge.textContent = `${data.totale_date} pomeriggi registrati · ${data.studenti.length} iscritti`;
+      statsBadge.textContent = `${data.incontri_registrati} pomeriggi registrati · ${data.studenti.length} iscritti`;
     }
 
     inizializzaStatoPresenzeDoposcuola();
@@ -3482,12 +3176,16 @@ function inizializzaStatoPresenzeDoposcuola() {
 }
 
 function impostaOggiDataDoposcuola() {
-  const today = new Date().toISOString().split('T')[0];
+  const today = GroupCalendar.localDate();
   document.getElementById('appelloDopDataIncontro').value = today;
   onDataIncontroDoposcuolaChanged();
 }
 
-function onDataIncontroDoposcuolaChanged() {
+async function onDataIncontroDoposcuolaChanged() {
+  const day=document.getElementById('appelloDopDataIncontro').value;
+  if(cacheRegistroDoposcuola && cacheRegistroDoposcuola.mese!==day.slice(0,7)) {
+    try {cacheRegistroDoposcuola=await apiJson(`/api/doposcuola/gruppi/${document.getElementById('appelloDopGruppoId').value}/registro?mese=${day.slice(0,7)}`);renderCalendarMeetingSelect(cacheRegistroDoposcuola.date_incontri,'appelloDop');} catch(error){showToast(error.message,'error');return;}
+  }
   inizializzaStatoPresenzeDoposcuola();
   renderTabellaRegistroDoposcuola();
 }
@@ -3558,7 +3256,7 @@ function renderTabellaRegistroDoposcuola() {
   if (!bodyEl || !cacheRegistroDoposcuola) return;
 
   const studenti = cacheRegistroDoposcuola.studenti || [];
-  const dateIncontri = cacheRegistroDoposcuola.date_incontri || [];
+  const dateIncontri = (cacheRegistroDoposcuola.date_incontri || []).filter(day=>day.registrato);
   const dataSel = document.getElementById('appelloDopDataIncontro').value;
 
   if (!studenti.length) {
@@ -8664,7 +8362,7 @@ async function refreshEnrollmentOptions() {
   let visible=false;
   for(const category of ['oratorio','catechismo','doposcuola']) {
     const managed=managesGroupCategory(category);
-    const available=managed || (!(currentUser.is_gestione_pura || ['segreteria','oratorio'].includes(currentUser.ruolo)) && !!data.gruppi?.[category]?.length);
+    const available=managed || (!(currentUser.is_gestione_pura || ['segreteria','oratorio'].includes(currentUser.ruolo)) && (!!data.gruppi?.[category]?.length || !!data.gruppi_iscritti?.[category]?.length));
     const nav=document.querySelector('.'+category+'-nav');
     if(nav) nav.style.display=available ? 'flex' : 'none';
     visible=visible || available;
@@ -8736,8 +8434,9 @@ async function loadFamilyGroupView(category,loadAssigned) {
   try {
     const data=await refreshEnrollmentOptions();
     const groups=data?.gruppi?.[category] || [];
-    if(!groups.length) {if(currentView===category) navigateTo('dashboard');return;}
-    container.innerHTML=`<div class="family-group-heading"><div><h2>Gruppi disponibili</h2><p>Consulta le informazioni e scegli chi iscrivere.</p></div><span class="badge badge-neutral">${groups.length} ${groups.length===1 ? 'gruppo':'gruppi'}</span></div><div class="family-group-grid">${availableGroupCards(category,groups)}</div><div class="family-group-assigned" id="${category}AssignedContainer"></div>`;
+    const joined=data?.gruppi_iscritti?.[category] || [];
+    if(!groups.length && !joined.length) {if(currentView===category) navigateTo('dashboard');return;}
+    container.innerHTML=(groups.length ? `<div class="family-group-heading"><div><h2>Gruppi disponibili</h2><p>Consulta le informazioni e scegli chi iscrivere.</p></div><span class="badge badge-neutral">${groups.length} ${groups.length===1 ? 'gruppo':'gruppi'}</span></div><div class="family-group-grid">${availableGroupCards(category,groups)}</div>` : '')+`<div class="family-group-assigned" id="${category}AssignedContainer"></div>`;
     await loadAssigned();
   } catch(error) {showToast(error.message,'error');}
 }
@@ -8795,19 +8494,10 @@ function updateDocumentAge(id,age) {
     group.style.display=visible ? 'block':'none';input.disabled=!visible;
   });
 }
-function groupCalendarMarkup(group) {
-  const url=group.calendar_embed_url;
-  if(!url || !url.startsWith('https://calendar.google.com/calendar/embed?')) return '';
-  return `<div class="group-calendar"><button type="button" class="btn btn-sm btn-secondary" data-calendar-url="${escapeHtml(url)}" onclick="loadGroupCalendar(this)">Mostra appuntamenti</button><a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Apri Google Calendar</a><div class="group-calendar-content"></div></div>`;
-}
-function loadGroupCalendar(button) {
-  const container=button.parentElement.querySelector('.group-calendar-content');
-  if(container.childElementCount) {container.hidden=!container.hidden;return;}
-  const url=button.dataset.calendarUrl;
-  if(!url.startsWith('https://calendar.google.com/calendar/embed?')) return;
-  const frame=document.createElement('iframe');frame.title='Appuntamenti del gruppo';frame.className='group-calendar-frame';frame.loading='lazy';frame.src=url;
-  container.appendChild(frame);button.textContent='Mostra / nascondi appuntamenti';
-}
+function groupCalendarMarkup(group) {return GroupCalendar.markup(group);}
+
+function loadGroupCalendar(button) {return GroupCalendar.load(button);}
+
 function withdrawButton(enrollment,showName=false) {
   if(!enrollment.puo_disiscriversi || ['annullata','rifiutata'].includes(enrollment.stato)) return '';
   return `<button type="button" class="btn btn-sm btn-danger" onclick="annullaMiaIscrizione(${enrollment.id})">Disiscrivi${showName ? ' · '+escapeHtml(enrollment.nominativo || ''):''}</button>`;
@@ -8817,4 +8507,40 @@ async function openEventEnrollments(id) {
   const data=await apiJson('/api/iscrizioni?attivita_id='+id);
   document.getElementById('partecipantiEventoElenco').innerHTML=(data.iscrizioni || []).map(i=>`<div class="choice-row"><span>${escapeHtml(i.partecipante_nome)} · ${escapeHtml(i.stato)}</span>${withdrawButton(i)}</div>`).join('') || '<p>Nessuna iscrizione presente.</p>';
   openModal('modalPartecipantiEvento');
+}
+
+async function loadAssignedGroupRegisters(category) {
+  const container=document.getElementById(category+'AssignedContainer');
+  if(!container) return;
+  const data=await apiJson('/api/famiglie/registri-gruppi/'+category);
+  container.innerHTML=(data.gruppi || []).length ? '<h2>I tuoi gruppi e le presenze</h2>'+data.gruppi.map(group=>`<section class="catechismo-card family-enrollment-card family-enrollment-card--${category} assigned-register-card"><header><span class="badge badge-success">Iscrizione effettuata</span><h3>${escapeHtml(group.nome)}</h3><p>${escapeHtml(group.anno_scolastico || group.anno_pastorale || '')} · ${escapeHtml(group.orario_incontri || group.giorni_orari || 'Orario da definire')}</p><p>${escapeHtml(group.catechista_nome || group.educatore_nome || group.animatori_nomi || group.animatore_referente_nome || '')}${group.aula ? ' · '+escapeHtml(group.aula):''}</p></header>${groupCalendarMarkup(group)}${group.componenti.map(person=>`<div class="family-person-register"><h4>${escapeHtml(person.nominativo)}</h4><div class="family-register-summary"><span><strong>${person.presenti}</strong> presenze</span><span><strong>${person.assenti}</strong> assenze</span><span><strong>${person.percentuale == null ? '—':person.percentuale+'%'}</strong> frequenza</span></div>${person.presenze.length ? `<div class="table-responsive"><table class="custom-table"><thead><tr><th>Data</th><th>Incontro</th><th>Presenza</th><th>Note</th></tr></thead><tbody>${person.presenze.map(record=>`<tr><td>${record.data.split('-').reverse().join('/')}</td><td>${escapeHtml(record.titolo_incontro || 'Incontro')}${record.concorre_percentuale===false ? '<br><small>Non concorre alla percentuale</small>':''}</td><td><span class="badge ${record.presente ? 'badge-success':'badge-danger'}">${record.presente ? 'Presente':'Assente'}</span></td><td>${escapeHtml(record.note || '—')}</td></tr>`).join('')}</tbody></table></div>`:'<p>Nessun appello ancora salvato per questo gruppo.</p>'}</div>`).join('')}</section>`).join('') : '';
+}
+async function openCalendarGroupAttendance(category,id,day) {
+  if(category==='catechismo') {
+    if(!cacheGruppiCatechismo.some(group=>group.id===id)) cacheGruppiCatechismo=(await apiJson('/api/catechismo/gruppi')).gruppi || [];
+    await openModalAppelloCatechismo(id,day);
+  } else if(category==='doposcuola') {
+    if(!cacheGruppiDoposcuola.some(group=>group.id===id)) cacheGruppiDoposcuola=(await apiJson('/api/doposcuola/gruppi')).gruppi || [];
+    await openModalAppelloDoposcuola(id,day);
+  } else if(category==='oratorio') {
+    if(!cacheGruppiOratorio.some(group=>group.id===id)) cacheGruppiOratorio=(await apiJson('/api/oratorio/gruppi')).gruppi || [];
+    await openModalRegistroPresenzeOratorio(id,day);
+  }
+}
+
+function renderCalendarMeetingSelect(meetings,prefix) {
+  const box=document.getElementById(prefix+'GoogleDateBox'),select=document.getElementById(prefix+'GoogleDate');
+  if(!box || !select) return;
+  const rows=(meetings || []).filter(meeting=>meeting.da_google);
+  box.style.display=rows.length ? 'block':'none';
+  select.innerHTML='<option value="">Scegli un incontro dal calendario</option>'+rows.map(meeting=>`<option value="${meeting.data}">${meeting.data.split('-').reverse().join('/')} · ${escapeHtml(meeting.titolo_incontro)}</option>`).join('');
+  select.value=document.getElementById(prefix==='registroOratorio' ? 'registroOratorioData':prefix+'DataIncontro').value;
+}
+function chooseCalendarMeeting(select,prefix) {
+  if(!select.value) return;
+  const field=prefix==='registroOratorio' ? 'registroOratorioData':prefix+'DataIncontro';
+  document.getElementById(field).value=select.value;
+  if(prefix==='appello') onDataIncontroCatechismoChanged();
+  else if(prefix==='appelloDop') onDataIncontroDoposcuolaChanged();
+  else caricaPresenzeOratorioData();
 }

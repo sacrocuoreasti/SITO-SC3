@@ -553,3 +553,26 @@ def save_presenze():
 
     db.session.commit()
     return jsonify({'success': True, 'message': 'Appello presenze salvato con successo!'})
+
+
+@oratorio_bp.route('/gruppi/<int:id>/presenze', methods=['GET','POST'])
+def group_attendance(id):
+    from services.group_attendance import can_record,group_records,save_group_records
+    from werkzeug.exceptions import Forbidden
+    group=db.session.get(GruppoOratorio,id)
+    if not group: return jsonify(error='Gruppo non trovato'),404
+    if not can_record('oratorio',group): raise Forbidden('Registro non disponibile per questo profilo')
+    if request.method=='POST':
+        save_group_records('oratorio',group,request.get_json() or {})
+        return jsonify(success=True,message='Presenze oratorio salvate')
+    try: day=datetime.strptime(request.args.get('data',date.today().isoformat()),'%Y-%m-%d').date()
+    except ValueError: return jsonify(error='Data non valida'),400
+    records={r.codice_fiscale_persona:r for r in group_records('oratorio',group) if r.data==day}
+    rows=[]
+    for person in group.ragazzi:
+        record=records.get(person.codice_fiscale)
+        info=person.to_dict();info.update(presente=record.presente if record else True,note_presenza=record.note if record else '',registrato=bool(record))
+        rows.append(info)
+    from services.calendar_events import calendar_dates
+    meetings,warning=calendar_dates(group,day.strftime('%Y-%m'))
+    return jsonify(gruppo=group.to_dict(include_ragazzi=False),ragazzi=rows,data=day.isoformat(),incontri_calendario=meetings,avviso_calendario=warning)

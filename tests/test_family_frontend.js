@@ -37,6 +37,7 @@ const context = vm.createContext({
     return {ok:true,headers:{get:()=> 'application/json'},json:async()=>url==='/api/iscrizioni'?{success:true,message:'Registrato'}:fixtures[url]};
   },
 });
+vm.runInContext(fs.readFileSync('static/js/group-calendar.js','utf8'),context);
 vm.runInContext(fs.readFileSync('static/js/app.js','utf8'),context);
 const loadDashboardOriginal=context.loadDashboard;
 vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['utente'],is_capofamiglia:true}; showToast=()=>{}; loadDashboard=async()=>{};",context);
@@ -108,7 +109,7 @@ vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['
   nodes('attEtaMin').value='0'; assert.equal(context.optionalAgeValue('attEtaMin'),0);
   for (const category of ['catechismo','doposcuola']) {
     fixtures['/api/famiglie/opportunita'].gruppi[category]=[{id:3,nome:'Gruppo disponibile '+category,eta_min:6,eta_max:14,partecipanti:[people[1]]}];
-    fixtures['/api/'+category+'/miei-figli']={ha_famiglia:true,figli:[]};
+    fixtures['/api/famiglie/registri-gruppi/'+category]={gruppi:[]};
     await context[category==='catechismo' ? 'loadCatechismoParentView' : 'loadDoposcuolaParentView']();
     const content=nodes(category+'ParentContainer').innerHTML;
     assert.ok(content.includes('Gruppo disponibile '+category));
@@ -143,8 +144,8 @@ vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['
   assert.equal((nodes('memberAccountConsents').innerHTML.match(/ required/g)||[]).length,2);
   assert.ok(!nodes('memberAccountConsents').innerHTML.includes(' checked'));
   const url='https://calendar.google.com/calendar/embed?src=test%40group.calendar.google.com';
-  const calendar=context.groupCalendarMarkup({calendar_embed_url:url});
-  assert.ok(calendar.includes('Mostra appuntamenti'));
+  const calendar=context.groupCalendarMarkup({calendar_api_url:'/api/calendari-gruppi/catechismo/3',calendar_embed_url:url});
+  assert.ok(calendar.includes('Calendario mensile'));
   assert.ok(!calendar.includes('<iframe'));
   assert.equal(context.groupCalendarMarkup({calendar_embed_url:'javascript:alert(1)'}),'');
   assert.ok(context.withdrawButton({id:5,puo_disiscriversi:true,stato:'confermata'}).includes('annullaMiaIscrizione(5)'));
@@ -168,5 +169,15 @@ vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['
   context.updateGroupEnrollmentSelection({closest:()=>fakeForm});
   assert.equal(submit.disabled,false);assert.equal(selection.textContent,'2 figli selezionati');
   count=0;context.updateGroupEnrollmentSelection({closest:()=>fakeForm});assert.equal(submit.disabled,true);
+  const monthDays=vm.runInContext("GroupCalendar.days('2028-02')",context);
+  assert.equal(monthDays.length,42);assert.ok(monthDays.includes('2028-02-29'));
+  assert.equal(new Date(monthDays[0]+'T12:00:00').getDay(),1);
+  fixtures['/api/famiglie/opportunita'].gruppi_iscritti={catechismo:[{id:3,nome:'Gruppo già frequentato'}]};
+  fixtures['/api/famiglie/registri-gruppi/catechismo']={gruppi:[{id:3,nome:'Gruppo già frequentato',componenti:[{nominativo:'Figlio iscritto',presenti:1,assenti:0,percentuale:100,presenze:[{data:'2026-11-01',titolo_incontro:'Incontro salvato',presente:true}]}]}]};
+  await context.loadCatechismoParentView();
+  assert.equal(nodes('.catechismo-nav').style.display,'flex');
+  assert.ok(nodes('catechismoParentContainer').innerHTML.includes('catechismoAssignedContainer'));
+  assert.ok(nodes('catechismoAssignedContainer').innerHTML.includes('Incontro salvato'));
+  assert.ok(!nodes('catechismoParentContainer').innerHTML.includes('Iscrivi al gruppo'));
   console.log('Alpha famiglia: attività fissata, selezione multipla, quota, invio unico, consensi e salute verificati.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

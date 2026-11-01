@@ -56,4 +56,16 @@ def enrollment_options():
         from routes.iscrizioni import can_withdraw
         withdrawals=[{'id':r.id,'nominativo':r.partecipante.nominativo,'puo_disiscriversi':can_withdraw(r)} for r in records if r.attivita_id==activity.id and r.stato != 'annullata']
         activities[activity.id] = {'partecipanti':candidates, 'gia_iscritto':bool(enrolled), 'iscrizioni':withdrawals}
-    return {'attivita':activities, 'gruppi':{category:available_groups(category) for category in GROUP_MODELS}}
+    return {'attivita':activities, 'gruppi':{category:available_groups(category) for category in GROUP_MODELS}, 'gruppi_iscritti':{category:assigned_groups(category) for category in GROUP_MODELS}}
+
+
+def assigned_groups(category):
+    groups={}
+    for person in manageable_people():
+        for group in getattr(person,'gruppi_'+category):
+            if group.id not in groups:
+                info=group.to_dict(**({'include_studenti':False} if category=='doposcuola' else {'include_ragazzi':False}))
+                info['componenti_iscritti']=[]
+                groups[group.id]=info
+            groups[group.id]['componenti_iscritti'].append({'codice_fiscale':person.codice_fiscale,'nominativo':person.nominativo,'eta':person.eta})
+    return list(groups.values())

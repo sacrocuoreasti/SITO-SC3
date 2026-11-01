@@ -366,5 +366,27 @@ def get_family_group_calendars():
                 url=calendar_info(group)
                 if url:
                     key=category+':'+str(group.id)
-                    calendars[key]={'id':key,'titolo':group.nome,'categoria':category,'calendar_embed_url':url,'google_calendar_url':url}
+                    calendars[key]={'id':key,'titolo':group.nome,'categoria':category,'calendar_embed_url':url,'google_calendar_url':url,'calendar_api_url':f'/api/calendari-gruppi/{category}/{group.id}'}
     return jsonify(calendari=list(calendars.values()))
+
+
+@famiglie_bp.route('/registri-gruppi/<category>', methods=['GET'])
+@login_required
+def get_family_group_registers(category):
+    from services.enrollment_options import GROUP_MODELS,manageable_people
+    from services.group_attendance import group_records
+    if category not in GROUP_MODELS: return jsonify(error='Categoria non trovata'),404
+    _,collection=GROUP_MODELS[category]
+    groups={}
+    for person in manageable_people():
+        for group in getattr(person,'gruppi_'+category):
+            if group.id not in groups:
+                groups[group.id]=group.to_dict(**({'include_studenti':False} if category=='doposcuola' else {'include_ragazzi':False}))
+                groups[group.id]['componenti']=[]
+            own=group_records(category,group,[person]);valid=[r for r in own if r.concorre_percentuale is not False]
+            present=sum(r.presente for r in valid)
+            groups[group.id]['componenti'].append({'nominativo':person.nominativo,'codice_fiscale':person.codice_fiscale,
+                'presenti':sum(r.presente for r in own),'assenti':sum(not r.presente for r in own),'totale':len(own),
+                'percentuale':round(100*present/len(valid)) if valid else None,
+                'presenze':[r.to_dict() for r in sorted(own,key=lambda r:r.data,reverse=True)]})
+    return jsonify(gruppi=list(groups.values()))

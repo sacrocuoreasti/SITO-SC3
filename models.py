@@ -630,6 +630,7 @@ class GruppoCatechismo(db.Model):
             'aula': self.aula or '',
             'google_calendar_url': self.google_calendar_url or '',
             'calendar_embed_url': calendar_info(self),
+            'calendar_api_url': f'/api/calendari-gruppi/catechismo/{self.id}' if calendar_info(self) else '',
             'note': self.note or '',
             'stato': self.stato or 'pubblico',
             'attivita_id': self.attivita_id,
@@ -673,6 +674,7 @@ class GruppoDoposcuola(db.Model):
             'id': self.id,
             'google_calendar_url': self.google_calendar_url or '',
             'calendar_embed_url': calendar_info(self),
+            'calendar_api_url': f'/api/calendari-gruppi/doposcuola/{self.id}' if calendar_info(self) else '',
             'eta_min': self.eta_min,
             'eta_max': self.eta_max,
             'nome': self.nome,
@@ -751,6 +753,7 @@ class GruppoOratorio(db.Model):
             'id': self.id,
             'google_calendar_url': self.google_calendar_url or '',
             'calendar_embed_url': calendar_info(self),
+            'calendar_api_url': f'/api/calendari-gruppi/oratorio/{self.id}' if calendar_info(self) else '',
             'eta_min': self.eta_min,
             'eta_max': self.eta_max,
             'nome': self.nome,
@@ -780,6 +783,8 @@ class GruppoOratorio(db.Model):
 class Presenza(db.Model):
     __tablename__ = 'presenza'
 
+    gruppo_categoria = db.Column(db.String(20), nullable=True)
+    gruppo_id = db.Column(db.Integer, nullable=True)
     id = db.Column(db.Integer, primary_key=True)
     attivita_id = db.Column(db.Integer, db.ForeignKey('attivita.id', ondelete='CASCADE'), nullable=False)
     codice_fiscale_persona = db.Column(db.String(16), db.ForeignKey('persona.codice_fiscale', ondelete='CASCADE'), nullable=False)
@@ -1051,6 +1056,8 @@ def init_default_configurazioni():
         # Verifica ed aggiunta colonne mancanti per SQLite
         from sqlalchemy import text
         col_checks = [
+            ('presenza','gruppo_categoria','VARCHAR(20)'),
+            ('presenza','gruppo_id','INTEGER'),
             ('persona','civico_residenza','VARCHAR(30)'),
             ('persona','consensi_aggiunta','TEXT'),
             ('gruppo_oratorio','google_calendar_url','VARCHAR(500)'),

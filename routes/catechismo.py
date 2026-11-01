@@ -1,3 +1,5 @@
+from services.group_attendance import can_record, group_records, save_group_records, registry_data
+from werkzeug.exceptions import Forbidden
 from services.group_calendar import apply_calendar
 from services.group_age_service import apply_age_range, register_age_guard
 from flask import Blueprint, request, jsonify
@@ -236,14 +238,9 @@ def delete_incontro_catechismo(id, data_str):
     except Exception:
         return jsonify({'error': 'Formato data non valido (richiesto YYYY-MM-DD)'}), 400
 
-    cf_ragazzi = [r.codice_fiscale for r in g.ragazzi]
-    query = Presenza.query.filter_by(data=data_del)
-    if g.attivita_id:
-        query = query.filter_by(attivita_id=g.attivita_id)
-    if cf_ragazzi:
-        query = query.filter(Presenza.codice_fiscale_persona.in_(cf_ragazzi))
-
-    deleted_count = query.delete(synchronize_session=False)
+    records=[record for record in group_records('catechismo',g) if record.data==data_del]
+    deleted_count=len(records)
+    for record in records: db.session.delete(record)
     db.session.commit()
     return jsonify({
         'success': True,
@@ -252,96 +249,12 @@ def delete_incontro_catechismo(id, data_str):
 
 @catechismo_bp.route('/presenze', methods=['POST'])
 def save_presenze_catechismo():
-    data = request.get_json() or {}
-    gruppo_id = data.get('gruppo_id')
-    attivita_id = data.get('attivita_id')
-    data_str = data.get('data')
-    elenco = data.get('presenze', [])
-    concorre = data.get('concorre_percentuale', True)
-    if concorre is None:
-        concorre = True
-    titolo_inc = data.get('titolo_incontro', '').strip()
+    data=request.get_json() or {}
+    group=db.session.get(GruppoCatechismo,data.get('gruppo_id'))
+    if not group: return jsonify(error='Gruppo non trovato'),404
+    save_group_records('catechismo',group,data)
+    return jsonify(success=True,message='Presenze salvate: un appello per gruppo e giornata')
 
-    gruppo = None
-    if gruppo_id:
-        gruppo = db.session.get(GruppoCatechismo, int(gruppo_id))
-        if gruppo and not attivita_id and gruppo.attivita_id:
-            attivita_id = gruppo.attivita_id
-
-    # Controllo isolamento catechista: può fare l'appello solo del suo gruppo
-    if current_user.is_authenticated:
-        roles = current_user.get_all_roles()
-        is_supervisor = any(r in ['admin', 'parroco', 'segreteria'] for r in roles)
-        if not is_supervisor and ('catechista' in roles or current_user.ruolo == 'catechista'):
-            user_cf = (current_user.codice_fiscale or '').strip().upper()
-            cond = (GruppoCatechismo.catechista_utente_id == current_user.id)
-            if user_cf:
-                cond = cond | (GruppoCatechismo.catechista_cf == user_cf)
-            gruppi_miei = GruppoCatechismo.query.filter(cond).all()
-            miei_gruppi_ids = {g.id for g in gruppi_miei}
-            attivita_autorizzate = {g.attivita_id for g in gruppi_miei if g.attivita_id}
-            
-            if gruppo_id and int(gruppo_id) not in miei_gruppi_ids:
-                return jsonify({'error': 'Non sei autorizzato a registrare presenze per un gruppo diverso dal tuo'}), 403
-            if attivita_id and attivita_autorizzate and attivita_id not in attivita_autorizzate:
-                return jsonify({'error': 'Non sei autorizzato a registrare presenze per un gruppo diverso dal tuo'}), 403
-
-    if not attivita_id:
-        # Se l'attività non è ancora associata al gruppo, cerca o crea l'attività catechismo
-        att_cat = Attivita.query.filter(
-            (Attivita.categoria == 'catechismo') |
-            (Attivita.titolo.ilike('%catechismo%'))
-        ).first()
-        if not att_cat:
-            att_cat = Attivita(
-                titolo=f"Incontri di Catechismo - {gruppo.nome if gruppo else 'Parrocchia'}",
-                categoria='catechismo',
-                anno_pastorale='2026/2027',
-                is_attiva=True,
-                is_pubblicato=True
-            )
-            db.session.add(att_cat)
-            db.session.flush()
-        attivita_id = att_cat.id
-        if gruppo and not gruppo.attivita_id:
-            gruppo.attivita_id = att_cat.id
-        db.session.commit()
-
-    data_presenza = date.today()
-    if data_str:
-        try:
-            data_presenza = datetime.strptime(data_str, '%Y-%m-%d').date()
-        except Exception:
-            pass
-
-    for item in elenco:
-        cf = normalizza_cf(item.get('codice_fiscale', ''))
-        presente = bool(item.get('presente', True))
-
-        rec = Presenza.query.filter_by(
-            attivita_id=attivita_id,
-            codice_fiscale_persona=cf,
-            data=data_presenza
-        ).first()
-
-        if rec:
-            rec.presente = presente
-            rec.concorre_percentuale = bool(concorre)
-            if titolo_inc:
-                rec.titolo_incontro = titolo_inc
-        else:
-            rec = Presenza(
-                attivita_id=attivita_id,
-                codice_fiscale_persona=cf,
-                data=data_presenza,
-                presente=presente,
-                concorre_percentuale=bool(concorre),
-                titolo_incontro=titolo_inc or None
-            )
-            db.session.add(rec)
-
-    db.session.commit()
-    return jsonify({'success': True, 'message': 'Presenze incontro catechismo salvate con successo'})
 
 @catechismo_bp.route('/gruppi/<int:id>/storico', methods=['GET'])
 def get_storico_gruppo(id):
@@ -349,14 +262,8 @@ def get_storico_gruppo(id):
     if not g:
         return jsonify({'error': 'Gruppo non trovato'}), 404
 
-    cf_ragazzi = [r.codice_fiscale for r in g.ragazzi]
-    query = Presenza.query
-    if g.attivita_id:
-        query = query.filter(Presenza.attivita_id == g.attivita_id)
-    if cf_ragazzi:
-        query = query.filter(Presenza.codice_fiscale_persona.in_(cf_ragazzi))
-
-    presenze = query.order_by(Presenza.data.desc()).all()
+    if not can_record('catechismo',g): raise Forbidden('Storico non disponibile per questo profilo')
+    presenze=list(reversed(group_records('catechismo',g)))
 
     # Raggruppa per data incontro
     date_map = {}
@@ -478,80 +385,10 @@ def get_allergie_gruppo(id):
 
 @catechismo_bp.route('/gruppi/<int:id>/registro', methods=['GET'])
 def get_registro_elettronico_gruppo(id):
-    """
-    Ritorna i dati per il registro elettronico del gruppo:
-    elenco ragazzi, date degli incontri svolti, matrice delle presenze/assenze e statistiche.
-    """
-    g = db.session.get(GruppoCatechismo, id)
-    if not g:
-        return jsonify({'error': 'Gruppo non trovato'}), 404
-
-    cf_ragazzi = [r.codice_fiscale for r in g.ragazzi]
-    query = Presenza.query
-    if g.attivita_id:
-        query = query.filter(Presenza.attivita_id == g.attivita_id)
-    if cf_ragazzi:
-        query = query.filter(Presenza.codice_fiscale_persona.in_(cf_ragazzi))
-
-    presenze = query.order_by(Presenza.data.asc()).all()
-
-    # Mappa presenze per CF e Data: matrice[cf][data_str] = True/False
-    matrice = {cf: {} for cf in cf_ragazzi}
-    date_info_map = {}
-
-    for p in presenze:
-        d_str = p.data.strftime('%Y-%m-%d')
-        if d_str not in date_info_map:
-            date_info_map[d_str] = {
-                'data': d_str,
-                'data_it': p.data.strftime('%d/%m/%Y'),
-                'titolo_incontro': p.titolo_incontro or '',
-                'concorre_percentuale': p.concorre_percentuale if p.concorre_percentuale is not None else True,
-                'presenti_count': 0,
-                'assenti_count': 0
-            }
-        if p.presente:
-            date_info_map[d_str]['presenti_count'] += 1
-        else:
-            date_info_map[d_str]['assenti_count'] += 1
-        if p.codice_fiscale_persona in matrice:
-            matrice[p.codice_fiscale_persona][d_str] = p.presente
-
-    sorted_dates = sorted(list(date_info_map.values()), key=lambda x: x['data'])
-
-    # Statistiche per ciascun ragazzo (calcolando percentuale solo su incontri validi)
-    studenti = []
-    for r in g.ragazzi:
-        cf = r.codice_fiscale
-        p_rag = [p for p in presenze if p.codice_fiscale_persona == cf]
-        tot_inc = len(p_rag)
-        pres_inc = sum(1 for p in p_rag if p.presente)
-
-        p_rag_validi = [p for p in p_rag if p.concorre_percentuale is not False]
-        tot_inc_validi = len(p_rag_validi)
-        pres_inc_validi = sum(1 for p in p_rag_validi if p.presente)
-
-        perc = round((pres_inc_validi / tot_inc_validi) * 100) if tot_inc_validi > 0 else 0
-        studenti.append({
-            'codice_fiscale': cf,
-            'nominativo': r.nominativo,
-            'eta': r.eta,
-            'presenze_map': matrice.get(cf, {}),
-            'totale_incontri': tot_inc,
-            'presenti': pres_inc,
-            'assenti': tot_inc - pres_inc,
-            'totale_incontri_validi': tot_inc_validi,
-            'presenti_validi': pres_inc_validi,
-            'percentuale': perc
-        })
-
-    return jsonify({
-        'gruppo': g.to_dict(include_ragazzi=False),
-        'date_incontri': sorted_dates,
-        'studenti': studenti,
-        'totale_date': len(sorted_dates),
-        'data_odierna': date.today().strftime('%Y-%m-%d')
-    })
+    group=db.session.get(GruppoCatechismo,id)
+    if not group: return jsonify(error='Gruppo non trovato'),404
+    if not can_record('catechismo',group): raise Forbidden('Registro non disponibile per questo profilo')
+    return jsonify(registry_data('catechismo',group,request.args.get('mese')))
 
 
 @catechismo_bp.route('/gruppi/<int:id>/ragazzi/batch', methods=['POST'])
@@ -654,10 +491,7 @@ def get_miei_figli_catechismo():
                 'note': gruppo_assegnato.note or ''
             }
 
-            query_p = Presenza.query.filter_by(codice_fiscale_persona=cf)
-            if gruppo_assegnato.attivita_id:
-                query_p = query_p.filter_by(attivita_id=gruppo_assegnato.attivita_id)
-            presenze = query_p.order_by(Presenza.data.desc()).all()
+            presenze=sorted(group_records('catechismo',gruppo_assegnato,[f]),key=lambda row:row.data,reverse=True)
 
             tot = len(presenze)
             pres = sum(1 for p in presenze if p.presente)

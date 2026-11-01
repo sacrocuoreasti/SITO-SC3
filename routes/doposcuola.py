@@ -1,3 +1,5 @@
+from services.group_attendance import can_record, group_records, save_group_records, registry_data
+from werkzeug.exceptions import Forbidden
 from services.group_calendar import apply_calendar
 from services.group_age_service import apply_age_range, register_age_guard
 from flask import Blueprint, request, jsonify
@@ -157,136 +159,20 @@ def remove_studente_gruppo(id, cf):
 
 @doposcuola_bp.route('/presenze', methods=['POST'])
 def save_presenze_doposcuola():
-    """Registra l'appello delle presenze/assenze per il gruppo di doposcuola."""
-    data = request.get_json() or {}
-    gruppo_id = data.get('gruppo_id')
-    attivita_id = data.get('attivita_id')
-    data_str = data.get('data')
-    elenco = data.get('presenze', [])
+    data=request.get_json() or {}
+    group=db.session.get(GruppoDoposcuola,data.get('gruppo_id'))
+    if not group: return jsonify(error='Gruppo non trovato'),404
+    save_group_records('doposcuola',group,data)
+    return jsonify(success=True,message='Presenze salvate: un appello per gruppo e giornata')
 
-    gruppo = None
-    if gruppo_id:
-        gruppo = db.session.get(GruppoDoposcuola, int(gruppo_id))
-        if gruppo and not attivita_id and gruppo.attivita_id:
-            attivita_id = gruppo.attivita_id
-
-    if not attivita_id:
-        att_dop = Attivita.query.filter(
-            (Attivita.categoria == 'doposcuola') |
-            (Attivita.titolo.ilike('%doposcuola%'))
-        ).first()
-        if not att_dop:
-            att_dop = Attivita(
-                titolo=f"Doposcuola e Studio - {gruppo.nome if gruppo else 'Parrocchia'}",
-                categoria='doposcuola',
-                anno_pastorale='2025/2026',
-                is_attiva=True,
-                is_pubblicato=False
-            )
-            db.session.add(att_dop)
-            db.session.flush()
-        attivita_id = att_dop.id
-        if gruppo and not gruppo.attivita_id:
-            gruppo.attivita_id = att_dop.id
-        db.session.commit()
-
-    data_presenza = date.today()
-    if data_str:
-        try:
-            data_presenza = datetime.strptime(data_str, '%Y-%m-%d').date()
-        except Exception:
-            pass
-
-    for item in elenco:
-        cf = normalizza_cf(item.get('codice_fiscale', ''))
-        presente = bool(item.get('presente', True))
-
-        rec = Presenza.query.filter_by(
-            attivita_id=attivita_id,
-            codice_fiscale_persona=cf,
-            data=data_presenza
-        ).first()
-
-        if rec:
-            rec.presente = presente
-        else:
-            rec = Presenza(
-                attivita_id=attivita_id,
-                codice_fiscale_persona=cf,
-                data=data_presenza,
-                presente=presente
-            )
-            db.session.add(rec)
-
-    db.session.commit()
-    return jsonify({'success': True, 'message': 'Presenze doposcuola salvate con successo'})
 
 @doposcuola_bp.route('/gruppi/<int:id>/registro', methods=['GET'])
 def get_registro_elettronico_gruppo(id):
-    """
-    Ritorna i dati per il registro elettronico del doposcuola:
-    studenti, date degli incontri svolti, matrice presenze e statistiche.
-    """
-    g = db.session.get(GruppoDoposcuola, id)
-    if not g:
-        return jsonify({'error': 'Gruppo doposcuola non trovato'}), 404
+    group=db.session.get(GruppoDoposcuola,id)
+    if not group: return jsonify(error='Gruppo non trovato'),404
+    if not can_record('doposcuola',group): raise Forbidden('Registro non disponibile per questo profilo')
+    return jsonify(registry_data('doposcuola',group,request.args.get('mese')))
 
-    cf_studenti = [s.codice_fiscale for s in g.studenti]
-    query = Presenza.query
-    if g.attivita_id:
-        query = query.filter(Presenza.attivita_id == g.attivita_id)
-    if cf_studenti:
-        query = query.filter(Presenza.codice_fiscale_persona.in_(cf_studenti))
-
-    presenze = query.order_by(Presenza.data.asc()).all()
-
-    # Mappa presenze per CF e Data
-    matrice = {cf: {} for cf in cf_studenti}
-    date_info_map = {}
-
-    for p in presenze:
-        d_str = p.data.strftime('%Y-%m-%d')
-        if d_str not in date_info_map:
-            date_info_map[d_str] = {
-                'data': d_str,
-                'data_it': p.data.strftime('%d/%m/%Y'),
-                'presenti_count': 0,
-                'assenti_count': 0
-            }
-        if p.presente:
-            date_info_map[d_str]['presenti_count'] += 1
-        else:
-            date_info_map[d_str]['assenti_count'] += 1
-        if p.codice_fiscale_persona in matrice:
-            matrice[p.codice_fiscale_persona][d_str] = p.presente
-
-    sorted_dates = sorted(list(date_info_map.values()), key=lambda x: x['data'])
-
-    studenti_data = []
-    for s in g.studenti:
-        cf = s.codice_fiscale
-        p_rag = [p for p in presenze if p.codice_fiscale_persona == cf]
-        tot_inc = len(p_rag)
-        pres_inc = sum(1 for p in p_rag if p.presente)
-        perc = round((pres_inc / tot_inc) * 100) if tot_inc > 0 else 0
-        studenti_data.append({
-            'codice_fiscale': cf,
-            'nominativo': s.nominativo,
-            'eta': s.eta,
-            'presenze_map': matrice.get(cf, {}),
-            'totale_incontri': tot_inc,
-            'presenti': pres_inc,
-            'assenti': tot_inc - pres_inc,
-            'percentuale': perc
-        })
-
-    return jsonify({
-        'gruppo': g.to_dict(include_studenti=False),
-        'date_incontri': sorted_dates,
-        'studenti': studenti_data,
-        'totale_date': len(sorted_dates),
-        'data_odierna': date.today().strftime('%Y-%m-%d')
-    })
 
 @doposcuola_bp.route('/gruppi/<int:id>/storico', methods=['GET'])
 def get_storico_gruppo(id):
@@ -294,14 +180,8 @@ def get_storico_gruppo(id):
     if not g:
         return jsonify({'error': 'Gruppo non trovato'}), 404
 
-    cf_studenti = [s.codice_fiscale for s in g.studenti]
-    query = Presenza.query
-    if g.attivita_id:
-        query = query.filter(Presenza.attivita_id == g.attivita_id)
-    if cf_studenti:
-        query = query.filter(Presenza.codice_fiscale_persona.in_(cf_studenti))
-
-    presenze = query.order_by(Presenza.data.desc()).all()
+    if not can_record('doposcuola',g): raise Forbidden('Storico non disponibile per questo profilo')
+    presenze=list(reversed(group_records('doposcuola',g)))
 
     date_map = {}
     for p in presenze:
@@ -506,10 +386,7 @@ def get_miei_figli_doposcuola():
                 'note': gruppo_assegnato.note or ''
             }
 
-            query_p = Presenza.query.filter_by(codice_fiscale_persona=cf)
-            if gruppo_assegnato.attivita_id:
-                query_p = query_p.filter_by(attivita_id=gruppo_assegnato.attivita_id)
-            presenze = query_p.order_by(Presenza.data.desc()).all()
+            presenze=sorted(group_records('doposcuola',gruppo_assegnato,[f]),key=lambda row:row.data,reverse=True)
 
             tot = len(presenze)
             pres = sum(1 for p in presenze if p.presente)
