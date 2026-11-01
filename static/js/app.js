@@ -6570,7 +6570,7 @@ async function openModalModificaPersona(cf) {
     document.getElementById('modPersonaTerapie').value = p.terapie_medicinali || '';
     await renderHealthSections('modPersona');
 
-    document.getElementById('modPersonaBattesimoBox').parentElement.hidden = !p.certificato_battesimo_url;
+    document.getElementById('modPersonaBattesimoBox').parentElement.style.display = p.certificato_battesimo_url ? 'block' : 'none';
     const badge = document.getElementById('modPersonaBattesimoBadge');
     const link = document.getElementById('modPersonaBattesimoLink');
     const delBtn = document.getElementById('modPersonaBattesimoDelBtn');

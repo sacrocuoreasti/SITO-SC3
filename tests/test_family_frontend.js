@@ -1,6 +1,9 @@
 const fs = require('fs');
 const vm = require('vm');
 const assert = require('assert');
+const template=fs.readFileSync('templates/index.html','utf8');
+assert.ok(!template.includes('id="modPersonaBattesimoInput"'));
+assert.ok(template.includes('id="modPersonaBattesimoLink"'));
 const elements = new Map();
 const selected = [];
 const requests = [];
