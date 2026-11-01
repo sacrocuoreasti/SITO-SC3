@@ -8685,8 +8685,49 @@ function activityEnrollmentAction(activity,staff=false) {
   else markup+=(state?.iscrizioni || []).map(i=>withdrawButton({...i,stato:'confermata'},true)).join('');
   return markup;
 }
-function availableGroupCards(category,groups) {
-  return groups.map(g=>`<form class="card family-section" onsubmit="enrollFamilyGroup(event,'${category}',${g.id})"><h3>${escapeHtml(g.nome)}</h3><p>${escapeHtml(ageRangeLabel(g))}</p>${groupCalendarMarkup(g)}<p>${escapeHtml(g.orario_incontri || g.giorni_orari || '')} ${escapeHtml(g.aula || '')}</p><fieldset><legend>Seleziona i figli da iscrivere</legend>${g.partecipanti.map(p=>`<label class="choice-row"><input class="group-participant" type="checkbox" value="${escapeHtml(p.codice_fiscale)}"><span>${escapeHtml(p.nominativo)}${p.eta == null ? '' : ' · '+p.eta+' anni'}</span></label>`).join('')}</fieldset><button type="submit" class="btn btn-primary">Iscrivi al gruppo</button></form>`).join('');
+function availableGroupCards(category, groups) {
+  const labels = {
+    catechismo: {icon:'📖', name:'Catechismo', reference:'Catechisti'},
+    doposcuola: {icon:'📚', name:'Doposcuola', reference:'Educatore'},
+    oratorio: {icon:'☀️', name:'Oratorio', reference:'Animatori'}
+  };
+  const type = labels[category];
+  if (!type) return '';
+  return groups.map(g => {
+    const winter = category === 'oratorio' && g.tipo_oratorio === 'invernale';
+    const year = g.anno_scolastico || g.anno_pastorale || 'Da definire';
+    const course = category === 'catechismo' ? g.anno_catechismo : category === 'doposcuola' ? g.fascia_eta : winter ? 'Oratorio invernale' : 'Oratorio estivo';
+    const staff = category === 'catechismo' ? g.catechisti : category === 'oratorio' ? g.animatori : null;
+    const reference = staff?.length ? staff.map(person=>person.nominativo).filter(Boolean).join(', ') : (g.catechista_nome || g.educatore_nome || g.animatori_nomi || g.animatore_referente_nome || 'Da assegnare');
+    const members = g.totale_studenti ?? g.totale_ragazzi ?? 0;
+    return `<form class="catechismo-card family-enrollment-card family-enrollment-card--${category}${winter ? ' family-enrollment-card--invernale' : ''}" onsubmit="enrollFamilyGroup(event,'${category}',${g.id})">
+      <header class="family-enrollment-header">
+        <div class="family-enrollment-title"><span class="family-enrollment-icon" aria-hidden="true">${winter ? '❄️' : type.icon}</span><div><span class="family-enrollment-category">${type.name}</span><h3>${escapeHtml(g.nome)}</h3></div></div>
+        <span class="badge badge-success family-enrollment-status">Iscrizioni aperte</span>
+      </header>
+      <div class="family-enrollment-badges"><span class="badge badge-neutral">📁 ${escapeHtml(year)}</span>${course ? `<span class="badge family-enrollment-course">${escapeHtml(course)}</span>` : ''}<span class="family-enrollment-members">${members} ${category === 'doposcuola' ? (members===1 ? 'studente':'studenti') : (members===1 ? 'iscritto':'iscritti')}</span></div>
+      <dl class="family-enrollment-details">
+        <div><dt>👤 ${type.reference}</dt><dd>${escapeHtml(reference)}</dd></div>
+        <div><dt>🕒 Giorni e orari</dt><dd>${escapeHtml(g.orario_incontri || g.giorni_orari || 'Da definire')}</dd></div>
+        <div><dt>📍 Aula / luogo</dt><dd>${escapeHtml(g.aula || g.luogo || 'Da definire')}</dd></div>
+        <div><dt>👶 Fascia d’età</dt><dd>${escapeHtml(ageRangeLabel(g))}</dd></div>
+      </dl>
+      ${g.attivita_titolo ? `<p class="family-enrollment-activity">Attività collegata: <strong>${escapeHtml(g.attivita_titolo)}</strong></p>` : ''}
+      ${g.note ? `<div class="family-enrollment-notes"><strong>Informazioni sul gruppo</strong><p>${escapeHtml(g.note)}</p></div>` : ''}
+      ${groupCalendarMarkup(g)}
+      <fieldset class="family-enrollment-people"><legend>Chi vuoi iscrivere?</legend><p>Seleziona i figli da iscrivere a questo gruppo.</p>
+        ${g.partecipanti.map(person => `<label class="family-enrollment-person"><input class="group-participant" type="checkbox" value="${escapeHtml(person.codice_fiscale)}" onchange="updateGroupEnrollmentSelection(this)"><span class="family-enrollment-person-avatar" aria-hidden="true">${escapeHtml((person.nominativo || '').trim().charAt(0))}</span><span class="family-enrollment-person-name"><strong>${escapeHtml(person.nominativo)}</strong><small>${person.eta == null ? 'Età non indicata' : person.eta+' anni'}</small></span></label>`).join('')}
+      </fieldset>
+      <footer class="family-enrollment-footer"><span class="family-enrollment-selection" aria-live="polite">Nessun figlio selezionato</span><button type="submit" class="btn btn-primary" disabled>Iscrivi al gruppo</button></footer>
+    </form>`;
+  }).join('');
+}
+
+function updateGroupEnrollmentSelection(input) {
+  const form = input.closest('form');
+  const count = form.querySelectorAll('.group-participant:checked').length;
+  form.querySelector('.family-enrollment-selection').textContent = count === 1 ? '1 figlio selezionato' : count+' figli selezionati';
+  form.querySelector('button[type="submit"]').disabled = count === 0;
 }
 async function loadFamilyGroupView(category,loadAssigned) {
   const container=document.getElementById(category+'ParentContainer');
@@ -8696,7 +8737,7 @@ async function loadFamilyGroupView(category,loadAssigned) {
     const data=await refreshEnrollmentOptions();
     const groups=data?.gruppi?.[category] || [];
     if(!groups.length) {if(currentView===category) navigateTo('dashboard');return;}
-    container.innerHTML='<h2>Gruppi disponibili</h2>'+availableGroupCards(category,groups)+`<div id="${category}AssignedContainer"></div>`;
+    container.innerHTML=`<div class="family-group-heading"><div><h2>Gruppi disponibili</h2><p>Consulta le informazioni e scegli chi iscrivere.</p></div><span class="badge badge-neutral">${groups.length} ${groups.length===1 ? 'gruppo':'gruppi'}</span></div><div class="family-group-grid">${availableGroupCards(category,groups)}</div><div class="family-group-assigned" id="${category}AssignedContainer"></div>`;
     await loadAssigned();
   } catch(error) {showToast(error.message,'error');}
 }

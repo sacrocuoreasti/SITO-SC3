@@ -1701,3 +1701,49 @@ input:checked + .slider:before {
 .dashboard-columns{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:24px;align-items:start}.dashboard-aside{min-width:0}.dashboard-columns>.card{min-width:0}@media(max-width:1000px){.dashboard-columns{grid-template-columns:1fr}}
 
 .profile-section{border:1px solid var(--border-light);border-radius:12px;padding:18px;margin:0 0 18px;min-width:0}.profile-section>legend{padding:0 8px;font-size:17px;font-weight:700;color:var(--primary)}.group-calendar-frame{width:100%;height:520px;border:0;margin-top:12px}
+
+/* User enrollment uses the same card structure as the administrative groups. */
+.family-group-heading{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:20px}
+.family-group-heading h2{font-size:19px;margin:0 0 5px;color:var(--ink-900)}
+.family-group-heading p{font-size:13px;color:var(--ink-500);margin:0}
+.family-group-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,480px),1fr));gap:20px;align-items:stretch}
+.family-group-assigned:not(:empty){margin-top:28px}
+.family-enrollment-card{--enrollment-accent:var(--primary);--enrollment-tint:var(--primary-light);border-top:4px solid var(--enrollment-accent);margin:0;min-width:0;gap:16px}
+.family-enrollment-card--doposcuola{--enrollment-accent:#d97706;--enrollment-tint:#fffbeb}
+.family-enrollment-card--oratorio{--enrollment-accent:#ca8a04;--enrollment-tint:#fefce8}
+.family-enrollment-card--invernale{--enrollment-accent:#2563eb;--enrollment-tint:#eff6ff}
+.family-enrollment-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.family-enrollment-title{display:flex;gap:10px;align-items:flex-start;min-width:0}
+.family-enrollment-title h3{margin:3px 0 0;font-size:18px;line-height:1.35;color:var(--ink-900);overflow-wrap:anywhere}
+.family-enrollment-icon{display:grid;place-items:center;background:var(--enrollment-tint);border-radius:10px;min-width:40px;height:40px;font-size:23px}
+.family-enrollment-category{color:var(--enrollment-accent);font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase}
+.family-enrollment-status{font-size:10px;flex-shrink:0;white-space:nowrap}
+.family-enrollment-badges{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.family-enrollment-course{background:var(--enrollment-tint);color:var(--enrollment-accent);max-width:100%;white-space:normal;overflow-wrap:anywhere}
+.family-enrollment-members{font-size:12px;color:var(--ink-500);margin-left:auto}
+.family-enrollment-details{display:grid;grid-template-columns:1fr 1fr;gap:14px;background:var(--bg-subtle);border-radius:var(--radius-md);padding:14px;margin:0}
+.family-enrollment-details div{min-width:0}
+.family-enrollment-details dt{font-size:11px;font-weight:600;color:var(--ink-500);margin-bottom:5px}
+.family-enrollment-details dd{margin:0;font-size:13px;font-weight:600;line-height:1.5;color:var(--ink-800);overflow-wrap:anywhere;white-space:pre-line}
+.family-enrollment-notes{border-left:3px solid var(--enrollment-accent);padding-left:12px;font-size:12px;color:var(--ink-700)}
+.family-enrollment-notes p{margin:5px 0 0;white-space:pre-line;line-height:1.6;overflow-wrap:anywhere}
+.family-enrollment-activity{margin:0;font-size:12px;color:var(--ink-600);line-height:1.5}
+.family-enrollment-card .group-calendar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px}
+.family-enrollment-card .group-calendar-content{flex-basis:100%;min-width:0}
+.family-enrollment-card .group-calendar-content:empty{display:none}
+.family-enrollment-people{border:0;border-top:1px solid var(--border-light);padding:16px 0 0;margin:0;min-width:0}
+.family-enrollment-people legend{font-size:14px;font-weight:700;color:var(--ink-900);padding:0 6px 0 0}
+.family-enrollment-people>p{font-size:12px;color:var(--ink-500);margin:0 0 10px}
+.family-enrollment-person{display:flex;align-items:center;gap:10px;padding:11px 12px;margin-top:8px;border:1px solid var(--border-light);border-radius:var(--radius-md);cursor:pointer;background:#fff;transition:background .15s,border-color .15s}
+.family-enrollment-person:hover{border-color:var(--enrollment-accent)}
+.family-enrollment-person:has(input:checked){border-color:var(--enrollment-accent);background:var(--enrollment-tint)}
+.family-enrollment-person input{width:18px;height:18px;flex-shrink:0;accent-color:var(--enrollment-accent)}
+.family-enrollment-person-avatar{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--bg-subtle);font-size:12px;font-weight:700;color:var(--enrollment-accent);flex-shrink:0}
+.family-enrollment-person-name{display:flex;flex-direction:column;gap:3px;min-width:0}
+.family-enrollment-person-name strong{font-size:13px;color:var(--ink-900);overflow-wrap:anywhere}
+.family-enrollment-person-name small{font-size:11px;color:var(--ink-500)}
+.family-enrollment-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:auto;padding-top:14px;border-top:1px solid var(--border-light)}
+.family-enrollment-selection{font-size:11px;color:var(--ink-500)}
+.family-enrollment-footer .btn{min-height:40px}
+.family-enrollment-footer .btn:disabled{opacity:.5;cursor:not-allowed;box-shadow:none}
+@media(max-width:600px){.family-group-grid{grid-template-columns:minmax(0,1fr)}.family-enrollment-header{flex-wrap:wrap}.family-enrollment-footer{align-items:stretch;flex-direction:column}.family-enrollment-footer .btn{width:100%}.family-enrollment-card{padding:16px}}

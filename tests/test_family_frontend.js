@@ -153,5 +153,20 @@ vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['
   fixtures['/api/iscrizioni/5/disiscrivi']={success:true,message:'Disiscrizione completata'};
   await context.annullaMiaIscrizione(5);
   assert.ok(requests.some(r=>r.url==='/api/iscrizioni/5/disiscrivi' && r.options.method==='POST'));
+  for(const category of ['catechismo','doposcuola','oratorio']) {
+    const group={id:9,nome:'Gruppo <prova>',anno_pastorale:'2026/2027',anno_scolastico:category==='doposcuola' ? '2026/2027':null,anno_catechismo:'Terza elementare',fascia_eta:'Scuola primaria',tipo_oratorio:'invernale',orario_incontri:'Sabato 15:30',aula:'Aula Don Bosco',catechista_nome:'Referente Test',educatore_nome:'Referente Test',animatori_nomi:'Referente Test',note:'Portare il quaderno <test>',totale_ragazzi:7,partecipanti:[people[1]]};
+    const card=context.availableGroupCards(category,[group]);
+    for(const info of ['2026/2027','Sabato 15:30','Aula Don Bosco','Referente Test','Portare il quaderno &lt;test&gt;','Chi vuoi iscrivere?']) assert.ok(card.includes(info));
+    assert.ok(card.includes('Gruppo &lt;prova&gt;'));
+    assert.ok(card.includes('family-enrollment-card--'+category));
+    assert.ok(card.includes('type="submit" class="btn btn-primary" disabled'));
+    assert.ok(!card.includes('openModalModificaGruppo'));
+  }
+  const selection={textContent:''}, submit={disabled:true};
+  let count=2;
+  const fakeForm={querySelectorAll:()=>Array(count).fill({}),querySelector:selector=>selector==='.family-enrollment-selection' ? selection:submit};
+  context.updateGroupEnrollmentSelection({closest:()=>fakeForm});
+  assert.equal(submit.disabled,false);assert.equal(selection.textContent,'2 figli selezionati');
+  count=0;context.updateGroupEnrollmentSelection({closest:()=>fakeForm});assert.equal(submit.disabled,true);
   console.log('Alpha famiglia: attività fissata, selezione multipla, quota, invio unico, consensi e salute verificati.');
 })().catch(error=>{console.error(error);process.exitCode=1;});
