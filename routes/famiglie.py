@@ -309,3 +309,44 @@ def get_offerte_famiglia():
         'totale_offerto': round(totale, 2),
         'storico_versamenti': storico
     })
+
+
+@famiglie_bp.route('/opportunita', methods=['GET'])
+@login_required
+def get_enrollment_options():
+    from services.enrollment_options import enrollment_options
+    return jsonify(enrollment_options())
+
+
+@famiglie_bp.route('/iscrizioni-gruppo', methods=['POST'])
+@login_required
+def enroll_family_group():
+    from services.enrollment_options import GROUP_MODELS, group_candidates, age_eligible
+    from services.cf_validator import normalizza_cf
+    data = request.get_json() or {}
+    category = data.get('categoria')
+    if not isinstance(category,str) or category not in GROUP_MODELS:
+        return jsonify(error='Categoria non valida'),400
+    model, collection = GROUP_MODELS[category]
+    try:
+        group = db.session.get(model, int(data.get('gruppo_id')))
+    except (ValueError, TypeError):
+        return jsonify(error='Gruppo non valido'),400
+    if not group or group.stato != 'pubblico':
+        return jsonify(error='Gruppo non disponibile'),400
+    supplied = data.get('partecipanti')
+    if not isinstance(supplied,list) or not supplied or any(not isinstance(cf,str) for cf in supplied):
+        return jsonify(error='Seleziona almeno un figlio'),400
+    cfs = list(dict.fromkeys(normalizza_cf(cf) for cf in supplied))
+    allowed = {p.codice_fiscale:p for p in group_candidates()}
+    for cf in cfs:
+        if cf not in allowed:
+            return jsonify(error='Non sei autorizzato a iscrivere uno dei partecipanti'),403
+        if not age_eligible(allowed[cf],group):
+            return jsonify(error='Uno dei partecipanti non rientra nella fascia di età'),400
+    members = getattr(group,collection)
+    for cf in cfs:
+        if allowed[cf] not in members:
+            members.append(allowed[cf])
+    db.session.commit()
+    return jsonify(success=True,message='Iscrizione al gruppo completata')

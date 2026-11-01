@@ -349,8 +349,8 @@ class Attivita(db.Model):
     categoria = db.Column(db.String(50), nullable=False)  # 'oratorio', 'catechismo', 'campo_estivo', 'doposcuola', 'evento', 'altro'
     descrizione = db.Column(db.Text, nullable=True)
     anno_pastorale = db.Column(db.String(20), default='2025/2026')
-    eta_min = db.Column(db.Integer, default=0)
-    eta_max = db.Column(db.Integer, default=99)
+    eta_min = db.Column(db.Integer, nullable=True)
+    eta_max = db.Column(db.Integer, nullable=True)
     quota_iscrizione = db.Column(db.Float, default=0.0)
     posti_massimi = db.Column(db.Integer, nullable=True)
     data_inizio = db.Column(db.Date, nullable=True)

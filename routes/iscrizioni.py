@@ -105,12 +105,14 @@ def _register_participant(data):
 
     # Controllo fascia di età obbligatoria (es. una persona di 60 anni non si iscrive al catechismo o all'oratorio estivo)
     eta = persona.eta
+    if eta is None and (attivita.eta_min is not None or attivita.eta_max is not None):
+        return jsonify(error='Indica la data di nascita prima di iscriverti a questa attività'),400
     if eta is not None:
-        if attivita.eta_min and eta < attivita.eta_min:
+        if attivita.eta_min is not None and eta < attivita.eta_min:
             return jsonify({
                 'error': f'Età non idonea: {persona.nominativo} ha {eta} anni, ma l\'attività "{attivita.titolo}" richiede un\'età minima di {attivita.eta_min} anni.'
             }), 400
-        if attivita.eta_max and eta > attivita.eta_max:
+        if attivita.eta_max is not None and eta > attivita.eta_max:
             return jsonify({
                 'error': f'Età non idonea: {persona.nominativo} ha {eta} anni, ma l\'attività "{attivita.titolo}" è riservata a ragazzi fino a {attivita.eta_max} anni.'
             }), 400

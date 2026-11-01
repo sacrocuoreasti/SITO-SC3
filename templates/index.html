@@ -455,9 +455,7 @@ Domenica: dopo le Sante Messe</p>
               <p>Panoramica delle attività pastorali, iscrizioni attive e avvisi della comunità di Asti.</p>
             </div>
             <div class="header-actions" style="display: flex; gap: 10px; flex-wrap: wrap;">
-              <button class="btn btn-outline-primary" onclick="openModalOfferteDonazioni()"><i>❤️</i> Offerte & Donazioni</button>
               <button class="btn btn-secondary" onclick="navigateTo('anagrafica')"><i>♙</i> Cerca Anagrafica</button>
-              <button class="btn btn-primary" onclick="openModalNuovaIscrizione()"><i>+</i> Nuova Iscrizione</button>
             </div>
           </div>
 
@@ -622,7 +620,6 @@ Domenica: dopo le Sante Messe</p>
             </div>
             <div class="header-actions">
               <button type="button" class="btn btn-secondary" id="btnCreaNuovaAttivita" style="display: none;" onclick="openModalNuovaAttivita()"><i>+</i> Crea Nuova Attività</button>
-              <button class="btn btn-primary" onclick="openModalNuovaIscrizione()"><i>✓</i> Iscrivi un Partecipante</button>
             </div>
           </div>
 
@@ -1871,12 +1868,12 @@ Domenica: dopo le Sante Messe</p>
 
           <div class="form-row">
             <div class="form-group">
-              <label>Età Minima (anni) *</label>
-              <input type="number" id="attEtaMin" class="form-control" value="6" min="0" max="99" required>
+              <label>Età Minima (anni, facoltativa)</label>
+              <input type="number" id="attEtaMin" class="form-control" min="0" max="120" step="1" placeholder="Nessun limite">
             </div>
             <div class="form-group">
-              <label>Età Massima (anni) *</label>
-              <input type="number" id="attEtaMax" class="form-control" value="14" min="0" max="99" required>
+              <label>Età Massima (anni, facoltativa)</label>
+              <input type="number" id="attEtaMax" class="form-control" min="0" max="120" step="1" placeholder="Nessun limite">
             </div>
           </div>
 
@@ -2001,12 +1998,12 @@ Domenica: dopo le Sante Messe</p>
 
           <div class="form-row">
             <div class="form-group">
-              <label>Età Minima (anni) *</label>
-              <input type="number" id="modAttEtaMin" class="form-control" min="0" max="99" required>
+              <label>Età Minima (anni, facoltativa)</label>
+              <input type="number" id="modAttEtaMin" class="form-control" min="0" max="120" step="1" placeholder="Nessun limite">
             </div>
             <div class="form-group">
-              <label>Età Massima (anni) *</label>
-              <input type="number" id="modAttEtaMax" class="form-control" min="0" max="99" required>
+              <label>Età Massima (anni, facoltativa)</label>
+              <input type="number" id="modAttEtaMax" class="form-control" min="0" max="120" step="1" placeholder="Nessun limite">
             </div>
           </div>
 

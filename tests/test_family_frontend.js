@@ -17,6 +17,7 @@ const nodes = id => {
 const people = [{codice_fiscale:'RSSMRA80A01H501U',nominativo:'Genitore di prova',eta:46}, {codice_fiscale:'RSSLGI14A01H501A',nominativo:'Figlio di prova',eta:12}];
 const fixtures = {
   '/api/attivita':{attivita:[{id:7,titolo:'Attività selezionata',eta_min:0,eta_max:99,quota_iscrizione:10,campi_personalizzati:[{nome:'Taglia',chiave:'taglia',obbligatorio:true}]}]},
+  '/api/famiglie/opportunita':{attivita:{7:{partecipanti:people.map(p=>p.codice_fiscale),gia_iscritto:false}},gruppi:{oratorio:[],catechismo:[],doposcuola:[]}},
   '/api/famiglie/mia':{nucleo:{id:1,componenti:people},puo_gestire:true},
   '/api/iscrizioni?solo_mie=true':{iscrizioni:[]},
   '/api/configurazioni/clausole':{clausole:[{id:1,obbligatoria:true,titolo:'Clausola',testo:'Testo'}]},
@@ -25,7 +26,7 @@ const fixtures = {
 const context = vm.createContext({
   console, AbortController, setTimeout, clearTimeout,
   window:{addEventListener(){}},
-  document:{addEventListener(){},querySelector(){return null;},getElementById:nodes,querySelectorAll(selector){
+  document:{addEventListener(){},querySelector(selector){return /^\.(oratorio|catechismo|doposcuola)-nav$/.test(selector) ? nodes(selector) : null;},getElementById:nodes,querySelectorAll(selector){
     if(selector==='.family-participant:checked')return selected.map(value=>({value}));
     if(selector==='#iscrizioneClausoleContainer .clause-checkbox')return [{dataset:{id:'1',req:'true'},checked:true}];
     return [];
@@ -82,5 +83,46 @@ vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['
   await loadDashboardOriginal();
   assert.ok(requests.some(r=>r.url==='/api/impostazioni/calendari?solo_pubblici=true'));
   assert.ok(nodes('dashUserCalendariGrid').innerHTML.includes('Nessun calendario'));
+  // Fresh eligibility controls buttons, even without opening the family screen.
+  const activity={id:7,titolo:'Evento famiglia',categoria:'evento',quota_iscrizione:0,posti_disponibili:null,eta_min:null,eta_max:null};
+  fixtures['/api/attivita']={attivita:[activity]};
+  const option=fixtures['/api/famiglie/opportunita'].attivita[7];
+  option.partecipanti=people.map(p=>p.codice_fiscale); option.gia_iscritto=false;
+  await context.loadAttivita();
+  assert.ok(nodes('activitiesCatalogGrid').innerHTML.includes('Iscriviti</button>'));
+  option.partecipanti=[people[1].codice_fiscale]; option.gia_iscritto=true;
+  await context.loadAttivita();
+  assert.ok(nodes('activitiesCatalogGrid').innerHTML.includes('Iscrivi altri familiari'));
+  assert.ok(!nodes('activitiesCatalogGrid').innerHTML.includes('Iscriviti</button>'));
+  option.partecipanti=[];
+  await context.loadAttivita();
+  assert.ok(nodes('activitiesCatalogGrid').innerHTML.includes('Iscrizione effettuata'));
+  assert.ok(!nodes('activitiesCatalogGrid').innerHTML.includes('openModalNuovaIscrizione'));
+  assert.equal(context.ageEligible({eta:null},{eta_min:null,eta_max:null}),true);
+  assert.equal(context.ageEligible({eta:100},{eta_min:18,eta_max:null}),true);
+  assert.equal(context.ageEligible({eta:null},{eta_min:0,eta_max:10}),false);
+  assert.equal(context.ageEligible({eta:2},{eta_min:null,eta_max:0}),false);
+  assert.equal(context.ageRangeLabel({eta_min:null,eta_max:null}),'Senza limiti di età');
+  nodes('attEtaMin').value=''; assert.equal(context.optionalAgeValue('attEtaMin'),null);
+  nodes('attEtaMin').value='0'; assert.equal(context.optionalAgeValue('attEtaMin'),0);
+  for (const category of ['catechismo','doposcuola']) {
+    fixtures['/api/famiglie/opportunita'].gruppi[category]=[{id:3,nome:'Gruppo disponibile '+category,eta_min:6,eta_max:14,partecipanti:[people[1]]}];
+    fixtures['/api/'+category+'/miei-figli']={ha_famiglia:true,figli:[]};
+    await context[category==='catechismo' ? 'loadCatechismoParentView' : 'loadDoposcuolaParentView']();
+    const content=nodes(category+'ParentContainer').innerHTML;
+    assert.ok(content.includes('Gruppo disponibile '+category));
+    assert.ok(content.includes('class="group-participant"'));
+    assert.ok(!content.includes('NON ANCORA ISCRITTO'));
+    assert.equal(nodes('.'+category+'-nav').style.display,'flex');
+    fixtures['/api/famiglie/opportunita'].gruppi[category]=[];
+    await context[category==='catechismo' ? 'loadCatechismoParentView' : 'loadDoposcuolaParentView']();
+    assert.equal(nodes(category+'ParentContainer').innerHTML,'');
+    assert.equal(nodes('.'+category+'-nav').style.display,'none');
+  }
+  assert.equal(nodes('sectionLabelPastorale').style.display,'none');
+  const dashboard=template.slice(template.indexOf('id="viewDashboard"'),template.indexOf('<!-- KPI Grid -->'));
+  assert.ok(!dashboard.includes('openModalNuovaIscrizione'));
+  assert.ok(!dashboard.includes('openModalOfferteDonazioni'));
+  assert.ok(!template.includes('Iscrivi un Partecipante'));
   console.log('Alpha famiglia: attività fissata, selezione multipla, quota, invio unico, consensi e salute verificati.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

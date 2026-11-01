@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_login import current_user
 from models import db, Attivita, Iscrizione
 from datetime import datetime
+from services.group_age_service import apply_age_range
 
 attivita_bp = Blueprint('attivita_bp', __name__, url_prefix='/api/attivita')
 
@@ -68,8 +69,6 @@ def create_attivita():
         categoria=categoria,
         descrizione=data.get('descrizione', '').strip(),
         anno_pastorale=data.get('anno_pastorale', '2025/2026').strip(),
-        eta_min=int(data.get('eta_min', 0)),
-        eta_max=int(data.get('eta_max', 99)),
         quota_iscrizione=float(data.get('quota_iscrizione', 0.0)),
         posti_massimi=int(data['posti_massimi']) if data.get('posti_massimi') else None,
         data_inizio=data_inizio,
@@ -82,6 +81,7 @@ def create_attivita():
     if 'campi_personalizzati' in data:
         nuova.campi_personalizzati = data['campi_personalizzati']
 
+    apply_age_range(nuova, data)
     db.session.add(nuova)
     db.session.commit()
 
@@ -102,8 +102,7 @@ def update_attivita(id):
     if 'categoria' in data: a.categoria = data['categoria'].strip()
     if 'descrizione' in data: a.descrizione = data['descrizione'].strip()
     if 'anno_pastorale' in data: a.anno_pastorale = data['anno_pastorale'].strip()
-    if 'eta_min' in data: a.eta_min = int(data['eta_min'])
-    if 'eta_max' in data: a.eta_max = int(data['eta_max'])
+    apply_age_range(a, data)
     if 'quota_iscrizione' in data: a.quota_iscrizione = float(data['quota_iscrizione'])
     if 'posti_massimi' in data:
         a.posti_massimi = int(data['posti_massimi']) if data['posti_massimi'] is not None else None
