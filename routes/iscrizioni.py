@@ -2,6 +2,8 @@ from flask import Blueprint, request, jsonify
 from flask_login import current_user
 from models import db, Iscrizione, Attivita, Persona, NucleoFamiliare, Lista
 from services.cf_validator import normalizza_cf
+from services.family_service import can_manage_family, staff_user
+from sqlalchemy import text
 
 iscrizioni_bp = Blueprint('iscrizioni_bp', __name__, url_prefix='/api/iscrizioni')
 
@@ -10,7 +12,7 @@ def get_iscrizioni():
     attivita_id = request.args.get('attivita_id', type=int)
     stato = request.args.get('stato')
     stato_pagamento = request.args.get('stato_pagamento')
-    solo_mie = request.args.get('solo_mie', '').lower() in ['true', '1']
+    solo_mie = not staff_user() or request.args.get('solo_mie', '').lower() in ['true', '1']
 
     query = Iscrizione.query
 
@@ -42,6 +44,37 @@ def get_iscrizioni():
 @iscrizioni_bp.route('', methods=['POST'])
 def create_iscrizione():
     data = request.get_json() or {}
+    participants = data.get('partecipanti')
+    if participants is None:
+        participants = [data.get('codice_fiscale_partecipante') or data.get('codice_fiscale', '')]
+    if not isinstance(participants, list) or not participants or len(participants) > 100 or any(not isinstance(cf, str) for cf in participants):
+        return jsonify(error='Seleziona almeno un partecipante valido'), 400
+    participants = [normalizza_cf(cf) for cf in participants]
+    if len(set(participants)) != len(participants):
+        return jsonify(error='Lo stesso partecipante è stato selezionato più volte'), 400
+    per_member = data.get('campi_personalizzati_per_partecipante', {})
+    if not isinstance(per_member, dict):
+        return jsonify(error='Formato dei campi dei partecipanti non valido'), 400
+    # Serializza le prenotazioni SQLite prima del controllo dei posti disponibili.
+    if db.engine.dialect.name == 'sqlite':
+        db.session.execute(text('BEGIN IMMEDIATE'))
+    saved = []
+    for cf in participants:
+        item = dict(data, codice_fiscale_partecipante=cf)
+        if cf in per_member:
+            item['campi_personalizzati'] = per_member[cf]
+        response, status = _register_participant(item)
+        if status != 201:
+            db.session.rollback()
+            return response, status
+        saved.append(response.get_json()['iscrizione'])
+    db.session.commit()
+    if 'partecipanti' not in data:
+        return response, status
+    return jsonify(success=True, message=f'Iscrizioni registrate per {len(saved)} componenti della famiglia', iscrizioni=saved), 201
+
+
+def _register_participant(data):
     attivita_id = data.get('attivita_id')
     cf = normalizza_cf(data.get('codice_fiscale_partecipante', '') or data.get('codice_fiscale', ''))
 
@@ -55,6 +88,20 @@ def create_iscrizione():
     persona = db.session.get(Persona, cf)
     if not persona:
         return jsonify({'error': f'Partecipante con Codice Fiscale {cf} non presente in anagrafica'}), 404
+
+    if not staff_user():
+        family = current_user.persona.nucleo if current_user.persona else None
+        if not family or persona.nucleo_id != family.id or (persona.codice_fiscale != current_user.codice_fiscale and not can_manage_family(family)):
+            return jsonify(error='Puoi iscrivere solo te stesso o i membri del nucleo che gestisci'), 403
+        if not attivita.is_attiva or not attivita.is_pubblicato:
+            return jsonify(error='Attività non disponibile per l’iscrizione'), 400
+    fields = data.get('campi_personalizzati', {})
+    if not isinstance(fields, dict):
+        return jsonify(error='Formato dei campi evento non valido'), 400
+    for field in attivita.campi_personalizzati or []:
+        key = field.get('chiave') or __import__('re').sub(r'[^a-z0-9_]', '_', field.get('nome', '').lower())
+        if field.get('obbligatorio') and not fields.get(key):
+            return jsonify(error=f'Compila il campo richiesto per {persona.nominativo}: {field.get("nome", key)}'), 400
 
     # Controllo fascia di età obbligatoria (es. una persona di 60 anni non si iscrive al catechismo o all'oratorio estivo)
     eta = persona.eta
@@ -175,7 +222,7 @@ def create_iscrizione():
         except Exception:
             pass
 
-    db.session.commit()
+    db.session.flush()
 
     return jsonify({
         'success': True,

@@ -118,3 +118,44 @@ con STARTTLS sulla porta 587 e TLS sulla porta 465.
 Riferimenti: [limiti Render Free](https://render.com/docs/free#other-limitations),
 [web app Apps Script](https://developers.google.com/apps-script/guides/web),
 [MailApp](https://developers.google.com/apps-script/reference/mail/mail-app).
+
+## Alpha 2.0.0: aggiornamenti e dati esistenti
+
+La versione è definita in `VERSION` e mostrata nella homepage, nel login e in
+`/health`. Ogni successiva modifica deve incrementarla, in accordo con AGENTS.md.
+Il capofamiglia è il responsabile del nucleo, indipendentemente dal ruolo di
+padre, madre, figlio o altro. I campi sanitari preesistenti restano invariati:
+terapie e medicinali usano una nuova colonna, senza riclassificare vecchie note.
+I suggerimenti sono opzioni dell'interfaccia, non nuovi record nel database.
+
+Le migrazioni aggiungono colonne e una tabella per le richieste di ingresso;
+assegnano un codice univoco di tre caratteri ai nuclei esistenti. Non cambiano
+password, utenti, eventi, clausole, categorie, dati sanitari o gruppi esistenti.
+L'avvio non esegue seed su database già esistenti, anche se alcune tabelle sono
+vuote. I nuovi consensi sono registrati solo quando dichiarati: non vengono
+attribuiti retroattivamente agli utenti esistenti.
+
+### Backup prima del deploy
+
+Per SQLite viene eseguito un backup coerente prima delle modifiche allo schema.
+Questo protegge la migrazione sullo stesso filesystem; non recupera i file che
+Render Free ha già perso sostituendo un'istanza durante il deploy.
+
+- `python scripts/backup_local.py`: copia completa del database LOCALE e degli
+  upload locali, con manifest, checksum e verifica SQLite. Non è una copia del
+  servizio online.
+- Quando alpha 2.0.0 è già installata, un amministratore può scaricare il backup
+  completo da `/api/backup/export`, oppure usare `python scripts/backup_remote.py`.
+  Le credenziali vengono richieste interattivamente e non salvate.
+- Ripristino a server fermo:
+  `python scripts/restore_backup.py ARCHIVIO.zip --data-dir CARTELLA_DATI --server-stopped`.
+  Il ripristino crea prima una copia dei dati eventualmente presenti, verifica
+  il manifest e conserva gli allegati non in conflitto. Impostare `DATA_DIR`
+  sulla cartella ripristinata prima dell'avvio del sito.
+
+Database, password hash, dati sanitari e allegati sono privati: i backup sono
+esclusi da Git e dalle immagini Docker. Non caricarli su GitHub pubblico.
+Non eseguire il primo deploy di questa versione finché il database live della
+versione precedente non è stato recuperato e verificato: quella versione non
+espone un export completo, mentre Render Free non offre shell o disco persistente.
+Un export Excel conserva una parte dei dati e non sostituisce il backup SQLite.

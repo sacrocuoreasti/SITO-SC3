@@ -21,6 +21,11 @@ login_manager = LoginManager()
 def create_app(config_class=Config):
     app = Flask(__name__, static_folder='static', template_folder='templates')
     app.config.from_object(config_class)
+    app.config['APP_VERSION'] = (Path(app.root_path) / 'VERSION').read_text().strip()
+
+    @app.context_processor
+    def release_context():
+        return {'app_version': app.config['APP_VERSION']}
 
     # Assicura esistenza cartelle database e upload
     os.makedirs(os.path.join(os.environ.get('DATA_DIR', app.root_path), 'database'), exist_ok=True)
@@ -64,7 +69,7 @@ def create_app(config_class=Config):
         public_endpoints = {
             'auth_bp.login', 'auth_bp.register', 'auth_bp.get_current_user',
             'auth_bp.richiedi_recupero_password', 'auth_bp.conferma_recupero_password',
-            'persone_bp.validate_cf_endpoint',
+            'persone_bp.validate_cf_endpoint', 'auth_bp.registration_options',
         }
         public_get = (
             request.method in {'GET', 'HEAD', 'OPTIONS'} and (
@@ -105,6 +110,8 @@ def create_app(config_class=Config):
     from routes.celebrazioni import celebrazioni_bp
     from routes.doposcuola import doposcuola_bp
 
+    from routes.backup import backup_bp
+    app.register_blueprint(backup_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(persone_bp)
     app.register_blueprint(famiglie_bp)
@@ -131,7 +138,7 @@ def create_app(config_class=Config):
     def health():
         try:
             db.session.execute(text('SELECT 1'))
-            return jsonify(status='ok', app='Parrocchia Sacro Cuore Asti', revision=os.environ.get('RENDER_GIT_COMMIT', 'local'))
+            return jsonify(status='ok', app='Parrocchia Sacro Cuore Asti', revision=os.environ.get('RENDER_GIT_COMMIT', 'local'), version=app.config['APP_VERSION'])
         except SQLAlchemyError:
             db.session.rollback()
             app.logger.exception('Health check database fallito')

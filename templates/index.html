@@ -7,7 +7,7 @@
   <meta name="description" content="Portale ufficiale della Parrocchia Sacro Cuore di Asti per la gestione delle iscrizioni alle attività parrocchiali, catechismo, Estate Ragazzi e vita comunitaria.">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=asset_version) }}">
 </head>
-<body data-local-quick-login="{{ 'true' if local_quick_login else 'false' }}">
+<body data-version="{{ app_version }}" data-local-quick-login="{{ 'true' if local_quick_login else 'false' }}">
 
   <!-- ================= HOMEPAGE PUBBLICA (PRIMA DELL'ACCESSO) ================= -->
   <div class="public-homepage" id="publicHomepage">
@@ -238,7 +238,7 @@ Domenica: dopo le Sante Messe</p>
         </div>
       </div>
       <div class="public-footer-bottom">
-        © 2026 Parrocchia Sacro Cuore di Gesù - Asti. Tutti i diritti riservati.
+        © 2026 Parrocchia Sacro Cuore di Gesù - Asti. Tutti i diritti riservati. · <span class="release-version">{{ app_version }}</span>
       </div>
     </footer>
 
@@ -283,6 +283,7 @@ Domenica: dopo le Sante Messe</p>
           <button type="submit" class="btn btn-primary" style="width: 100%;">Accedi al Portale →</button>
         </form>
 
+        <p class="release-version" style="font-size:12px;color:var(--ink-500)">{{ app_version }}</p>
         <!-- Form Registrazione Genitore -->
         <form id="formRegister" onsubmit="handleRegisterSubmit(event)" style="display: none;">
           <div style="background: var(--bg-subtle); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 12px; margin-bottom: 14px; color: var(--ink-700);">
@@ -313,16 +314,21 @@ Domenica: dopo le Sante Messe</p>
               <input type="text" id="regNomeFamiglia" class="form-control" placeholder="Famiglia ...">
             </div>
           </div>
+          <div class="form-row">
+            <div class="form-group"><label for="regRuoloFamiglia">Ruolo nella famiglia *</label><select id="regRuoloFamiglia" class="form-control" required><option value="">Scegli il ruolo</option><option>Padre</option><option>Madre</option><option value="Figlio/a">Figlio / Figlia</option><option>Coniuge</option><option>Fratello</option><option>Sorella</option><option>Nonno</option><option>Nonna</option><option>Altro</option></select></div>
+            <div class="form-group"><label for="regCodiceInvito">Codice invito famiglia (facoltativo)</label><input id="regCodiceInvito" class="form-control uppercase" maxlength="3" pattern="[A-Za-z0-9]{3}" placeholder="Es. A7B"><small>Se hai ricevuto un codice, il capofamiglia approverà la tua richiesta. Senza codice creerai il tuo nucleo e ne sarai responsabile, indipendentemente dal ruolo.</small></div>
+          </div>
           <div class="form-group">
             <label>Indirizzo Email *</label>
             <input type="email" id="regEmail" class="form-control" placeholder="tua.email@esempio.it" required>
           </div>
           <div class="form-group">
             <label>Password di Accesso *</label>
-            <input type="password" id="regPassword" class="form-control" placeholder="Minimo 6 caratteri" required>
+            <input type="password" id="regPassword" class="form-control" minlength="8" autocomplete="new-password" placeholder="Minimo 8 caratteri" required>
           </div>
           <!-- Campi Personalizzati Dinamici configurati da Segreteria -->
           <div id="regCampiPersonalizzatiContainer"></div>
+          <div id="registrationConsents" class="registration-consents"></div>
           <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Crea Account & Accedi →</button>
         </form>
       </div>
@@ -401,6 +407,8 @@ Domenica: dopo le Sante Messe</p>
       </nav>
 
       <div class="sidebar-footer">
+        <div class="release-version" style="font-size:12px;margin-bottom:10px">{{ app_version }}</div>
+        <a id="downloadBackupButton" href="/api/backup/export" class="btn btn-sm btn-secondary" style="display:none;margin-bottom:10px">Scarica backup completo</a>
         <div style="margin-bottom: 8px;">
           <a href="#" onclick="goToPublicHome()" style="color: var(--primary); text-decoration: none; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; font-size: 13px;">
             🌐 Vai alla Homepage Pubblica
@@ -579,6 +587,7 @@ Domenica: dopo le Sante Messe</p>
             <span style="font-size: 12px; color: var(--ink-500);">Chiave universale: Codice Fiscale</span>
           </div>
 
+          <div id="familyInvitationPanel" class="family-section"></div>
           <div class="family-grid" id="familyMembersGrid"></div>
 
           <!-- Le mie Iscrizioni attive -->
@@ -1237,7 +1246,7 @@ Domenica: dopo le Sante Messe</p>
           <!-- Tab 4: Configurazioni Categorie, Allergie & Clausole -->
           <div id="tabContentSegConfigurazioni" style="display: none;">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
-              
+
               <!-- Card Categorie Attività -->
               <div class="card">
                 <div class="card-header">
@@ -1299,7 +1308,7 @@ Domenica: dopo le Sante Messe</p>
                   <p style="font-size: 13px; color: var(--ink-700); margin-bottom: 12px;">
                     Queste voci appariranno come pulsanti cliccabili rapidi nei moduli di iscrizione e anagrafica:
                   </p>
-                  
+
                   <div id="segAllergiePillsGrid" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; min-height: 50px;"></div>
 
                   <form onsubmit="handleSalvaNuovaAllergia(event)" style="background: var(--bg-subtle); padding: 14px; border-radius: var(--radius-md);">
@@ -1717,6 +1726,8 @@ Domenica: dopo le Sante Messe</p>
 
   <!-- ================= MODALS ================= -->
 
+  <div class="modal-overlay" id="modalAccountMembro"><div class="modal-window"><div class="modal-header"><h3>Gestisci accesso del membro</h3><button type="button" class="btn-close-modal" onclick="closeModal('modalAccountMembro')">×</button></div><form onsubmit="saveMemberAccount(event)"><div class="modal-body"><input type="hidden" id="accountMembroCF"><div class="form-group"><label for="accountMembroEmail">Email di accesso *</label><input type="email" id="accountMembroEmail" class="form-control" required></div><div class="form-group"><label for="accountMembroPassword">Nuova password (lascia vuota per conservare quella attuale)</label><input type="password" id="accountMembroPassword" class="form-control" minlength="8" autocomplete="new-password"></div><div id="managedAccountConsents" class="registration-consents"></div></div><div class="modal-footer"><button type="submit" class="btn btn-primary">Salva accesso</button></div></form></div></div>
+
   <!-- Modal Aggiungi Figlio / Membro al Nucleo -->
   <div class="modal-overlay" id="modalAggiungiFiglio">
     <div class="modal-window">
@@ -1728,7 +1739,7 @@ Domenica: dopo le Sante Messe</p>
         <div class="modal-body">
           <div class="form-row">
             <div class="form-group">
-              <label>Nome Figlio/a *</label>
+              <label>Nome del componente *</label>
               <input type="text" id="membroNome" class="form-control" placeholder="Nome" required>
             </div>
             <div class="form-group">
@@ -1768,6 +1779,11 @@ Domenica: dopo le Sante Messe</p>
             </div>
           </div>
 
+          <div class="form-row">
+            <div class="form-group"><label for="membroComune">Comune di residenza</label><input id="membroComune" class="form-control"></div>
+            <div class="form-group"><label for="membroCAP">CAP</label><input id="membroCAP" class="form-control" maxlength="10"></div>
+          </div>
+          <fieldset class="family-section"><legend>Accesso personale (facoltativo)</legend><p>Email e password permettono al membro di accedere al proprio profilo. L’account è gestito dal capofamiglia.</p><div class="form-row"><div class="form-group"><label for="membroEmail">Email di accesso</label><input type="email" id="membroEmail" class="form-control" autocomplete="off"></div><div class="form-group"><label for="membroPassword">Password iniziale</label><input type="password" id="membroPassword" class="form-control" minlength="8" autocomplete="new-password"></div></div><div id="memberAccountConsents" class="registration-consents"></div></fieldset>
           <div class="form-group">
             <label>Ruolo nel Nucleo Familiare *</label>
             <select id="membroRuolo" class="form-control">
@@ -1778,27 +1794,16 @@ Domenica: dopo le Sante Messe</p>
               <option value="Sorella">Sorella</option>
               <option value="Nonno">Nonno</option>
               <option value="Nonna">Nonna</option>
-              <option value="Capofamiglia">Capofamiglia</option>
+
               <option value="Coniuge">Coniuge</option>
               <option value="Tutore Legale">Tutore Legale</option>
               <option value="Altro">Altro convivente</option>
             </select>
           </div>
 
-          <div class="form-group">
-            <label>Allergie & Intolleranze Frequenti (clicca per selezionare):</label>
-            <div id="membroAllergiePills" class="allergy-chips-container"></div>
-          </div>
-
-          <div class="form-group">
-            <label>Intolleranze Alimentari (Celiachia, Lattosio, etc.)</label>
-            <input type="text" id="membroIntolleranze" class="form-control" placeholder="es. Celiachia, Lattosio...">
-          </div>
-
-          <div class="form-group">
-            <label>Altre Allergie, Patologie & Note Mediche (Campo Libero)</label>
-            <input type="text" id="membroAllergie" class="form-control" placeholder="es. Epistassi, acari, graminacee, punture d'ape, farmaci...">
-          </div>
+          <fieldset class="family-section"><legend>Allergie</legend><div id="membroAllergiePills" class="allergy-chips-container"></div><label for="membroAllergie">Allergie note e altre informazioni</label><textarea id="membroAllergie" class="form-control" rows="2" placeholder="Indica le allergie; puoi aggiungere voci non presenti tra i suggerimenti."></textarea></fieldset>
+          <fieldset class="family-section"><legend>Intolleranze alimentari</legend><div id="membroIntolleranzePills" class="allergy-chips-container"></div><label for="membroIntolleranze">Intolleranze e altre esigenze alimentari</label><input id="membroIntolleranze" class="form-control" placeholder="Specificare eventuali altre intolleranze"></fieldset>
+          <fieldset class="family-section"><legend>Terapie e medicinali</legend><div id="membroTerapiePills" class="allergy-chips-container"></div><label for="membroTerapie">Terapie / medicinali prescritti e altre indicazioni</label><textarea id="membroTerapie" class="form-control" rows="3" placeholder="Nome del medicinale, indicazioni prescritte e contatto del referente, se necessario."></textarea><small>I suggerimenti classificano le informazioni: non sono prescrizioni né autorizzano la somministrazione.</small></fieldset>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal('modalAggiungiFiglio')">Annulla</button>
@@ -1818,13 +1823,14 @@ Domenica: dopo le Sante Messe</p>
       <form onsubmit="handleSalvaIscrizione(event)">
         <div class="modal-body">
           <div class="form-group">
-            <label>Seleziona Attività Parrocchiale *</label>
+            <label id="iscrizioneAttivitaLabel">Attività parrocchiale *</label><strong id="iscrizioneAttivitaTitolo" hidden></strong>
             <select id="iscrizioneAttivitaSelect" class="form-control" onchange="onIscrizioneFormChange()" required></select>
           </div>
 
           <div class="form-group">
-            <label>Partecipante da Iscrivere *</label>
-            <select id="iscrizionePartecipanteSelect" class="form-control" onchange="onIscrizioneFormChange()" required></select>
+            <label>Componenti da iscrivere *</label>
+            <div id="iscrizionePartecipantiCheckbox" class="family-participants"></div>
+            <select id="iscrizionePartecipanteSelect" hidden aria-hidden="true"></select>
           </div>
 
           <!-- Banner di Verifica Età -->
@@ -2546,20 +2552,9 @@ Domenica: dopo le Sante Messe</p>
             <input type="text" id="personaComune" class="form-control" value="Asti">
           </div>
 
-          <div class="form-group">
-            <label>Allergie & Intolleranze Frequenti (clicca per selezionare):</label>
-            <div id="personaAllergiePills" class="allergy-chips-container"></div>
-          </div>
-
-          <div class="form-group">
-            <label>Intolleranze Alimentari</label>
-            <input type="text" id="personaIntolleranze" class="form-control">
-          </div>
-
-          <div class="form-group">
-            <label>Allergie & Note Mediche (Campo Libero)</label>
-            <input type="text" id="personaAllergie" class="form-control">
-          </div>
+          <fieldset class="family-section"><legend>Allergie</legend><div id="personaAllergiePills" class="allergy-chips-container"></div><label for="personaAllergie">Allergie note e altre informazioni</label><textarea id="personaAllergie" class="form-control" rows="2" placeholder="Indica le allergie; puoi aggiungere voci non presenti tra i suggerimenti."></textarea></fieldset>
+          <fieldset class="family-section"><legend>Intolleranze alimentari</legend><div id="personaIntolleranzePills" class="allergy-chips-container"></div><label for="personaIntolleranze">Intolleranze e altre esigenze alimentari</label><input id="personaIntolleranze" class="form-control" placeholder="Specificare eventuali altre intolleranze"></fieldset>
+          <fieldset class="family-section"><legend>Terapie e medicinali</legend><div id="personaTerapiePills" class="allergy-chips-container"></div><label for="personaTerapie">Terapie / medicinali prescritti e altre indicazioni</label><textarea id="personaTerapie" class="form-control" rows="3" placeholder="Nome del medicinale, indicazioni prescritte e contatto del referente, se necessario."></textarea><small>I suggerimenti classificano le informazioni: non sono prescrizioni né autorizzano la somministrazione.</small></fieldset>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal('modalNuovaPersona')">Annulla</button>
@@ -2624,7 +2619,7 @@ Domenica: dopo le Sante Messe</p>
               <label>Ruolo nel Nucleo Familiare</label>
               <select id="modPersonaRuoloFamiglia" class="form-control">
                 <option value="Figlio/a">Figlio/a</option>
-                <option value="Capofamiglia">Capofamiglia</option>
+
                 <option value="Coniuge">Coniuge</option>
                 <option value="Padre">Padre</option>
                 <option value="Madre">Madre</option>
@@ -2632,7 +2627,7 @@ Domenica: dopo le Sante Messe</p>
                 <option value="Nonno/a">Nonno/a</option>
                 <option value="Parente">Parente</option>
                 <option value="Altro">Altro</option>
-              </select>
+              </select><label class="choice-row"><input type="checkbox" id="modPersonaCapofamiglia">Responsabile capofamiglia (indipendente dal ruolo)</label>
             </div>
             <div class="form-group">
               <label>Comune Residenza</label>
@@ -2656,22 +2651,9 @@ Domenica: dopo le Sante Messe</p>
             <input type="email" id="modPersonaEmail" class="form-control">
           </div>
 
-          <div class="form-group">
-            <label>Allergie & Intolleranze Frequenti (clicca per selezionare):</label>
-            <div id="modPersonaAllergiePills" class="allergy-chips-container"></div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label>Intolleranze Alimentari</label>
-              <input type="text" id="modPersonaIntolleranze" class="form-control">
-            </div>
-            <div class="form-group">
-              <label>Allergie, Patologie & Note Mediche (Campo Libero)</label>
-              <input type="text" id="modPersonaAllergie" class="form-control">
-            </div>
-          </div>
-
+          <fieldset class="family-section"><legend>Allergie</legend><div id="modPersonaAllergiePills" class="allergy-chips-container"></div><label for="modPersonaAllergie">Allergie note e altre informazioni</label><textarea id="modPersonaAllergie" class="form-control" rows="2" placeholder="Indica le allergie; puoi aggiungere voci non presenti tra i suggerimenti."></textarea></fieldset>
+          <fieldset class="family-section"><legend>Intolleranze alimentari</legend><div id="modPersonaIntolleranzePills" class="allergy-chips-container"></div><label for="modPersonaIntolleranze">Intolleranze e altre esigenze alimentari</label><input id="modPersonaIntolleranze" class="form-control" placeholder="Specificare eventuali altre intolleranze"></fieldset>
+          <fieldset class="family-section"><legend>Terapie e medicinali</legend><div id="modPersonaTerapiePills" class="allergy-chips-container"></div><label for="modPersonaTerapie">Terapie / medicinali prescritti e altre indicazioni</label><textarea id="modPersonaTerapie" class="form-control" rows="3" placeholder="Nome del medicinale, indicazioni prescritte e contatto del referente, se necessario."></textarea><small>I suggerimenti classificano le informazioni: non sono prescrizioni né autorizzano la somministrazione.</small></fieldset>
           <div class="form-group">
             <label>Note Generali o Particolari</label>
             <textarea id="modPersonaNoteGenerali" class="form-control" rows="2" placeholder="Note o annotazioni particolari..."></textarea>

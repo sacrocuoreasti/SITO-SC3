@@ -10,3 +10,6 @@ service_account.json
 tests
 
 database/.session-key
+
+backups
+database/backups

@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_login import current_user, login_required
 from models import db, Persona, NucleoFamiliare, Utente
+from services.family_service import can_manage_family, staff_user, FAMILY_ROLES
 from services.cf_validator import normalizza_cf, valida_cf, estrai_dati_cf
 from datetime import datetime
 
@@ -142,6 +143,7 @@ def create_persona():
         email=data.get('email', '').strip().lower(),
         intolleranze_alimentari=data.get('intolleranze_alimentari', '').strip(),
         allergie=data.get('allergie', '').strip(),
+        terapie_medicinali=data.get('terapie_medicinali', '').strip(),
         note_generali=data.get('note_generali', '').strip(),
         nucleo_id=data.get('nucleo_id') or (current_user.persona.nucleo_id if (current_user.is_authenticated and current_user.persona) else None),
         ruolo_famiglia=data.get('ruolo_famiglia', 'Figlio/a')
@@ -163,19 +165,29 @@ def update_persona(cf):
     if not p:
         return jsonify({'error': 'Persona non trovata'}), 404
 
-    # Controllo permessi modifica scheda anagrafica
-    if current_user.is_authenticated:
-        roles = current_user.get_all_roles()
-        is_staff = any(r in ['admin', 'segreteria', 'parroco', 'catechista'] for r in roles)
-        if not is_staff:
-            user_cf = (current_user.codice_fiscale or '').upper()
-            family_cfs = []
-            if current_user.persona and current_user.persona.nucleo:
-                family_cfs = [(c.codice_fiscale or '').upper() for c in current_user.persona.nucleo.componenti]
-            if cf != user_cf and cf not in family_cfs:
-                return jsonify({'error': 'Non autorizzato a modificare persone esterne al tuo nucleo'}), 403
+    if not staff_user() and cf != current_user.codice_fiscale and not (p.nucleo and can_manage_family(p.nucleo)):
+        return jsonify(error='La gestione degli altri membri è riservata al capofamiglia'), 403
 
     data = request.get_json() or {}
+    if 'nucleo_id' in data and data['nucleo_id'] != p.nucleo_id:
+        return jsonify(error='Usa la procedura di invito per cambiare nucleo familiare'), 400
+    role = data.get('ruolo_famiglia', p.ruolo_famiglia)
+    if 'ruolo_famiglia' in data and role not in FAMILY_ROLES and role != p.ruolo_famiglia:
+        return jsonify(error='Scegli un ruolo familiare; capofamiglia è una responsabilità separata'), 400
+    if data.get('is_capofamiglia') is True:
+        if not p.nucleo or not can_manage_family(p.nucleo):
+            return jsonify(error='Solo il capofamiglia o la segreteria possono assegnare il responsabile'), 403
+        p.nucleo.codice_fiscale_capofamiglia = p.codice_fiscale
+    elif data.get('is_capofamiglia') is False and p.nucleo and p.nucleo.codice_fiscale_capofamiglia == p.codice_fiscale:
+        return jsonify(error='Per cambiare responsabile assegna prima un altro capofamiglia'), 400
+    if 'email' in data and p.utente:
+        email = data['email'].strip().lower()
+        if not staff_user() and not (p.nucleo and can_manage_family(p.nucleo)) and email != p.utente.email:
+            return jsonify(error='Per cambiare l’email di accesso rivolgiti al capofamiglia'), 403
+        if '@' not in email or Utente.query.filter(Utente.email == email, Utente.id != p.utente.id).first():
+            return jsonify(error='Email non valida o già usata'), 400
+        p.utente.email = email
+
 
     if 'nome' in data: p.nome = data['nome'].strip()
     if 'cognome' in data: p.cognome = data['cognome'].strip()
@@ -193,6 +205,7 @@ def update_persona(cf):
     if 'email' in data: p.email = data['email'].strip().lower()
     if 'intolleranze_alimentari' in data: p.intolleranze_alimentari = data['intolleranze_alimentari'].strip()
     if 'allergie' in data: p.allergie = data['allergie'].strip()
+    if 'terapie_medicinali' in data: p.terapie_medicinali = data['terapie_medicinali'].strip()
     if 'note_generali' in data: p.note_generali = data['note_generali'].strip()
     if 'ruolo_famiglia' in data: p.ruolo_famiglia = data['ruolo_famiglia'].strip()
     if 'nucleo_id' in data: p.nucleo_id = data['nucleo_id']

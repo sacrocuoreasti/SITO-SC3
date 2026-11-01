@@ -164,7 +164,7 @@ class StabilityTests(unittest.TestCase):
             response = self.client.post('/api/auth/register', json={
                 'email': 'first@example.test', 'password': 'test-password-123',
                 'nome': 'Persona', 'cognome': 'Test', 'codice_fiscale': 'RSSMRA80A01H501U',
-                'ruolo': 'admin', 'privilegi': ['admin'],
+                'ruolo': 'admin', 'privilegi': ['admin'], 'consensi_registrazione': {'privacy': True, 'foto_video': True},
             })
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json['user']['ruolo'], 'utente')

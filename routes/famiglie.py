@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_login import current_user, login_required
-from models import db, NucleoFamiliare, Persona, Utente
+from models import db, NucleoFamiliare, Persona, Utente, RichiestaNucleo
+from services.family_service import can_manage_family, family_member, staff_user, FAMILY_ROLES, consent_record
 from services.cf_validator import normalizza_cf, valida_cf, estrai_dati_cf
 from datetime import datetime
 
@@ -24,6 +25,10 @@ def get_mia_famiglia():
     elif cf_utente:
         nucleo = NucleoFamiliare.query.filter_by(codice_fiscale_capofamiglia=cf_utente).first()
 
+    pending = RichiestaNucleo.query.filter_by(utente_id=current_user.id).filter(RichiestaNucleo.stato.in_(['in_attesa', 'rifiutata'])).order_by(RichiestaNucleo.id.desc()).first()
+    if not nucleo and pending:
+        return jsonify(nucleo=None, richiesta_in_attesa=pending.stato == 'in_attesa', richiesta_rifiutata=pending.stato == 'rifiutata', membri=[])
+
     if not nucleo and persona:
         # Crea automaticamente il nucleo familiare per l'utente loggato se non esiste
         nome_famiglia = f"Famiglia {persona.cognome}"
@@ -37,7 +42,7 @@ def get_mia_famiglia():
         db.session.add(nucleo)
         db.session.flush()
         persona.nucleo_id = nucleo.id
-        persona.ruolo_famiglia = 'Capofamiglia'
+        # La responsabilità di capofamiglia è indipendente dal ruolo.
         db.session.commit()
 
     if not nucleo:
@@ -45,6 +50,8 @@ def get_mia_famiglia():
 
     return jsonify({
         'nucleo': nucleo.to_dict(include_members=True),
+        'puo_gestire': bool(can_manage_family(nucleo)),
+        'richieste_ingresso': [{'id': r.id, 'nome': r.utente.persona.nominativo, 'email': r.utente.email} for r in RichiestaNucleo.query.filter_by(nucleo_id=nucleo.id, stato='in_attesa').all()] if can_manage_family(nucleo) else [],
         'figli': [c.to_dict(include_family=False) for c in nucleo.componenti if c.ruolo_famiglia == 'Figlio/a' or c.codice_fiscale != nucleo.codice_fiscale_capofamiglia]
     })
 
@@ -52,6 +59,8 @@ def get_mia_famiglia():
 def get_famiglie():
     q = request.args.get('q', '').strip()
     query = NucleoFamiliare.query
+    if not staff_user():
+        query = query.filter_by(id=current_user.persona.nucleo_id if current_user.persona else None)
 
     if q:
         search = f"%{q}%"
@@ -72,10 +81,14 @@ def get_famiglia(id):
     f = db.session.get(NucleoFamiliare, id)
     if not f:
         return jsonify({'error': 'Nucleo familiare non trovato'}), 404
+    if not staff_user() and not family_member(f):
+        return jsonify(error='Accesso al nucleo non autorizzato'), 403
     return jsonify({'famiglia': f.to_dict(include_members=True)})
 
 @famiglie_bp.route('', methods=['POST'])
 def create_famiglia():
+    if not staff_user():
+        return jsonify(error='Operazione riservata alla segreteria'), 403
     data = request.get_json() or {}
     nome = data.get('nome_famiglia', '').strip()
     cf_capo = normalizza_cf(data.get('codice_fiscale_capofamiglia', ''))
@@ -101,7 +114,7 @@ def create_famiglia():
         capo = db.session.get(Persona, cf_capo)
         if capo:
             capo.nucleo_id = nucleo.id
-            capo.ruolo_famiglia = 'Capofamiglia'
+            # Mantieni invariato il ruolo familiare esistente.
 
     db.session.commit()
     return jsonify({
@@ -112,93 +125,137 @@ def create_famiglia():
 
 @famiglie_bp.route('/<int:id>/membri', methods=['POST'])
 def add_membro(id):
-    """
-    Aggiunge un figlio o membro alla famiglia.
-    Il genitore compila i dati: Codice Fiscale (chiave primaria), Nome, Cognome, Data Nascita, Allergie.
-    Se la persona esiste già in anagrafica, viene associata alla famiglia; altrimenti viene creata.
-    """
     nucleo = db.session.get(NucleoFamiliare, id)
     if not nucleo:
-        return jsonify({'error': 'Nucleo familiare non trovato'}), 404
-
+        return jsonify(error='Nucleo familiare non trovato'), 404
+    if not can_manage_family(nucleo):
+        return jsonify(error='Solo il capofamiglia o la segreteria possono aggiungere membri'), 403
     data = request.get_json() or {}
     cf = normalizza_cf(data.get('codice_fiscale', ''))
     nome = data.get('nome', '').strip()
     cognome = data.get('cognome', '').strip() or (nucleo.capofamiglia.cognome if nucleo.capofamiglia else '')
-
-    if not cf or not nome:
-        return jsonify({'error': 'Codice Fiscale e Nome sono campi obbligatori'}), 400
-
-    if not valida_cf(cf):
-        return jsonify({'error': 'Codice Fiscale non valido secondo il calcolo formale'}), 400
-
-    # Ricerca persona esistente o crea nuova
-    persona = db.session.get(Persona, cf)
+    role = data.get('ruolo_famiglia', 'Figlio/a')
+    email = data.get('email', '').strip().lower()
+    password = data.get('password', '')
+    if not cf or not nome or not cognome or not valida_cf(cf) or role not in FAMILY_ROLES:
+        return jsonify(error='Verifica codice fiscale, nome, cognome e ruolo familiare'), 400
+    existing = db.session.get(Persona, cf)
+    if existing:
+        return jsonify(error='Persona già censita: usa la modifica della scheda o un invito, senza sovrascrivere dati esistenti'), 409
+    consents = None
+    if email or password:
+        if '@' not in email or len(password) < 8:
+            return jsonify(error='Per attivare l’account servono email e password di almeno 8 caratteri'), 400
+        if Utente.query.filter_by(email=email).first():
+            return jsonify(error='Email già utilizzata da un account'), 409
+        try:
+            consents = consent_record(data, current_user.id)
+        except ValueError as error:
+            return jsonify(error=str(error)), 400
     dati_cf = estrai_dati_cf(cf)
-
-    data_nascita = None
+    born = dati_cf.get('data_nascita')
     if data.get('data_nascita'):
         try:
-            data_nascita = datetime.strptime(data['data_nascita'], '%Y-%m-%d').date()
-        except Exception:
-            pass
-    if not data_nascita and 'data_nascita' in dati_cf:
-        data_nascita = dati_cf['data_nascita']
-
-    sesso = data.get('sesso') or dati_cf.get('sesso', 'M')
-    ruolo_famiglia = data.get('ruolo_famiglia', 'Figlio/a')
-
-    if persona:
-        # Aggiorna associazione
-        persona.nucleo_id = nucleo.id
-        persona.ruolo_famiglia = ruolo_famiglia
-        if not persona.cognome and cognome: persona.cognome = cognome
-        if not persona.nome and nome: persona.nome = nome
-        if 'luogo_nascita' in data and data['luogo_nascita']: persona.luogo_nascita = data['luogo_nascita'].strip()
-        if 'indirizzo_residenza' in data and data['indirizzo_residenza']: persona.indirizzo_residenza = data['indirizzo_residenza'].strip()
-        if 'sesso' in data and data['sesso']: persona.sesso = data['sesso']
-        if data_nascita: persona.data_nascita = data_nascita
-        if 'intolleranze_alimentari' in data: persona.intolleranze_alimentari = data['intolleranze_alimentari'].strip()
-        if 'allergie' in data: persona.allergie = data['allergie'].strip()
-        if 'telefono' in data and data['telefono']: persona.telefono = data['telefono'].strip()
-    else:
-        persona = Persona(
-            codice_fiscale=cf,
-            nome=nome,
-            cognome=cognome,
-            sesso=sesso,
-            data_nascita=data_nascita,
-            luogo_nascita=data.get('luogo_nascita', '').strip(),
-            indirizzo_residenza=data.get('indirizzo_residenza', nucleo.indirizzo or '').strip(),
-            comune_residenza=data.get('comune_residenza', nucleo.citta or 'Asti').strip(),
-            cap_residenza=data.get('cap_residenza', '14100').strip(),
-            telefono=data.get('telefono', nucleo.telefono_principale or '').strip(),
-            email=data.get('email', '').strip().lower(),
-            intolleranze_alimentari=data.get('intolleranze_alimentari', '').strip(),
-            allergie=data.get('allergie', '').strip(),
-            nucleo_id=nucleo.id,
-            ruolo_famiglia=ruolo_famiglia
-        )
-        db.session.add(persona)
-
+            born = datetime.strptime(data['data_nascita'], '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify(error='Data di nascita non valida'), 400
+    capo = nucleo.capofamiglia
+    persona = Persona(codice_fiscale=cf, nome=nome, cognome=cognome, sesso=data.get('sesso') or dati_cf.get('sesso', 'M'),
+                      data_nascita=born, luogo_nascita=data.get('luogo_nascita', '').strip(),
+                      indirizzo_residenza=data.get('indirizzo_residenza', '').strip() or (capo.indirizzo_residenza if capo else None) or nucleo.indirizzo,
+                      comune_residenza=data.get('comune_residenza', '').strip() or (capo.comune_residenza if capo else None) or nucleo.citta,
+                      cap_residenza=data.get('cap_residenza', '').strip() or (capo.cap_residenza if capo else None) or '14100',
+                      provincia_residenza=data.get('provincia_residenza', '').strip() or (capo.provincia_residenza if capo else None) or 'AT',
+                      telefono=data.get('telefono', '').strip(), email=email,
+                      intolleranze_alimentari=data.get('intolleranze_alimentari', '').strip(),
+                      allergie=data.get('allergie', '').strip(), terapie_medicinali=data.get('terapie_medicinali', '').strip(),
+                      nucleo_id=nucleo.id, ruolo_famiglia=role)
+    db.session.add(persona)
+    db.session.flush()
+    if email and password:
+        user = Utente(email=email, codice_fiscale=cf, ruolo='utente', privilegi_extra='["utente"]',
+                      gestito_da_id=current_user.id, consensi_registrazione=consents, is_attivo=True)
+        user.set_password(password)
+        db.session.add(user)
     db.session.commit()
-    return jsonify({
-        'success': True,
-        'message': f'{persona.nome} aggiunto/a con successo al nucleo familiare!',
-        'persona': persona.to_dict()
-    }), 201
+    return jsonify(success=True, message='Membro aggiunto al nucleo' + (' e account personale attivato' if email else ''), persona=persona.to_dict()), 201
+
+
+@famiglie_bp.route('/<int:id>/membri/<cf>/account', methods=['PUT'])
+def manage_member_account(id, cf):
+    family = db.session.get(NucleoFamiliare, id)
+    if not family or not can_manage_family(family):
+        return jsonify(error='Gestione account riservata al capofamiglia o alla segreteria'), 403
+    person = db.session.get(Persona, normalizza_cf(cf))
+    if not person or person.nucleo_id != id:
+        return jsonify(error='Membro non trovato'), 404
+    data = request.get_json() or {}
+    email = data.get('email', '').strip().lower()
+    password = data.get('password', '')
+    if '@' not in email or (password and len(password) < 8):
+        return jsonify(error='Verifica email e password (almeno 8 caratteri)'), 400
+    user = person.utente
+    if user and set(user.get_all_roles()) & {'admin', 'segreteria', 'parroco'} and not staff_user():
+        return jsonify(error='L’account del personale può essere gestito solo dalla segreteria'), 403
+    if Utente.query.filter(Utente.email == email, Utente.id != (user.id if user else -1)).first():
+        return jsonify(error='Email già utilizzata'), 409
+    if not user:
+        if not password:
+            return jsonify(error='La password è obbligatoria per un nuovo account'), 400
+        try:
+            consent = consent_record(data, current_user.id)
+        except ValueError as error:
+            return jsonify(error=str(error)), 400
+        user = Utente(email=email, codice_fiscale=person.codice_fiscale, ruolo='utente', privilegi_extra='["utente"]',
+                      consensi_registrazione=consent, gestito_da_id=current_user.id, is_attivo=True)
+        db.session.add(user)
+    user.email = person.email = email
+    if password:
+        user.set_password(password)
+    db.session.commit()
+    return jsonify(success=True, message='Account del membro aggiornato')
+
+
+@famiglie_bp.route('/<int:id>/richieste/<int:request_id>', methods=['PUT'])
+def review_family_request(id, request_id):
+    family = db.session.get(NucleoFamiliare, id)
+    if not family or not can_manage_family(family):
+        return jsonify(error='Solo il capofamiglia può gestire gli inviti'), 403
+    entry = db.session.get(RichiestaNucleo, request_id)
+    if not entry or entry.nucleo_id != id or entry.stato != 'in_attesa':
+        return jsonify(error='Richiesta non trovata o già gestita'), 404
+    decision = (request.get_json() or {}).get('azione')
+    if decision not in {'approva', 'rifiuta'}:
+        return jsonify(error='Scegli approva o rifiuta'), 400
+    if decision == 'approva':
+        person = entry.utente.persona
+        if not person or person.nucleo_id not in (None, id):
+            return jsonify(error='La persona appartiene già a un altro nucleo'), 409
+        person.nucleo_id = id
+        entry.utente.gestito_da_id = current_user.id
+        entry.stato = 'approvata'
+    else:
+        entry.stato = 'rifiutata'
+    db.session.commit()
+    return jsonify(success=True, message='Richiesta ' + entry.stato)
+
 
 @famiglie_bp.route('/<int:id>/membri/<cf>', methods=['DELETE'])
 def remove_membro(id, cf):
-    cf = normalizza_cf(cf)
-    persona = db.session.get(Persona, cf)
+    family = db.session.get(NucleoFamiliare, id)
+    if not family or not can_manage_family(family):
+        return jsonify(error='Operazione riservata al capofamiglia'), 403
+    persona = db.session.get(Persona, normalizza_cf(cf))
     if not persona or persona.nucleo_id != id:
-        return jsonify({'error': 'Membro non trovato nel nucleo familiare'}), 404
-
+        return jsonify(error='Membro non trovato nel nucleo familiare'), 404
+    if family.codice_fiscale_capofamiglia == persona.codice_fiscale:
+        return jsonify(error='Assegna prima un altro capofamiglia'), 400
     persona.nucleo_id = None
     persona.ruolo_famiglia = None
+    if persona.utente:
+        persona.utente.gestito_da_id = None
     db.session.commit()
-    return jsonify({'success': True, 'message': 'Membro rimosso dal nucleo familiare'})
+    return jsonify(success=True, message='Membro scollegato dal nucleo; account e dati conservati')
 
 @famiglie_bp.route('/offerte', methods=['GET'])
 def get_offerte_famiglia():

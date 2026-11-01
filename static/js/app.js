@@ -294,6 +294,8 @@ function renderAppShell() {
   document.getElementById('appShell').style.display = 'flex';
 
   if (currentUser) {
+    const backupButton = document.getElementById('downloadBackupButton');
+    if (backupButton) backupButton.style.display = currentUser.tutti_i_ruoli.includes('admin') ? 'block' : 'none';
     const nome = currentUser.nominativo || currentUser.email.split('@')[0];
     document.getElementById('topUserName').textContent = nome;
     document.getElementById('topUserRole').textContent = currentUser.ruolo.toUpperCase();
@@ -505,7 +507,9 @@ async function handleRegisterSubmit(e) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         nome, cognome, codice_fiscale: cf, telefono, nome_famiglia: nomeFamiglia, email, password,
-        campi_extra: extraFields
+        campi_extra: extraFields, ruolo_famiglia: document.getElementById('regRuoloFamiglia').value,
+        codice_invito: document.getElementById('regCodiceInvito').value.trim(),
+        consensi_registrazione: readRegistrationConsents('registrationConsents')
       })
     });
     const data = await res.json();
@@ -523,6 +527,10 @@ async function handleRegisterSubmit(e) {
 async function handleLogout() {
   await fetch('/api/auth/logout', { method: 'POST' });
   currentUser = null;
+  currentFamilyData = null;
+  cacheMembriFamiglia = [];
+  enrollmentPeople = [];
+  enrollmentExisting = [];
   showToast('Disconnesso con successo', 'info');
   goToPublicHome();
 }
@@ -544,6 +552,7 @@ function showAuthTab(tab) {
     btnLogin.className = 'btn btn-sm btn-secondary';
     btnReg.className = 'btn btn-sm btn-primary';
     renderCustomRegistrationFields();
+    renderRegistrationConsents('registrationConsents').catch(error => showToast(error.message, 'error'));
   }
 }
 
@@ -881,6 +890,11 @@ async function loadFamiglia() {
   try {
     const res = await fetch('/api/famiglie/mia');
     const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Impossibile caricare la famiglia');
+    currentFamilyData = data;
+    const addButton = document.querySelector('#viewFamiglia .header-actions button');
+    if (addButton) addButton.style.display = data.puo_gestire ? 'inline-flex' : 'none';
+    document.getElementById('familyInvitationPanel').innerHTML = '';
 
     const summaryEl = document.getElementById('famigliaInfoSummary');
     const membersGrid = document.getElementById('familyMembersGrid');
@@ -888,7 +902,7 @@ async function loadFamiglia() {
     if (!data.nucleo) {
       summaryEl.innerHTML = `
         <div style="padding: 16px; color: var(--ink-500);">
-          Nessun nucleo familiare registrato. Clicca "+ Aggiungi Figlio / Membro" per iniziare a comporre la tua famiglia.
+          ${data.richiesta_in_attesa ? 'La tua richiesta di ingresso è in attesa di approvazione del capofamiglia.' : 'Nessun nucleo familiare registrato.'}
         </div>
       `;
       membersGrid.innerHTML = '';
@@ -908,6 +922,9 @@ async function loadFamiglia() {
     `;
 
     cacheMembriFamiglia = n.componenti || [];
+    const invitationPanel = document.getElementById('familyInvitationPanel');
+    invitationPanel.innerHTML = `<h3>Invita nella tua famiglia</h3><p>Codice famiglia: <strong class="family-invite-code">${escapeHtml(n.codice_invito || '')}</strong></p><p>Condividi questo codice con chi vuoi invitare. L’ingresso richiede l’approvazione del capofamiglia.</p>`;
+    if (data.puo_gestire) invitationPanel.innerHTML += (data.richieste_ingresso || []).map(r=>`<div class="choice-row"><span>${escapeHtml(r.nome)} · ${escapeHtml(r.email)}</span><button type="button" class="btn btn-sm btn-primary" onclick="reviewFamilyInvitation(${r.id},'approva')">Approva</button><button type="button" class="btn btn-sm btn-secondary" onclick="reviewFamilyInvitation(${r.id},'rifiuta')">Rifiuta</button></div>`).join('');
 
     if (!cacheMembriFamiglia.length) {
       membersGrid.innerHTML = `<div style="grid-column: 1/-1; padding: 24px; text-align: center; color: var(--ink-500);">Nessun componente aggiunto. Clicca "+ Aggiungi Figlio / Membro".</div>`;
@@ -927,7 +944,7 @@ async function loadFamiglia() {
                   <span class="member-cf">${escapeHtml(m.codice_fiscale)}</span>
                 </div>
               </div>
-              <span class="badge ${isCapo ? 'badge-info' : 'badge-neutral'}">${escapeHtml(m.ruolo_famiglia || 'Figlio/a')}</span>
+              <span class="badge ${isCapo ? 'badge-info' : 'badge-neutral'}">${escapeHtml(m.ruolo_famiglia === 'Capofamiglia' ? 'Ruolo da specificare' : (m.ruolo_famiglia || 'Figlio/a'))}</span>${isCapo ? '<span class="badge badge-info">Capofamiglia</span>' : ''}
             </div>
 
             <div class="member-details">
@@ -936,11 +953,12 @@ async function loadFamiglia() {
               ${m.telefono ? `<div>📞 Telefono: <strong>${escapeHtml(m.telefono)}</strong></div>` : ''}
             </div>
 
-            ${(m.allergie || m.intolleranze_alimentari) ? `
+            ${(m.allergie || m.intolleranze_alimentari || m.terapie_medicinali) ? `
               <div class="member-health-alert">
                 <strong>⚠️ Scheda Sanitaria:</strong>
                 ${m.intolleranze_alimentari ? `<span>Intolleranze: ${escapeHtml(m.intolleranze_alimentari)}</span>` : ''}
                 ${m.allergie ? `<span>Allergie: ${escapeHtml(m.allergie)}</span>` : ''}
+                ${m.terapie_medicinali ? `<span>Terapie / medicinali: ${escapeHtml(m.terapie_medicinali)}</span>` : ''}
               </div>
             ` : `
               <div style="font-size: 11px; color: #15803d; background: #f0fdf4; padding: 6px 10px; border-radius: var(--radius-sm);">
@@ -960,6 +978,7 @@ async function loadFamiglia() {
               <button class="btn btn-sm btn-primary" style="flex: 1; display: flex; justify-content: center; align-items: center; gap: 6px;" onclick="openModalModificaPersona('${m.codice_fiscale}')">
                 ✏️ Modifica
               </button>
+              ${data.puo_gestire ? `<button type="button" class="btn btn-sm btn-secondary" onclick="openMemberAccount('${m.codice_fiscale}')">${m.has_account ? 'Gestisci accesso' : 'Attiva accesso'}</button>` : ''}
               <button class="btn btn-sm btn-secondary" style="display: flex; justify-content: center; align-items: center; gap: 4px;" onclick="openModalFotoProfilo('${m.codice_fiscale}', '${escapeHtml(m.nominativo)}', '${m.foto_profilo_url || ''}')" title="Carica o modifica foto profilo">
                 📸 Foto
               </button>
@@ -4643,7 +4662,7 @@ function renderFamiglieAnagraficaTree(items) {
 
   famiglieAttive.forEach(f => {
     const isCollapsed = !expandedFamiglieIds.has(String(f.id));
-    const capofamiglia = f.membri.find(m => m.ruolo_famiglia === 'Capofamiglia' || (f.codice_fiscale_capofamiglia && m.codice_fiscale === f.codice_fiscale_capofamiglia));
+    const capofamiglia = f.membri.find(m => m.is_capofamiglia || (f.codice_fiscale_capofamiglia && m.codice_fiscale === f.codice_fiscale_capofamiglia));
     const capofamigliaNome = capofamiglia ? capofamiglia.nominativo : (f.codice_fiscale_capofamiglia || '');
 
     html += `
@@ -4815,13 +4834,14 @@ async function apriSchedaVisualizzazionePersona(cf) {
 
     const alertBox = document.getElementById('viewSchedaAllergieAlert');
     const alertDetails = document.getElementById('viewSchedaAllergieDetails');
-    if (p.allergie || p.intolleranze_alimentari || p.note_mediche) {
+    if (p.allergie || p.intolleranze_alimentari || p.terapie_medicinali || p.note_mediche) {
       alertBox.style.display = 'block';
       let msgs = [];
       if (p.allergie) msgs.push(`Allergie: <strong>${escapeHtml(p.allergie)}</strong>`);
       if (p.intolleranze_alimentari) msgs.push(`Intolleranze: <strong>${escapeHtml(p.intolleranze_alimentari)}</strong>`);
+      if (p.terapie_medicinali) msgs.push(`Terapie / medicinali: <strong>${escapeHtml(p.terapie_medicinali)}</strong>`);
       if (p.note_mediche) msgs.push(`Note mediche/farmaci: <strong>${escapeHtml(p.note_mediche)}</strong>`);
-      alertDetails.innerHTML = msgs.join(' · ');
+      alertDetails.innerHTML = msgs.map(value => `<p style="margin:4px 0">${value}</p>`).join('');
     } else {
       alertBox.style.display = 'none';
     }
@@ -4834,7 +4854,7 @@ async function apriSchedaVisualizzazionePersona(cf) {
     document.getElementById('viewSchedaComuneNascita').textContent = p.comune_nascita || '-';
 
     document.getElementById('viewSchedaFamigliaNome').textContent = p.nome_famiglia || 'Non assegnato';
-    document.getElementById('viewSchedaRuoloFamiglia').textContent = p.ruolo_famiglia || 'Non specificato';
+    document.getElementById('viewSchedaRuoloFamiglia').textContent = (p.ruolo_famiglia === 'Capofamiglia' ? 'Ruolo da specificare' : p.ruolo_famiglia || 'Non specificato') + (p.is_capofamiglia ? ' · Responsabile capofamiglia' : '');
     document.getElementById('viewSchedaCapofamigliaCF').textContent = p.cf_capofamiglia || '-';
     document.getElementById('viewSchedaHasAccount').textContent = p.has_account ? '✓ Account attivo associato' : 'Nessun account collegato';
 
@@ -5577,11 +5597,21 @@ async function openModalAggiungiFiglio() {
   document.getElementById('membroCF').value = '';
   document.getElementById('membroCFFeedback').textContent = '';
   if (document.getElementById('membroLuogoNascita')) document.getElementById('membroLuogoNascita').value = '';
-  if (document.getElementById('membroIndirizzo')) document.getElementById('membroIndirizzo').value = '';
+  const family = currentFamilyData || await apiJson('/api/famiglie/mia');
+  const capo = family.nucleo?.componenti.find(p => p.codice_fiscale === family.nucleo.codice_fiscale_capofamiglia) || currentUser.persona || {};
+  document.getElementById('membroIndirizzo').value = capo.indirizzo_residenza || family.nucleo?.indirizzo || '';
+  document.getElementById('membroComune').value = capo.comune_residenza || family.nucleo?.citta || 'Asti';
+  document.getElementById('membroCAP').value = capo.cap_residenza || '14100';
+  document.getElementById('membroEmail').value = '';
+  document.getElementById('membroPassword').value = '';
+  document.getElementById('membroTerapie').value = '';
+  document.getElementById('membroRuolo').value = 'Figlio/a';
+  document.getElementById('membroSesso').value = 'M';
+  document.getElementById('membroDataNascita').value = '';
+  await renderRegistrationConsents('memberAccountConsents', false);
   document.getElementById('membroIntolleranze').value = '';
   document.getElementById('membroAllergie').value = '';
-  await loadAllergieSuggerite();
-  renderAllergyPills('membroAllergiePills', 'membroIntolleranze', 'membroAllergie');
+  await renderHealthSections('membro');
   openModal('modalAggiungiFiglio');
 }
 
@@ -5611,7 +5641,11 @@ async function handleSalvaNuovoMembro(e) {
       body: JSON.stringify({
         nome, cognome, codice_fiscale: cf, sesso, data_nascita: dataNascita,
         luogo_nascita: luogoNascita, indirizzo_residenza: indirizzo,
-        ruolo_famiglia: ruolo, intolleranze_alimentari: intolleranze, allergie
+        ruolo_famiglia: ruolo, intolleranze_alimentari: intolleranze, allergie,
+        comune_residenza: document.getElementById('membroComune').value, cap_residenza: document.getElementById('membroCAP').value,
+        terapie_medicinali: document.getElementById('membroTerapie').value,
+        email: document.getElementById('membroEmail').value, password: document.getElementById('membroPassword').value,
+        consensi_registrazione: readRegistrationConsents('memberAccountConsents')
       })
     });
     const data = await res.json();
@@ -5625,245 +5659,181 @@ async function handleSalvaNuovoMembro(e) {
   }
 }
 
-// ---------------- NUOVA ISCRIZIONE CON CONTROLLO RIGIDO ETÀ E CLAUSOLE ----------------
+let familyOptions = null;
+let familyOptionsRequest = null;
+let currentFamilyData = null;
+let enrollmentPeople = [];
+let enrollmentExisting = [];
+
+async function getFamilyOptions() {
+  if (familyOptions) return familyOptions;
+  if (!familyOptionsRequest) familyOptionsRequest = apiJson('/api/auth/registration-options');
+  try { familyOptions = await familyOptionsRequest; return familyOptions; }
+  finally { familyOptionsRequest = null; }
+}
+
+async function renderRegistrationConsents(containerId, required = true) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const options = await getFamilyOptions();
+  container.innerHTML = Object.entries(options.consensi).map(([key, c]) => `<label class="choice-row"><input type="checkbox" data-consent="${key}" ${required ? 'required' : ''}><span><strong>${escapeHtml(c.titolo)} *</strong><small>${escapeHtml(c.testo)}</small></span></label>`).join('');
+}
+
+function readRegistrationConsents(containerId) {
+  const result = {};
+  document.querySelectorAll(`#${containerId} [data-consent]`).forEach(input => { result[input.dataset.consent] = input.checked; });
+  return result;
+}
+
+async function renderHealthSections(prefix) {
+  const options = await getFamilyOptions();
+  const sections = [['allergie', 'Allergie'], ['intolleranze_alimentari', 'Intolleranze'], ['terapie_medicinali', 'Terapie']];
+  for (const [key, suffix] of sections) {
+    const container = document.getElementById(prefix + suffix + 'Pills');
+    const input = document.getElementById(prefix + suffix);
+    if (!container || !input) continue;
+    const current = input.value.split(',').map(x => x.trim().toLowerCase());
+    container.innerHTML = options.salute[key].map(value => `<button type="button" class="allergy-chip ${current.includes(value.toLowerCase()) ? 'active' : ''}" data-nome="${escapeHtml(value)}" onclick="toggleAllergyChip(this, '${prefix + suffix}')">${escapeHtml(value)}</button>`).join('');
+  }
+}
+
+async function reviewFamilyInvitation(id, action) {
+  try {
+    const result = await apiJson(`/api/famiglie/${currentFamilyData.nucleo.id}/richieste/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({azione:action})});
+    showToast(result.message, 'success');
+    await loadFamiglia();
+  } catch (error) { showToast(error.message, 'error'); }
+}
+
+async function openMemberAccount(cf) {
+  const person = cacheMembriFamiglia.find(p => p.codice_fiscale === cf);
+  if (!person) return;
+  document.getElementById('accountMembroCF').value = cf;
+  document.getElementById('accountMembroEmail').value = person.email || '';
+  const password = document.getElementById('accountMembroPassword');
+  password.value = '';
+  password.required = !person.has_account;
+  const container = document.getElementById('managedAccountConsents');
+  container.innerHTML = '';
+  if (!person.has_account) await renderRegistrationConsents('managedAccountConsents');
+  openModal('modalAccountMembro');
+}
+
+async function saveMemberAccount(event) {
+  event.preventDefault();
+  try {
+    const cf = document.getElementById('accountMembroCF').value;
+    const result = await apiJson(`/api/famiglie/${currentFamilyData.nucleo.id}/membri/${cf}/account`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email:document.getElementById('accountMembroEmail').value, password:document.getElementById('accountMembroPassword').value, consensi_registrazione:readRegistrationConsents('managedAccountConsents')})});
+    showToast(result.message, 'success'); closeModal('modalAccountMembro'); await loadFamiglia();
+  } catch (error) { showToast(error.message, 'error'); }
+}
+
 async function openModalNuovaIscrizione(defaultAttivitaId = null, defaultCF = null) {
-  // Carica attività
-  const isStaff = currentUser && (currentUser.tutti_i_ruoli || []).some(r => ['admin', 'segreteria', 'parroco'].includes(r));
-  const resAtt = await fetch(isStaff ? '/api/attivita?include_bozze=true' : '/api/attivita');
-  const dataAtt = await resAtt.json();
-  cacheAttivita = dataAtt.attivita || [];
-
-  const attSelect = document.getElementById('iscrizioneAttivitaSelect');
-  attSelect.innerHTML = cacheAttivita.map(a => `
-    <option value="${a.id}" data-quota="${a.quota_iscrizione}" data-min="${a.eta_min}" data-max="${a.eta_max}" ${defaultAttivitaId == a.id ? 'selected' : ''}>
-      ${escapeHtml(a.titolo)} (Età: ${a.eta_min}-${a.eta_max} anni · € ${a.quota_iscrizione.toFixed(2)})
-    </option>
-  `).join('');
-
-  // Carica partecipanti
-  const partSelect = document.getElementById('iscrizionePartecipanteSelect');
-  if (cacheMembriFamiglia.length) {
-    partSelect.innerHTML = cacheMembriFamiglia.map(m => `
-      <option value="${m.codice_fiscale}" data-eta="${m.eta !== null ? m.eta : ''}" data-nome="${escapeHtml(m.nominativo)}" ${defaultCF == m.codice_fiscale ? 'selected' : ''}>
-        ${escapeHtml(m.nominativo)} (${m.eta !== null ? `${m.eta} anni` : 'Età N/D'} - ${m.codice_fiscale})
-      </option>
-    `).join('');
-  } else {
-    const resP = await fetch('/api/persone');
-    const dataP = await resP.json();
-    cacheTuttePersone = dataP.persone || [];
-    partSelect.innerHTML = cacheTuttePersone.map(p => `
-      <option value="${p.codice_fiscale}" data-eta="${p.eta !== null ? p.eta : ''}" data-nome="${escapeHtml(p.nominativo)}" ${defaultCF == p.codice_fiscale ? 'selected' : ''}>
-        ${escapeHtml(p.nominativo)} (${p.eta !== null ? `${p.eta} anni` : 'Età N/D'} - ${p.codice_fiscale})
-      </option>
-    `).join('');
-  }
-
-  // Carica clausole dinamiche da Segreteria
   try {
-    const resC = await fetch('/api/configurazioni/clausole');
-    const dataC = await resC.json();
-    const clausole = dataC.clausole || [];
+    const staff = currentUser && currentUser.tutti_i_ruoli.some(r => ['admin','segreteria','parroco'].includes(r));
+    const [activities, family, existing, clauses] = await Promise.all([
+      apiJson(staff ? '/api/attivita?include_bozze=true' : '/api/attivita'),
+      apiJson('/api/famiglie/mia'), apiJson('/api/iscrizioni?solo_mie=true'), apiJson('/api/configurazioni/clausole')
+    ]);
+    cacheAttivita = activities.attivita || [];
+    enrollmentPeople = family.nucleo ? family.nucleo.componenti : [];
+    if (staff && !enrollmentPeople.length) enrollmentPeople = (await apiJson('/api/persone')).persone || [];
+    else if (!staff && !family.puo_gestire) enrollmentPeople = enrollmentPeople.filter(p => p.codice_fiscale === currentUser.codice_fiscale);
+    enrollmentExisting = existing.iscrizioni || [];
+    const select = document.getElementById('iscrizioneAttivitaSelect');
+    select.innerHTML = cacheAttivita.map(a => `<option value="${a.id}" ${String(defaultAttivitaId) === String(a.id) ? 'selected' : ''}>${escapeHtml(a.titolo)}</option>`).join('');
+    if (defaultAttivitaId && !cacheAttivita.some(a => String(a.id) === String(defaultAttivitaId))) throw new Error('Attività non disponibile');
+    select.style.display = defaultAttivitaId ? 'none' : 'block';
+    select.required = !defaultAttivitaId;
+    document.getElementById('iscrizioneAttivitaLabel').style.display = defaultAttivitaId ? 'none' : 'block';
+    const title = document.getElementById('iscrizioneAttivitaTitolo');
+    title.hidden = !defaultAttivitaId;
+    title.textContent = defaultAttivitaId ? cacheAttivita.find(a => String(a.id) === String(defaultAttivitaId)).titolo : '';
+    document.getElementById('iscrizioneNote').value = '';
     const container = document.getElementById('iscrizioneClausoleContainer');
-    if (container) {
-      if (!clausole.length) {
-        container.innerHTML = '<span style="font-size:12px; color:var(--ink-500);">Nessuna clausola specifica configurata dalla segreteria.</span>';
-      } else {
-        container.innerHTML = clausole.map(c => `
-          <label class="clause-card ${c.obbligatoria ? 'mandatory' : ''}">
-            <input type="checkbox" class="clause-checkbox" data-id="${c.id}" data-req="${c.obbligatoria}" data-titolo="${escapeHtml(c.titolo)}" ${c.obbligatoria ? 'checked required' : ''}>
-            <div style="flex: 1;">
-              <div class="clause-meta">
-                <strong>${escapeHtml(c.titolo)}</strong>
-                ${c.obbligatoria ? '<span class="badge-clause-req">Obbligatoria</span>' : '<span class="badge-clause-opt">Facoltativa</span>'}
-              </div>
-              <p style="margin: 0; font-size: 12.5px; color: var(--ink-700);">${escapeHtml(c.testo)}</p>
-            </div>
-          </label>
-        `).join('');
-      }
-    }
-  } catch (err) {
-    console.error('Errore caricamento clausole iscrizione:', err);
-  }
-
-  onIscrizioneFormChange();
-  openModal('modalNuovaIscrizione');
+    container.innerHTML = (clauses.clausole || []).filter(c => c.is_attiva !== false).map(c => `<label class="clause-card ${c.obbligatoria ? 'mandatory' : ''}"><input type="checkbox" class="clause-checkbox" data-id="${c.id}" data-req="${!!c.obbligatoria}" data-titolo="${escapeHtml(c.titolo)}" ${c.obbligatoria ? 'required' : ''}><span><strong>${escapeHtml(c.titolo)}</strong><p>${escapeHtml(c.testo)}</p></span></label>`).join('');
+    document.getElementById('iscrizionePartecipantiCheckbox').innerHTML = '';
+    onIscrizioneFormChange(defaultCF);
+    openModal('modalNuovaIscrizione');
+  } catch (error) { showToast(error.message, 'error'); }
 }
 
-function onIscrizioneFormChange() {
-  const attSelect = document.getElementById('iscrizioneAttivitaSelect');
-  const partSelect = document.getElementById('iscrizionePartecipanteSelect');
-  const warningEl = document.getElementById('iscrizioneAgeWarning');
-  const btnSubmit = document.getElementById('btnConfermaIscrizione');
-
-  const selectedAttOpt = attSelect.options[attSelect.selectedIndex];
-  const selectedPartOpt = partSelect.options[partSelect.selectedIndex];
-
-  if (!selectedAttOpt || !selectedPartOpt) return;
-
-  const quota = parseFloat(selectedAttOpt.getAttribute('data-quota') || '0');
-  const etaMin = parseInt(selectedAttOpt.getAttribute('data-min') || '0');
-  const etaMax = parseInt(selectedAttOpt.getAttribute('data-max') || '99');
-
-  document.getElementById('previewQuotaAttivita').textContent = `€ ${quota.toFixed(2)}`;
-  document.getElementById('previewEtaAttivita').textContent = `${etaMin} - ${etaMax} anni`;
-
-  // Render dinamico campi richiesti per questa specifica attività/evento
-  const selAttId = parseInt(selectedAttOpt.value);
-  const attObj = (cacheAttivita || []).find(a => a.id === selAttId);
-  const campiSec = document.getElementById('iscrizioneCampiEventoSection');
-  const campiCont = document.getElementById('iscrizioneCampiEventoContainer');
-
-  if (campiSec && campiCont) {
-    let campiList = attObj ? attObj.campi_personalizzati : [];
-    if (typeof campiList === 'string') {
-      try { campiList = JSON.parse(campiList); } catch(e) { campiList = []; }
-    }
-    if (Array.isArray(campiList) && campiList.length > 0) {
-      campiSec.style.display = 'block';
-      campiCont.innerHTML = campiList.map(c => {
-        const reqAttr = c.obbligatorio ? 'required' : '';
-        const reqStar = c.obbligatorio ? '<span style="color:var(--crimson-600); font-weight:bold;">*</span>' : '';
-        const fieldKey = c.chiave || c.nome.toLowerCase().replace(/[^a-z0-9_]/g, '_');
-        let inputHtml = '';
-
-        if (c.tipo === 'checkbox') {
-          inputHtml = `
-            <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; font-weight:600;">
-              <input type="checkbox" class="campo-evento-input" data-key="${fieldKey}" data-label="${escapeHtml(c.nome)}" data-req="${c.obbligatorio ? 'true' : 'false'}">
-              <span>${escapeHtml(c.nome)} ${reqStar}</span>
-            </label>
-          `;
-        } else if (c.tipo === 'select') {
-          const optItems = (c.opzioni || '').split(',').map(x => x.trim()).filter(Boolean);
-          inputHtml = `
-            <label style="font-size:12px; font-weight:600; display:block; margin-bottom:4px;">${escapeHtml(c.nome)} ${reqStar}</label>
-            <select class="form-control form-control-sm campo-evento-input" data-key="${fieldKey}" data-label="${escapeHtml(c.nome)}" data-req="${c.obbligatorio ? 'true' : 'false'}" ${reqAttr}>
-              <option value="">-- Seleziona un'opzione --</option>
-              ${optItems.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('')}
-            </select>
-          `;
-        } else if (c.tipo === 'numero') {
-          inputHtml = `
-            <label style="font-size:12px; font-weight:600; display:block; margin-bottom:4px;">${escapeHtml(c.nome)} ${reqStar}</label>
-            <input type="number" class="form-control form-control-sm campo-evento-input" data-key="${fieldKey}" data-label="${escapeHtml(c.nome)}" data-req="${c.obbligatorio ? 'true' : 'false'}" placeholder="${escapeHtml(c.nome)}" ${reqAttr}>
-          `;
-        } else if (c.tipo === 'data') {
-          inputHtml = `
-            <label style="font-size:12px; font-weight:600; display:block; margin-bottom:4px;">${escapeHtml(c.nome)} ${reqStar}</label>
-            <input type="date" class="form-control form-control-sm campo-evento-input" data-key="${fieldKey}" data-label="${escapeHtml(c.nome)}" data-req="${c.obbligatorio ? 'true' : 'false'}" ${reqAttr}>
-          `;
-        } else {
-          inputHtml = `
-            <label style="font-size:12px; font-weight:600; display:block; margin-bottom:4px;">${escapeHtml(c.nome)} ${reqStar}</label>
-            <input type="text" class="form-control form-control-sm campo-evento-input" data-key="${fieldKey}" data-label="${escapeHtml(c.nome)}" data-req="${c.obbligatorio ? 'true' : 'false'}" placeholder="${escapeHtml(c.nome)}" ${reqAttr}>
-          `;
-        }
-
-        return `<div class="form-group" style="margin-bottom:8px;">${inputHtml}</div>`;
-      }).join('');
-    } else {
-      campiSec.style.display = 'none';
-      campiCont.innerHTML = '';
-    }
-  }
-
-  const partEtaRaw = selectedPartOpt.getAttribute('data-eta');
-  const partNome = selectedPartOpt.getAttribute('data-nome');
-
-  if (partEtaRaw !== '' && !isNaN(parseInt(partEtaRaw))) {
-    const eta = parseInt(partEtaRaw);
-    if (eta < etaMin) {
-      warningEl.style.display = 'flex';
-      warningEl.innerHTML = `⚠️ <strong>Età non idonea:</strong> ${partNome} ha <strong>${eta} anni</strong>, ma questa attività richiede un'età minima di <strong>${etaMin} anni</strong>. Iscrizione non consentita.`;
-      btnSubmit.disabled = true;
-      btnSubmit.style.opacity = '0.5';
-      return;
-    } else if (eta > etaMax) {
-      warningEl.style.display = 'flex';
-      warningEl.innerHTML = `⚠️ <strong>Età non idonea:</strong> ${partNome} ha <strong>${eta} anni</strong>, ma questa attività è riservata fino a <strong>${etaMax} anni</strong> (es. bambini/ragazzi). Iscrizione non consentita.`;
-      btnSubmit.disabled = true;
-      btnSubmit.style.opacity = '0.5';
-      return;
-    }
-  }
-
-  // Idoneo
-  warningEl.style.display = 'none';
-  btnSubmit.disabled = false;
-  btnSubmit.style.opacity = '1';
+function onIscrizioneFormChange(defaultCF = null) {
+  const activity = cacheAttivita.find(a => a.id === Number(document.getElementById('iscrizioneAttivitaSelect').value));
+  if (!activity) return;
+  const selected = new Set([...document.querySelectorAll('.family-participant:checked')].map(x => x.value));
+  if (defaultCF) selected.add(defaultCF);
+  document.getElementById('iscrizionePartecipantiCheckbox').innerHTML = enrollmentPeople.map(person => {
+    const already = enrollmentExisting.some(i => i.attivita_id === activity.id && i.codice_fiscale_partecipante === person.codice_fiscale);
+    const eligible = person.eta === null || (person.eta >= activity.eta_min && person.eta <= activity.eta_max);
+    return `<label class="choice-row"><input type="checkbox" class="family-participant" value="${person.codice_fiscale}" ${already || !eligible ? 'disabled' : ''} ${selected.has(person.codice_fiscale) && eligible && !already ? 'checked' : ''} onchange="updateFamilyEnrollmentSelection()"><span><strong>${escapeHtml(person.nominativo)}</strong><br><small>${person.eta === null ? 'Età non indicata' : person.eta + ' anni'}${already ? ' · Già iscritto/a' : !eligible ? ' · Fuori dalla fascia di età' : ''}</small></span></label>`;
+  }).join('') || '<p>Aggiungi prima i componenti al tuo nucleo familiare.</p>';
+  document.getElementById('previewEtaAttivita').textContent = `${activity.eta_min} – ${activity.eta_max} anni`;
+  updateFamilyEnrollmentSelection();
 }
 
-async function handleSalvaIscrizione(e) {
-  e.preventDefault();
-  const attivitaId = parseInt(document.getElementById('iscrizioneAttivitaSelect').value);
-  const cf = document.getElementById('iscrizionePartecipanteSelect').value;
-  const note = document.getElementById('iscrizioneNote').value.trim();
+function eventFieldMarkup(field, cf) {
+  const key = field.chiave || field.nome.toLowerCase().replace(/[^a-z0-9_]/g,'_');
+  const attributes = `class="form-control campo-evento-input" data-cf="${cf}" data-key="${escapeHtml(key)}" data-label="${escapeHtml(field.nome)}" data-req="${!!field.obbligatorio}" ${field.obbligatorio ? 'required' : ''}`;
+  const label = escapeHtml(field.nome) + (field.obbligatorio ? ' *' : '');
+  if (field.tipo === 'checkbox') return `<label class="choice-row"><input type="checkbox" ${attributes}><span>${label}</span></label>`;
+  if (field.tipo === 'select') return `<label>${label}<select ${attributes}><option value="">Scegli</option>${String(field.opzioni || '').split(',').map(x=>`<option>${escapeHtml(x.trim())}</option>`).join('')}</select></label>`;
+  const type = ({numero:'number', data:'date'})[field.tipo] || 'text';
+  return `<label>${label}<input type="${type}" ${attributes}></label>`;
+}
 
-  // Validazione clausole
-  const clauseCheckboxes = document.querySelectorAll('#iscrizioneClausoleContainer .clause-checkbox');
-  const clausoleAccettate = {};
-  for (const chk of clauseCheckboxes) {
-    const id = chk.getAttribute('data-id');
-    const isReq = chk.getAttribute('data-req') === 'true';
-    const titolo = chk.getAttribute('data-titolo') || 'Clausola';
-    if (isReq && !chk.checked) {
-      showToast(`Attenzione: devi accettare la clausola obbligatoria: "${titolo}"`, 'error');
-      return;
-    }
-    clausoleAccettate[id] = chk.checked;
+function updateFamilyEnrollmentSelection() {
+  const activity = cacheAttivita.find(a=>a.id === Number(document.getElementById('iscrizioneAttivitaSelect').value));
+  if (!activity) return;
+  const chosen = [...document.querySelectorAll('.family-participant:checked')].map(x=>x.value);
+  document.getElementById('previewQuotaAttivita').textContent = `${chosen.length} × € ${Number(activity.quota_iscrizione).toFixed(2)} = € ${(chosen.length * Number(activity.quota_iscrizione)).toFixed(2)}`;
+  document.getElementById('btnConfermaIscrizione').disabled = !chosen.length;
+  const warning = document.getElementById('iscrizioneAgeWarning');
+  warning.style.display = chosen.length ? 'none' : 'block';
+  warning.textContent = 'Seleziona i componenti da iscrivere.';
+  let fields = activity.campi_personalizzati || [];
+  if (typeof fields === 'string') { try { fields = JSON.parse(fields); } catch (_) { fields = []; } }
+  const previous = {};
+  document.querySelectorAll('.campo-evento-input').forEach(input => { previous[input.dataset.cf + ':' + input.dataset.key] = input.type === 'checkbox' ? input.checked : input.value; });
+  const section = document.getElementById('iscrizioneCampiEventoSection');
+  section.style.display = fields.length && chosen.length ? 'block' : 'none';
+  document.getElementById('iscrizioneCampiEventoContainer').innerHTML = chosen.map(cf => {
+    const person = enrollmentPeople.find(p=>p.codice_fiscale === cf);
+    return `<fieldset class="family-section"><legend>${escapeHtml(person.nominativo)}</legend>${fields.map(f=>eventFieldMarkup(f,cf)).join('')}</fieldset>`;
+  }).join('');
+  document.querySelectorAll('.campo-evento-input').forEach(input => {
+    const value = previous[input.dataset.cf + ':' + input.dataset.key];
+    if (value !== undefined) { if (input.type === 'checkbox') input.checked = value; else input.value = value; }
+  });
+}
+
+async function handleSalvaIscrizione(event) {
+  event.preventDefault();
+  const participants = [...document.querySelectorAll('.family-participant:checked')].map(x=>x.value);
+  if (!participants.length) return showToast('Seleziona almeno un componente', 'warning');
+  const clauses = {};
+  for (const input of document.querySelectorAll('#iscrizioneClausoleContainer .clause-checkbox')) {
+    if (input.dataset.req === 'true' && !input.checked) return showToast('Accetta le clausole obbligatorie', 'warning');
+    clauses[input.dataset.id] = input.checked;
   }
-
-  // Raccogli e valida campi personalizzati specifici per questa attività
-  const campiEventoInputs = document.querySelectorAll('#iscrizioneCampiEventoContainer .campo-evento-input');
-  const campiPersonalizzatiValori = {};
-  for (const input of campiEventoInputs) {
-    const key = input.getAttribute('data-key');
-    const label = input.getAttribute('data-label') || key;
-    const isReq = input.getAttribute('data-req') === 'true';
-    let val = '';
-    if (input.type === 'checkbox') {
-      val = input.checked;
-      if (isReq && !val) {
-        showToast(`Attenzione: devi compilare o accettare il campo: "${label}"`, 'error');
-        return;
-      }
-    } else {
-      val = input.value.trim();
-      if (isReq && !val) {
-        showToast(`Attenzione: il campo "${label}" è obbligatorio`, 'error');
-        return;
-      }
-    }
-    campiPersonalizzatiValori[key] = val;
+  const fields = {};
+  for (const input of document.querySelectorAll('#iscrizioneCampiEventoContainer .campo-evento-input')) {
+    const value = input.type === 'checkbox' ? input.checked : input.value.trim();
+    if (input.dataset.req === 'true' && !value) return showToast(`Compila: ${input.dataset.label}`, 'warning');
+    if (!fields[input.dataset.cf]) fields[input.dataset.cf] = {};
+    fields[input.dataset.cf][input.dataset.key] = value;
   }
-
+  const button = document.getElementById('btnConfermaIscrizione');
+  button.disabled = true;
   try {
-    const res = await fetch('/api/iscrizioni', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        attivita_id: attivitaId,
-        codice_fiscale_partecipante: cf,
-        note_iscrizione: note,
-        clausole_accettate: clausoleAccettate,
-        campi_personalizzati: campiPersonalizzatiValori,
-        consenso_privacy: true
-      })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Errore salvataggio iscrizione');
-
-    showToast(data.message, 'success');
-    closeModal('modalNuovaIscrizione');
-
+    const data = await apiJson('/api/iscrizioni', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({attivita_id:Number(document.getElementById('iscrizioneAttivitaSelect').value), partecipanti:participants, note_iscrizione:document.getElementById('iscrizioneNote').value.trim(), clausole_accettate:clauses, campi_personalizzati_per_partecipante:fields})});
+    showToast(data.message,'success'); closeModal('modalNuovaIscrizione');
     if (currentView === 'famiglia') await loadFamiglia();
     if (currentView === 'segreteria') await loadSegreteriaIscrizioni();
     if (currentView === 'dashboard') await loadDashboard();
-  } catch (err) {
-    showToast(err.message, 'error');
-  }
+    if (currentView === 'attivita') await loadAttivita();
+  } catch (error) { showToast(error.message,'error'); }
+  finally { button.disabled = false; }
 }
 
 // ---------------- GESTIONE CAMPI PERSONALIZZATI PER ATTIVITÀ/EVENTO ----------------
@@ -6193,8 +6163,8 @@ async function openModalNuovaPersona() {
   document.getElementById('personaIndirizzo').value = '';
   document.getElementById('personaIntolleranze').value = '';
   document.getElementById('personaAllergie').value = '';
-  await loadAllergieSuggerite();
-  renderAllergyPills('personaAllergiePills', 'personaIntolleranze', 'personaAllergie');
+  document.getElementById('personaTerapie').value = '';
+  await renderHealthSections('persona');
   openModal('modalNuovaPersona');
 }
 
@@ -6221,7 +6191,7 @@ async function handleSalvaNuovaPersona(e) {
         nome, cognome, codice_fiscale: cf, sesso, data_nascita: dataNascita,
         luogo_nascita: luogoNascita,
         telefono, email, indirizzo_residenza: indirizzo, comune_residenza: comune,
-        intolleranze_alimentari: intolleranze, allergie
+        intolleranze_alimentari: intolleranze, allergie, terapie_medicinali: document.getElementById('personaTerapie').value
       })
     });
     const data = await res.json();
@@ -6567,7 +6537,14 @@ async function openModalModificaPersona(cf) {
       document.getElementById('modPersonaCellulare').value = p.cellulare || p.telefono || '';
     }
     if (document.getElementById('modPersonaRuoloFamiglia')) {
-      document.getElementById('modPersonaRuoloFamiglia').value = p.ruolo_famiglia || 'Figlio/a';
+      const select = document.getElementById('modPersonaRuoloFamiglia');
+      const options = await getFamilyOptions();
+      select.innerHTML = options.ruoli_famiglia.map(r=>`<option>${escapeHtml(r)}</option>`).join('');
+      if (p.ruolo_famiglia && !options.ruoli_famiglia.includes(p.ruolo_famiglia)) select.add(new Option(p.ruolo_famiglia === 'Capofamiglia' ? 'Ruolo da specificare (dato precedente)' : p.ruolo_famiglia, p.ruolo_famiglia));
+      select.value = p.ruolo_famiglia || 'Altro';
+      const head = document.getElementById('modPersonaCapofamiglia');
+      head.checked = p.is_capofamiglia;
+      head.disabled = !currentUser.is_capofamiglia && !currentUser.tutti_i_ruoli.some(r=>['admin','segreteria','parroco'].includes(r));
     }
     document.getElementById('modPersonaEmail').value = p.email || '';
     document.getElementById('modPersonaIntolleranze').value = p.intolleranze_alimentari || '';
@@ -6577,8 +6554,8 @@ async function openModalModificaPersona(cf) {
     }
     document.getElementById('modPersonaBattesimoInput').value = '';
 
-    await loadAllergieSuggerite();
-    renderAllergyPills('modPersonaAllergiePills', 'modPersonaIntolleranze', 'modPersonaAllergie');
+    document.getElementById('modPersonaTerapie').value = p.terapie_medicinali || '';
+    await renderHealthSections('modPersona');
 
     const badge = document.getElementById('modPersonaBattesimoBadge');
     const link = document.getElementById('modPersonaBattesimoLink');
@@ -6630,6 +6607,8 @@ async function handleSalvaModificaPersona(e) {
         comune_residenza: comune, telefono: cellulare || telefono, email,
         intolleranze_alimentari: intolleranze, allergie,
         ruolo_famiglia: ruoloFamiglia,
+        is_capofamiglia: document.getElementById('modPersonaCapofamiglia').disabled ? undefined : document.getElementById('modPersonaCapofamiglia').checked,
+        terapie_medicinali: document.getElementById('modPersonaTerapie').value,
         note_generali: noteGenerali
       })
     });

@@ -1682,3 +1682,18 @@ input:checked + .slider:before {
 }
 
 
+
+/* alpha 2.0.0: famiglia, consensi e quadro sanitario */
+.family-section { border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 16px; margin: 14px 0; }
+.family-section legend { padding: 0 6px; font-weight: 700; font-size: 14px; }
+.family-section label:not(.choice-row) { display: block; margin: 8px 0; font-size: 13px; }
+.family-section p, .family-section small { font-size: 12px; color: var(--ink-600); line-height: 1.5; }
+.choice-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px; font-size: 13px; }
+.choice-row input { margin-top: 3px; flex: 0 0 auto; }
+.registration-consents .choice-row { border: 1px solid var(--border-light); border-radius: 8px; margin: 8px 0; }
+.registration-consents strong, .registration-consents small { display: block; }
+.registration-consents small { line-height: 1.5; margin-top: 5px; font-size: 12px; color: var(--ink-600); }
+.family-participants { display: grid; gap: 6px; }
+.family-participants .choice-row { border: 1px solid var(--border-light); border-radius: 8px; }
+.family-invite-code { font-family: monospace; font-size: 24px; letter-spacing: 5px; }
+.release-version { white-space: nowrap; }

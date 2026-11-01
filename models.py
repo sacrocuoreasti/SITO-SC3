@@ -1,4 +1,7 @@
 import json
+import secrets
+import string
+from sqlalchemy import event, inspect, text
 from datetime import datetime, date
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
@@ -73,6 +76,7 @@ class Persona(db.Model):
     # Quadro sanitario e alimentare
     intolleranze_alimentari = db.Column(db.Text, nullable=True)  # es. Celiachia, Lattosio, Favismo
     allergie = db.Column(db.Text, nullable=True)                 # es. Arachidi, Farmaci, Punture, Polline
+    terapie_medicinali = db.Column(db.Text, nullable=True)
     note_generali = db.Column(db.Text, nullable=True)
     
     # Documenti e sacramenti
@@ -125,6 +129,8 @@ class Persona(db.Model):
             'email': self.email or '',
             'intolleranze_alimentari': self.intolleranze_alimentari or '',
             'allergie': self.allergie or '',
+            'terapie_medicinali': self.terapie_medicinali or '',
+            'is_capofamiglia': bool(self.nucleo and self.nucleo.codice_fiscale_capofamiglia == self.codice_fiscale),
             'note_generali': self.note_generali or '',
             'certificato_battesimo_path': self.certificato_battesimo_path or '',
             'certificato_battesimo_url': self.certificato_battesimo_path if (self.certificato_battesimo_path and self.certificato_battesimo_path.startswith('http')) else (f"/uploads/{self.certificato_battesimo_path}" if self.certificato_battesimo_path else None),
@@ -149,6 +155,7 @@ class NucleoFamiliare(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     nome_famiglia = db.Column(db.String(120), nullable=False)
+    codice_invito = db.Column(db.String(3), nullable=True, unique=True)
     codice_fiscale_capofamiglia = db.Column(
         db.String(16),
         db.ForeignKey('persona.codice_fiscale', ondelete='SET NULL', use_alter=True, name='fk_nucleo_capofamiglia'),
@@ -168,6 +175,7 @@ class NucleoFamiliare(db.Model):
         d = {
             'id': self.id,
             'nome_famiglia': self.nome_famiglia,
+            'codice_invito': self.codice_invito,
             'codice_fiscale_capofamiglia': self.codice_fiscale_capofamiglia,
             'telefono_principale': self.telefono_principale or '',
             'indirizzo': self.indirizzo or '',
@@ -191,6 +199,35 @@ class NucleoFamiliare(db.Model):
         return d
 
 
+def unique_family_code(used):
+    alphabet = string.ascii_uppercase + string.digits
+    if len(used) >= len(alphabet) ** 3:
+        raise RuntimeError('Codici famiglia esauriti')
+    for _ in range(1000):
+        code = ''.join(secrets.choice(alphabet) for _ in range(3))
+        if code not in used:
+            return code
+    raise RuntimeError('Impossibile generare un codice famiglia univoco')
+
+
+@event.listens_for(NucleoFamiliare, 'before_insert')
+def assign_family_code(mapper, connection, family):
+    if not family.codice_invito:
+        used = set(connection.execute(text('SELECT codice_invito FROM nucleo_familiare WHERE codice_invito IS NOT NULL')).scalars())
+        family.codice_invito = unique_family_code(used)
+
+
+class RichiestaNucleo(db.Model):
+    __tablename__ = 'richiesta_nucleo'
+    id = db.Column(db.Integer, primary_key=True)
+    nucleo_id = db.Column(db.Integer, db.ForeignKey('nucleo_familiare.id'), nullable=False)
+    utente_id = db.Column(db.Integer, db.ForeignKey('utente.id'), nullable=False)
+    stato = db.Column(db.String(20), nullable=False, default='in_attesa')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    utente = db.relationship('Utente', foreign_keys=[utente_id])
+
+
+
 class Utente(UserMixin, db.Model):
     __tablename__ = 'utente'
 
@@ -203,6 +240,8 @@ class Utente(UserMixin, db.Model):
     ruolo = db.Column(db.String(30), default='utente', nullable=False)
     privilegi_extra = db.Column(db.Text, default='[]')  # memorizza JSON di ruoli extra
     campi_extra = db.Column(db.Text, default='{}')      # campi dinamici personalizzati dalla segreteria
+    consensi_registrazione = db.Column(db.Text, nullable=True)
+    gestito_da_id = db.Column(db.Integer, db.ForeignKey('utente.id', ondelete='SET NULL'), nullable=True)
     is_attivo = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime, nullable=True)
@@ -259,6 +298,8 @@ class Utente(UserMixin, db.Model):
             'tutti_i_ruoli': self.get_all_roles(),
             'codice_fiscale': self.codice_fiscale,
             'is_attivo': self.is_attivo,
+            'gestito_da_id': self.gestito_da_id,
+            'is_capofamiglia': bool(self.persona and self.persona.nucleo and self.persona.nucleo.codice_fiscale_capofamiglia == self.codice_fiscale),
             'campi_extra': campi_extra_dict,
             'is_gestione_pura': self.ruolo in ['segreteria', 'oratorio'] or not self.codice_fiscale,
             'nominativo': self.persona.nominativo if self.persona else self.email.split('@')[0],
@@ -429,6 +470,7 @@ class Iscrizione(db.Model):
             'partecipante_sesso': p.sesso if p else '',
             'partecipante_data_nascita': p.data_nascita.strftime('%d/%m/%Y') if (p and p.data_nascita) else '',
             'allergie': p.allergie if p else '',
+            'terapie_medicinali': p.terapie_medicinali if p else '',
             'intolleranze_alimentari': p.intolleranze_alimentari if p else '',
             'nome_famiglia': nucleo.nome_famiglia if nucleo else 'Non associato',
             'telefono_contatto': telefono_contatto,
@@ -941,12 +983,20 @@ class CalendarioComunita(db.Model):
 def init_default_configurazioni():
     """Inizializza categorie, allergie, clausole, celebrazioni e campi account se non presenti."""
     try:
-        # Crea eventuali nuove tabelle
+        # Su un database esistente aggiungere solo schema e metadati richiesti.
+        existing_database = bool(inspect(db.engine).get_table_names())
+        if existing_database and db.engine.dialect.name == 'sqlite':
+            from services.migrations import backup_sqlite
+            backup_sqlite(db.engine)
         db.create_all()
 
         # Verifica ed aggiunta colonne mancanti per SQLite
         from sqlalchemy import text
         col_checks = [
+            ('persona', 'terapie_medicinali', 'TEXT'),
+            ('nucleo_familiare', 'codice_invito', 'VARCHAR(3)'),
+            ('utente', 'consensi_registrazione', 'TEXT'),
+            ('utente', 'gestito_da_id', 'INTEGER'),
             ('persona', 'certificato_battesimo_path', 'VARCHAR(255)'),
             ('persona', 'foto_profilo_url', 'VARCHAR(500)'),
             ('utente', 'campi_extra', 'TEXT DEFAULT "{}"'),
@@ -982,6 +1032,16 @@ def init_default_configurazioni():
                 if col not in [r[1] for r in res]:
                     db.session.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
                     db.session.commit()
+
+        used = {row[0] for row in db.session.execute(text('SELECT codice_invito FROM nucleo_familiare WHERE codice_invito IS NOT NULL'))}
+        for family_id, in db.session.execute(text('SELECT id FROM nucleo_familiare WHERE codice_invito IS NULL')).fetchall():
+            code = unique_family_code(used)
+            used.add(code)
+            db.session.execute(text('UPDATE nucleo_familiare SET codice_invito=:code WHERE id=:id'), {'code': code, 'id': family_id})
+        db.session.execute(text('CREATE UNIQUE INDEX IF NOT EXISTS ux_nucleo_codice_invito ON nucleo_familiare (codice_invito)'))
+        db.session.commit()
+        if existing_database:
+            return
 
         imp = ImpostazioniSito.query.first()
         if not imp:

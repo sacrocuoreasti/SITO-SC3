@@ -25,3 +25,8 @@ service_account.json
 !.env.example
 
 /database/.session-key
+
+/database/backups/
+*.sqlite3
+
+/backups/

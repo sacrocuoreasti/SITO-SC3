@@ -21,3 +21,4 @@ jobs:
       - run: node --check static/js/app.js
       - run: node tests/test_frontend.js
       - run: node tests/test_google_script.js
+      - run: node tests/test_family_frontend.js
