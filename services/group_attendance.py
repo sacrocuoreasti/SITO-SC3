@@ -87,8 +87,8 @@ def save_group_records(category,group,data):
     db.session.commit()
 
 
-def registry_data(category,group,month=None):
-    from services.calendar_events import merge_calendar_dates,month_range
+def registry_data(category,group,month=None,whole_year=False):
+    from services.calendar_events import merge_calendar_dates,month_range,group_year_dates
     _,collection=GROUP_MODELS[category]
     records=group_records(category,group)
     by_date={}
@@ -98,7 +98,7 @@ def registry_data(category,group,month=None):
             'concorre_percentuale':record.concorre_percentuale is not False,'presenti_count':0,'assenti_count':0})
         row['presenti_count' if record.presente else 'assenti_count']+=1
         if not row['titolo_incontro'] and record.titolo_incontro: row['titolo_incontro']=record.titolo_incontro
-    dates,warning=merge_calendar_dates(group,list(by_date.values()),month)
+    dates,warning=(group_year_dates(group,list(by_date.values())) if whole_year else merge_calendar_dates(group,list(by_date.values()),month))
     students=[]
     for person in getattr(group,collection):
         own=[r for r in records if r.codice_fiscale_persona==person.codice_fiscale]

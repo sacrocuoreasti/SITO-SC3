@@ -1,6 +1,7 @@
 """Appuntamenti Google in sola lettura: feed pubblico, cache limitata e ricorrenze."""
 import calendar as month_calendar
 import hashlib
+import re
 import threading
 import time
 from collections import OrderedDict
@@ -159,3 +160,24 @@ def merge_calendar_dates(group,dates,month=None):
         merged[row['data']]={**previous,**row,'registrato':True,
             'titolo_incontro':row.get('titolo_incontro') or previous.get('titolo_incontro','')}
     return sorted(merged.values(),key=lambda row:row['data']),warning
+
+
+def group_year_dates(group,dates):
+    """Tutti gli incontri dell'anno pastorale, oltre all'intero storico salvato."""
+    match=re.match(r'^(\d{4})[/-](\d{4})$',getattr(group,'anno_pastorale','') or '')
+    today=datetime.now(ROME)
+    year=int(match[1]) if match else today.year-(today.month<9)
+    if not 1900<=year<2100: raise BadRequest('Anno pastorale non valido')
+    scheduled=[];warnings=[]
+    for offset in range(12):
+        month=(8+offset)%12+1
+        current_year=year+(8+offset)//12
+        rows,warning=calendar_dates(group,f'{current_year:04d}-{month:02d}')
+        scheduled.extend(rows)
+        if warning and warning not in warnings: warnings.append(warning)
+    merged={row['data']:dict(row) for row in scheduled}
+    for row in dates:
+        previous=merged.get(row['data'],{})
+        merged[row['data']]={**previous,**row,'registrato':True,
+            'titolo_incontro':row.get('titolo_incontro') or previous.get('titolo_incontro','')}
+    return sorted(merged.values(),key=lambda row:row['data']),' '.join(warnings)

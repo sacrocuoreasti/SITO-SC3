@@ -55,6 +55,28 @@ class GroupCalendarRegisterTests(unittest.TestCase):
             self.assertEqual(Presenza.query.count(),0)
             self.assertIsNone(db.session.get(GruppoCatechismo,self.group_id).attivita_id)
 
+    @patch('services.calendar_events.fetch_public_feed')
+    def test_group_date_list_includes_entire_pastoral_year_and_older_saved_attendance(self,fetch):
+        fetch.return_value=FEED.replace(b'20261107',b'20260907').replace(b'FREQ=WEEKLY;COUNT=3',b'FREQ=MONTHLY;COUNT=12')
+        with self.app.app_context():
+            group=db.session.get(GruppoCatechismo,self.group_id)
+            group.anno_pastorale='2026/2027'
+            db.session.commit()
+        self.assertEqual(self.attendance(day='2024-12-01').status_code,200)
+        response=self.client.get(f'/api/catechismo/gruppi/{self.group_id}/registro?periodo=anno')
+        self.assertEqual(response.status_code,200,response.json)
+        dates=response.json['date_incontri']
+        self.assertEqual(len(dates),13)
+        self.assertEqual(dates[0]['data'],'2024-12-01')
+        self.assertTrue(dates[0]['registrato'])
+        self.assertEqual(dates[1]['data'],'2026-09-07')
+        self.assertEqual(dates[-1]['data'],'2027-08-07')
+        self.assertTrue(all(not row['registrato'] for row in dates[1:]))
+        self.assertEqual(fetch.call_count,1)
+        with self.app.app_context(): self.assertEqual(Presenza.query.count(),1)
+        self.login()
+        self.assertEqual(self.client.get(f'/api/catechismo/gruppi/{self.group_id}/registro?periodo=anno').status_code,403)
+
     @patch('services.calendar_events.fetch_public_feed',return_value=FEED)
     def test_daily_save_is_idempotent_and_google_dates_do_not_affect_percentage(self,fetch):
         self.assertEqual(self.attendance().status_code,200)

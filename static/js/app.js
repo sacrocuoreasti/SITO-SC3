@@ -686,6 +686,7 @@ function navigateTo(viewName) {
   };
 
   const current = viewMap[viewName];
+  let loading;
   if (current) {
     const el = document.getElementById(current.id);
     if (el) {
@@ -693,6 +694,7 @@ function navigateTo(viewName) {
       if (current.fn) {
         try {
           const p = current.fn();
+          loading = p;
           if (p && typeof p.catch === 'function') {
             p.catch(err => console.warn(`Avviso caricamento vista ${viewName}:`, err));
           }
@@ -704,6 +706,7 @@ function navigateTo(viewName) {
   }
 
   document.getElementById('sidebar').classList.remove('open');
+  return loading;
 }
 
 function toggleSidebar() {
@@ -1826,6 +1829,76 @@ let cacheGruppiCatechismo = [];
 let cacheIsCatechistaOnly = false;
 let currentCatechismoAnnoFilter = '2026/2027';
 let cacheRegistroCatechismo = null;
+let catechismoRegisterGroupId = null;
+let catechismoRegisterRequest = 0;
+
+function showCatechismoRegisterSection(section) {
+  for(const [id,name] of [['catechismoGroupOverview','groups'],['catechismoDatesSection','dates'],['catechismoAttendanceSection','attendance']]) {
+    document.getElementById(id).style.display=section===name?'block':'none';
+  }
+  document.getElementById('catechismoStaffHeaderActions').style.display=section==='groups'?'flex':'none';
+}
+
+function tornaGruppiCatechismo() {
+  catechismoRegisterRequest++;
+  catechismoRegisterGroupId=null;
+  cacheRegistroCatechismo=null;
+  showCatechismoRegisterSection('groups');
+}
+
+async function openCatechismoDates(gruppoId) {
+  const group=cacheGruppiCatechismo.find(g=>g.id===gruppoId);
+  if(!group) return;
+  const request=++catechismoRegisterRequest;
+  catechismoRegisterGroupId=gruppoId;
+  cacheRegistroCatechismo=null;
+  showCatechismoRegisterSection('dates');
+  document.getElementById('catechismoDatesTitle').textContent=group.nome+' · Incontri e appelli';
+  document.getElementById('catechismoDatesDetails').textContent=[group.anno_pastorale,group.catechista_nome,group.aula].filter(Boolean).join(' · ');
+  document.getElementById('catechismoDatesWarning').textContent='';
+  document.getElementById('catechismoDatesList').innerHTML='<p>Caricamento delle date del gruppo…</p>';
+  document.getElementById('catechismoManualDate').value=GroupCalendar.localDate();
+  document.getElementById('catechismoDatesTitle').focus?.();
+  try {
+    const data=await apiJson(`/api/catechismo/gruppi/${gruppoId}/registro?periodo=anno`);
+    if(request!==catechismoRegisterRequest) return;
+    cacheRegistroCatechismo=data;
+    document.getElementById('catechismoDatesWarning').textContent=data.avviso_calendario||'';
+    renderCatechismoDates(data);
+  } catch(error) {
+    if(request!==catechismoRegisterRequest) return;
+    document.getElementById('catechismoDatesList').innerHTML=`<p role="alert">${escapeHtml(error.message)}</p><button type="button" class="btn btn-secondary" onclick="openCatechismoDates(${gruppoId})">Riprova</button>`;
+  }
+}
+
+function renderCatechismoDates(data) {
+  const dates=[...(data.date_incontri||[])].sort((a,b)=>a.data.localeCompare(b.data));
+  const today=GroupCalendar.localDate();
+  let month='';
+  document.getElementById('catechismoDatesList').innerHTML=dates.length?dates.map(day=>{
+    const newMonth=day.data.slice(0,7)!==month;
+    month=day.data.slice(0,7);
+    const date=new Date(day.data+'T12:00:00');
+    const heading=newMonth?`<h3 class="catechismo-date-month">${escapeHtml(date.toLocaleDateString('it-IT',{month:'long',year:'numeric'}))}</h3>`:'';
+    const status=day.registrato?'Appello salvato':(day.data<today?'Da compilare':'In programma');
+    return `${heading}<button type="button" class="catechismo-date-row ${day.registrato?'is-recorded':''}" onclick="openModalAppelloCatechismo(${catechismoRegisterGroupId},'${day.data}')">
+      <span class="catechismo-date-day">${escapeHtml(date.toLocaleDateString('it-IT',{weekday:'short',day:'2-digit',month:'short'}))}</span>
+      <span class="catechismo-date-description"><strong>${escapeHtml(day.titolo_incontro||'Incontro del gruppo')}</strong><small>${day.registrato?`${day.presenti_count} presenti · ${day.assenti_count} assenti`:(day.da_google?'Dal calendario Google':'Incontro del gruppo')}</small></span>
+      <span class="catechismo-date-status">${status} <span aria-hidden="true">→</span></span>
+    </button>`;
+  }).join(''):'<p>Nessun incontro in calendario e nessun appello salvato. Puoi aprire un appello indicando la data qui sotto.</p>';
+}
+
+function tornaDateCatechismo() {
+  if(catechismoRegisterGroupId) return openCatechismoDates(catechismoRegisterGroupId);
+  tornaGruppiCatechismo();
+}
+
+function apriDataManualeCatechismo(event) {
+  event.preventDefault();
+  const day=document.getElementById('catechismoManualDate').value;
+  if(day && catechismoRegisterGroupId) return openModalAppelloCatechismo(catechismoRegisterGroupId,day);
+}
 let statoPresenzeCorrentiCatechismo = {};
 
 async function loadCatechismo() {
@@ -1856,6 +1929,7 @@ async function loadCatechismo() {
   if (staffSec) staffSec.style.display = 'block';
   if (staffActions) staffActions.style.display = 'flex';
   if (parentSec) parentSec.style.display = 'none';
+  tornaGruppiCatechismo();
   const titleEl = document.getElementById('catechismoPageTitle');
   const descEl = document.getElementById('catechismoPageDesc');
   if (titleEl) titleEl.textContent = 'Gruppi di Catechismo & Archivio';
@@ -1976,8 +2050,8 @@ function renderGruppiCatechismoGrid() {
       </div>
 
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; border-top: 1px solid var(--border-light); padding-top: 10px;">
-        <button class="btn btn-sm btn-primary" onclick="openModalAppelloCatechismo(${g.id})">
-          📖 Appello & Registro
+        <button class="btn btn-sm btn-primary" onclick="openCatechismoDates(${g.id})">
+          📅 Incontri e appelli
         </button>
         <button class="btn btn-sm btn-secondary" onclick="openModalStoricoIncontriCatechismo(${g.id})">
           📅 Storico Incontri
@@ -2006,8 +2080,14 @@ function renderGruppiCatechismoGrid() {
 }
 
 async function openModalAppelloCatechismo(gruppoId, selectedDay = null) {
+  if(!selectedDay) return openCatechismoDates(gruppoId);
   const g = cacheGruppiCatechismo.find(x => x.id === gruppoId);
   if (!g) return;
+  const request=++catechismoRegisterRequest;
+  catechismoRegisterGroupId=gruppoId;
+  cacheRegistroCatechismo=null;
+  statoPresenzeCorrentiCatechismo={};
+  document.getElementById('btnSalvaRegistroCatechismo').disabled=true;
 
   document.getElementById('appelloGruppoId').value = g.id;
   document.getElementById('appelloAttivitaId').value = g.attivita_id || '';
@@ -2018,18 +2098,20 @@ async function openModalAppelloCatechismo(gruppoId, selectedDay = null) {
   const today = GroupCalendar.localDate();
   document.getElementById('appelloDataIncontro').value = selectedDay || today;
 
-  openModal('modalAppelloCatechismo');
+  showCatechismoRegisterSection('attendance');
+  document.getElementById('catechismoAttendanceTitle').textContent='Appello del '+selectedDay.split('-').reverse().join('/');
+  document.getElementById('catechismoAttendanceTitle').focus?.();
 
   const bodyEl = document.getElementById('registroElettronicoCatechismoBody');
-  bodyEl.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--ink-500);"><div class="spinner" style="margin:0 auto 10px;"></div>Caricamento registro elettronico e presenze passate in corso...</td></tr>`;
+  bodyEl.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--ink-500);"><div class="spinner" style="margin:0 auto 10px;"></div>Caricamento registro elettronico e presenze passate in corso...</td></tr>`;
 
   try {
     const res = await fetch(`/api/catechismo/gruppi/${gruppoId}/registro?mese=${document.getElementById('appelloDataIncontro').value.slice(0,7)}`);
     const data = await res.json();
+    if(request!==catechismoRegisterRequest) return;
     if (!res.ok) throw new Error(data.error || 'Errore caricamento registro');
 
     cacheRegistroCatechismo = data;
-    renderCalendarMeetingSelect(data.date_incontri, 'appello');
     if(data.avviso_calendario) showToast(data.avviso_calendario,'warning');
     const statsBadge = document.getElementById('appelloStatsGruppo');
     if (statsBadge) {
@@ -2039,8 +2121,10 @@ async function openModalAppelloCatechismo(gruppoId, selectedDay = null) {
     aggiornaCampiIncontroCorrente();
     inizializzaStatoPresenzeCatechismo();
     renderTabellaRegistroCatechismo();
+    document.getElementById('btnSalvaRegistroCatechismo').disabled=!data.studenti.length;
   } catch (err) {
-    bodyEl.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--crimson-600);">Errore: ${escapeHtml(err.message)}</td></tr>`;
+    if(request!==catechismoRegisterRequest) return;
+    bodyEl.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--crimson-600);">Errore: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -2111,8 +2195,7 @@ async function confermaCancellaIncontroCatechismo() {
     if (!res.ok) throw new Error(data.error || 'Errore cancellazione incontro');
 
     showToast(data.message || `Incontro del ${dataStr} cancellato con successo`, 'success');
-    await openModalAppelloCatechismo(gruppoId);
-    await loadCatechismo();
+    await openCatechismoDates(gruppoId);
   } catch (err) {
     showToast(err.message, 'error');
   }
@@ -2184,38 +2267,15 @@ function renderTabellaRegistroCatechismo() {
   if (!bodyEl || !cacheRegistroCatechismo) return;
 
   const studenti = cacheRegistroCatechismo.studenti || [];
-  const dateIncontri = (cacheRegistroCatechismo.date_incontri || []).filter(day=>day.registrato);
-  const dataSel = document.getElementById('appelloDataIncontro').value;
 
   if (!studenti.length) {
-    bodyEl.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 24px; color: var(--ink-500);">Nessun ragazzo iscritto in questo gruppo di catechismo.</td></tr>`;
+    bodyEl.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 24px; color: var(--ink-500);">Nessun ragazzo iscritto in questo gruppo di catechismo.</td></tr>`;
     aggiornaConteggioLiveCatechismo();
     return;
   }
 
   bodyEl.innerHTML = studenti.map((s, idx) => {
     const isPresente = statoPresenzeCorrentiCatechismo[s.codice_fiscale] === true;
-
-    // Storico incontri passati
-    let storicoHtml = '';
-    const datePassate = dateIncontri.filter(d => d.data !== dataSel);
-    if (!datePassate.length) {
-      storicoHtml = '<span style="color:var(--ink-400); font-size:11.5px; font-style:italic;">Nessun altro incontro registrato</span>';
-    } else {
-      storicoHtml = '<div style="display:flex; gap:4px; flex-wrap:wrap; align-items:center;">' +
-        datePassate.slice(-6).map(d => {
-          const pres = s.presenze_map ? s.presenze_map[d.data] : undefined;
-          const noPercTag = d.concorre_percentuale === false ? ' (no %)' : '';
-          if (pres === true) {
-            return `<span class="badge" style="background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; font-size:11px; padding:2px 6px;" title="${d.data_it}${noPercTag}: Presente">✓ ${d.data_it.substring(0,5)}${d.concorre_percentuale === false ? '*' : ''}</span>`;
-          } else if (pres === false) {
-            return `<span class="badge" style="background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; font-size:11px; padding:2px 6px;" title="${d.data_it}${noPercTag}: Assente">✗ ${d.data_it.substring(0,5)}${d.concorre_percentuale === false ? '*' : ''}</span>`;
-          } else {
-            return `<span class="badge" style="background:#f1f5f9; color:#64748b; font-size:11px; padding:2px 6px;" title="${d.data_it}: Non iscritto">- ${d.data_it.substring(0,5)}</span>`;
-          }
-        }).join('') +
-        '</div>';
-    }
 
     const percColor = s.percentuale >= 75 ? '#10b981' : (s.percentuale >= 50 ? '#f59e0b' : '#ef4444');
 
@@ -2235,9 +2295,6 @@ function renderTabellaRegistroCatechismo() {
               ✗ Assente
             </button>
           </div>
-        </td>
-        <td>
-          ${storicoHtml}
         </td>
         <td style="text-align: center; font-size: 12.5px; font-weight: 600; color: var(--ink-700);">
           ${s.presenti} / ${s.totale_incontri}
@@ -2293,8 +2350,7 @@ async function handleSalvaAppelloCatechismo(e) {
     if (!res.ok) throw new Error(result.error || 'Errore salvataggio presenze');
 
     showToast(result.message || 'Presenze incontro registrate con successo!', 'success');
-    closeModal('modalAppelloCatechismo');
-    await loadCatechismo();
+    await openCatechismoDates(gruppoId);
   } catch (err) {
     showToast(err.message, 'error');
   } finally {
@@ -8517,6 +8573,7 @@ async function loadAssignedGroupRegisters(category) {
 }
 async function openCalendarGroupAttendance(category,id,day) {
   if(category==='catechismo') {
+    if(currentView!=='catechismo') await navigateTo('catechismo');
     if(!cacheGruppiCatechismo.some(group=>group.id===id)) cacheGruppiCatechismo=(await apiJson('/api/catechismo/gruppi')).gruppi || [];
     await openModalAppelloCatechismo(id,day);
   } else if(category==='doposcuola') {

@@ -388,7 +388,7 @@ def get_registro_elettronico_gruppo(id):
     group=db.session.get(GruppoCatechismo,id)
     if not group: return jsonify(error='Gruppo non trovato'),404
     if not can_record('catechismo',group): raise Forbidden('Registro non disponibile per questo profilo')
-    return jsonify(registry_data('catechismo',group,request.args.get('mese')))
+    return jsonify(registry_data('catechismo',group,request.args.get('mese'),whole_year=request.args.get('periodo')=='anno'))
 
 
 @catechismo_bp.route('/gruppi/<int:id>/ragazzi/batch', methods=['POST'])

@@ -748,6 +748,7 @@ Domenica: dopo le Sante Messe</p>
 
           <!-- SEZIONE STAFF / CATECHISTI / SEGRETERIA -->
           <div id="catechismoStaffSection">
+            <div id="catechismoGroupOverview">
             <!-- Archivio per Anni Pastorali & Ricerca Gruppi -->
             <div class="card" style="margin-bottom: 20px; padding: 14px 20px;">
               <div style="display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap;">
@@ -766,6 +767,110 @@ Domenica: dopo le Sante Messe</p>
             </div>
 
             <div class="catechismo-grid" id="catechismoGruppiGrid"></div>
+            </div>
+            <section id="catechismoDatesSection" class="card catechismo-dates" style="display:none" aria-labelledby="catechismoDatesTitle">
+              <div class="catechismo-dates-header">
+                <div><h2 id="catechismoDatesTitle" tabindex="-1">Incontri del gruppo</h2><p id="catechismoDatesDetails"></p></div>
+                <button type="button" class="btn btn-secondary" onclick="tornaGruppiCatechismo()">← Gruppi</button>
+              </div>
+              <p>Seleziona una data per aprire l’appello. Sono inclusi gli appuntamenti dell’anno pastorale e tutte le presenze già salvate.</p>
+              <div id="catechismoDatesWarning" role="status"></div>
+              <div id="catechismoDatesList" aria-live="polite"></div>
+              <form class="catechismo-manual-date" onsubmit="apriDataManualeCatechismo(event)">
+                <label for="catechismoManualDate">Incontro fuori calendario</label>
+                <input type="date" id="catechismoManualDate" class="form-control" required>
+                <button type="submit" class="btn btn-secondary">Apri appello per questa data</button>
+              </form>
+            </section>
+  <section id="catechismoAttendanceSection" class="card catechismo-attendance" style="display:none" aria-labelledby="catechismoAttendanceTitle">
+      <div class="modal-header">
+        <div>
+          <h3 id="catechismoAttendanceTitle" tabindex="-1" style="margin:0">
+            Appello del gruppo
+          </h3>
+          <p style="margin: 4px 0 0 0; font-size: 12.5px; color: var(--ink-500);">
+            Segna le presenze per questa data e salva l’appello.
+          </p>
+        </div>
+        <button type="button" class="btn btn-secondary" onclick="tornaDateCatechismo()">← Tutte le date</button>
+      </div>
+      <form onsubmit="handleSalvaAppelloCatechismo(event)" style="display: flex; flex-direction: column; flex: 1; overflow: hidden; margin: 0;">
+        <input type="hidden" id="appelloGruppoId">
+        <input type="hidden" id="appelloAttivitaId">
+        <div class="modal-body" style="overflow-y: auto; flex: 1; padding: 18px 24px;">
+          <!-- Info Gruppo Banner -->
+          <div style="background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%); border: 1px solid #bae6fd; border-left: 4px solid #0284c7; padding: 12px 18px; border-radius: var(--radius-md); margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #0369a1; letter-spacing: 0.5px;">Gruppo Catechismo</div>
+              <strong id="appelloGruppoNome" style="font-size: 16px; color: var(--ink-900);"></strong>
+              <div id="appelloGruppoDettaglio" style="font-size: 12px; color: var(--ink-600); margin-top: 2px;"></div>
+            </div>
+            <div style="text-align: right;">
+              <span id="appelloStatsGruppo" class="badge badge-info" style="font-size: 12px; padding: 6px 12px;"></span>
+            </div>
+          </div>
+
+          <!-- Barra Strumenti Appello: Data Incontro, Titolo, Percentuale e Azioni Rapide -->
+          <div style="display: flex; flex-direction: column; gap: 12px; background: #fff; border: 1px solid var(--border-light); padding: 14px 18px; border-radius: var(--radius-md); margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap;">
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <label for="appelloDataIncontro" style="margin: 0; font-weight: 700; font-size: 13px; color: var(--ink-800);">📅 Data Incontro:</label>
+                <input type="date" id="appelloDataIncontro" class="form-control" style="width: 160px; font-weight: 600;" readonly required>
+
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; justify-content: flex-end;">
+                <input type="text" id="appelloTitoloIncontro" aria-label="Titolo incontro" class="form-control" placeholder="Titolo incontro (es. Festa di Carnevale, Incontro #3)" style="max-width: 280px; font-size: 12.5px;">
+                <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; margin: 0; cursor: pointer; font-weight: 600; color: var(--ink-800); background: #f8fafc; border: 1px solid var(--border-light); padding: 6px 10px; border-radius: var(--radius-sm);" title="Se deselezionato (es. festa parrocchiale), gli assenti non saranno penalizzati nel calcolo della percentuale presenze">
+                  <input type="checkbox" id="appelloConcorrePercentuale" checked> Concorre a % presenze
+                </label>
+                <button type="button" id="btnCancellaIncontroCatechismo" class="btn btn-sm btn-outline-danger" onclick="confermaCancellaIncontroCatechismo()" title="Elimina questo incontro dal registro presenze" style="font-weight: 600;">
+                  🗑️ Cancella Incontro
+                </button>
+              </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; border-top: 1px dashed var(--border-light); padding-top: 10px;">
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span style="font-size: 12px; font-weight: 600; color: var(--ink-500); margin-right: 4px;">Azioni Rapide:</span>
+                <button type="button" class="btn btn-sm" onclick="segnaTuttiPresentiCatechismo()" style="color: #166534; background: #f0fdf4; border: 1px solid #bbf7d0; font-weight: 600;">✓ Tutti Presenti</button>
+                <button type="button" class="btn btn-sm" onclick="segnaTuttiAssentiCatechismo()" style="color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; font-weight: 600;">✗ Tutti Assenti</button>
+              </div>
+              <div id="appelloConteggioLive" style="font-size: 12.5px; font-weight: 700; color: var(--ink-800); background: #f8fafc; padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border-light);"></div>
+            </div>
+          </div>
+
+          <!-- Matrice Registro Elettronico -->
+          <div class="table-responsive" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-light); border-radius: var(--radius-md); background: #fff;">
+            <table class="custom-table" id="tableRegistroElettronicoCatechismo" style="margin: 0; width: 100%;">
+              <thead>
+                <tr>
+                  <th style="width: 36px; text-align: center;">#</th>
+                  <th style="min-width: 180px;">Ragazzo / Allievo</th>
+                  <th style="width: 210px; text-align: center; background: #e0f2fe; color: #0369a1; border-left: 2px solid #38bdf8; border-right: 2px solid #38bdf8;">
+                    Appello Data Selezionata
+                  </th>
+                  <th style="width: 100px; text-align: center;">Presenze</th>
+                  <th style="width: 80px; text-align: center;">% Pres.</th>
+                </tr>
+              </thead>
+              <tbody id="registroElettronicoCatechismoBody">
+                <!-- Generato dinamicamente via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 24px; background: #f8fafc; border-top: 1px solid var(--border-light);">
+          <div style="font-size: 12px; color: var(--ink-500);">
+            💡 <em>Clicca su <strong>Presente</strong> o <strong>Assente</strong> per ciascun ragazzo. Poi premi Salva per registrare.</em>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn btn-secondary" onclick="tornaDateCatechismo()">Annulla</button>
+            <button type="submit" class="btn btn-primary" id="btnSalvaRegistroCatechismo">💾 Salva Registro Presenze</button>
+          </div>
+        </div>
+      </form>
+  </section>
+
+
           </div>
 
           <!-- SEZIONE GENITORE / UTENTE (VEDE SOLO I PROPRI FIGLI) -->
@@ -2835,98 +2940,6 @@ Domenica: dopo le Sante Messe</p>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal('modalAdminResetPassword')">Annulla</button>
           <button type="submit" class="btn btn-primary">Reimposta Password</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Modal Appello Catechismo Gruppo -> REGISTRO ELETTRONICO -->
-  <div class="modal-overlay" id="modalAppelloCatechismo">
-    <div class="modal-window" style="max-width: 980px; width: 95vw; max-height: 90vh; display: flex; flex-direction: column;">
-      <div class="modal-header">
-        <div>
-          <h3 style="margin: 0; display: flex; align-items: center; gap: 8px;">
-            <i>📖</i> Registro Elettronico & Appello Catechismo
-          </h3>
-          <p style="margin: 4px 0 0 0; font-size: 12.5px; color: var(--ink-500);">
-            Segna le presenze/assenze dell'incontro e visualizza la partecipazione agli incontri passati.
-          </p>
-        </div>
-        <button class="btn-close-modal" onclick="closeModal('modalAppelloCatechismo')">×</button>
-      </div>
-      <form onsubmit="handleSalvaAppelloCatechismo(event)" style="display: flex; flex-direction: column; flex: 1; overflow: hidden; margin: 0;">
-        <input type="hidden" id="appelloGruppoId">
-        <input type="hidden" id="appelloAttivitaId">
-        <div class="modal-body" style="overflow-y: auto; flex: 1; padding: 18px 24px;">
-          <!-- Info Gruppo Banner -->
-          <div style="background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%); border: 1px solid #bae6fd; border-left: 4px solid #0284c7; padding: 12px 18px; border-radius: var(--radius-md); margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-            <div>
-              <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #0369a1; letter-spacing: 0.5px;">Gruppo Catechismo</div>
-              <strong id="appelloGruppoNome" style="font-size: 16px; color: var(--ink-900);"></strong>
-              <div id="appelloGruppoDettaglio" style="font-size: 12px; color: var(--ink-600); margin-top: 2px;"></div>
-            </div>
-            <div style="text-align: right;">
-              <span id="appelloStatsGruppo" class="badge badge-info" style="font-size: 12px; padding: 6px 12px;"></span>
-            </div>
-          </div>
-
-          <!-- Barra Strumenti Appello: Data Incontro, Titolo, Percentuale e Azioni Rapide -->
-          <div style="display: flex; flex-direction: column; gap: 12px; background: #fff; border: 1px solid var(--border-light); padding: 14px 18px; border-radius: var(--radius-md); margin-bottom: 16px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap;">
-              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                <label for="appelloDataIncontro" style="margin: 0; font-weight: 700; font-size: 13px; color: var(--ink-800);">📅 Data Incontro:</label>
-                <input type="date" id="appelloDataIncontro" class="form-control" style="width: 160px; font-weight: 600;" onchange="onDataIncontroCatechismoChanged()" required><div class="calendar-meeting-picker" id="appelloGoogleDateBox" style="display:none"><label for="appelloGoogleDate">Incontri dal calendario Google</label><select id="appelloGoogleDate" class="form-control" onchange="chooseCalendarMeeting(this,'appello')"></select><small>Un solo appello per gruppo e giornata. Le presenze si salvano nel sito.</small></div>
-                <button type="button" class="btn btn-sm btn-secondary" onclick="impostaOggiDataCatechismo()">Oggi</button>
-              </div>
-              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; justify-content: flex-end;">
-                <input type="text" id="appelloTitoloIncontro" class="form-control" placeholder="Titolo incontro (es. Festa di Carnevale, Incontro #3)" style="max-width: 280px; font-size: 12.5px;">
-                <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; margin: 0; cursor: pointer; font-weight: 600; color: var(--ink-800); background: #f8fafc; border: 1px solid var(--border-light); padding: 6px 10px; border-radius: var(--radius-sm);" title="Se deselezionato (es. festa parrocchiale), gli assenti non saranno penalizzati nel calcolo della percentuale presenze">
-                  <input type="checkbox" id="appelloConcorrePercentuale" checked> Concorre a % presenze
-                </label>
-                <button type="button" id="btnCancellaIncontroCatechismo" class="btn btn-sm btn-outline-danger" onclick="confermaCancellaIncontroCatechismo()" title="Elimina questo incontro dal registro presenze" style="font-weight: 600;">
-                  🗑️ Cancella Incontro
-                </button>
-              </div>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; border-top: 1px dashed var(--border-light); padding-top: 10px;">
-              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                <span style="font-size: 12px; font-weight: 600; color: var(--ink-500); margin-right: 4px;">Azioni Rapide:</span>
-                <button type="button" class="btn btn-sm" onclick="segnaTuttiPresentiCatechismo()" style="color: #166534; background: #f0fdf4; border: 1px solid #bbf7d0; font-weight: 600;">✓ Tutti Presenti</button>
-                <button type="button" class="btn btn-sm" onclick="segnaTuttiAssentiCatechismo()" style="color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; font-weight: 600;">✗ Tutti Assenti</button>
-              </div>
-              <div id="appelloConteggioLive" style="font-size: 12.5px; font-weight: 700; color: var(--ink-800); background: #f8fafc; padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border-light);"></div>
-            </div>
-          </div>
-
-          <!-- Matrice Registro Elettronico -->
-          <div class="table-responsive" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-light); border-radius: var(--radius-md); background: #fff;">
-            <table class="custom-table" id="tableRegistroElettronicoCatechismo" style="margin: 0; width: 100%;">
-              <thead>
-                <tr>
-                  <th style="width: 36px; text-align: center;">#</th>
-                  <th style="min-width: 180px;">Ragazzo / Allievo</th>
-                  <th style="width: 210px; text-align: center; background: #e0f2fe; color: #0369a1; border-left: 2px solid #38bdf8; border-right: 2px solid #38bdf8;">
-                    Appello Data Selezionata
-                  </th>
-                  <th style="min-width: 240px;">Incontri Passati (Storico Presenze)</th>
-                  <th style="width: 100px; text-align: center;">Presenze</th>
-                  <th style="width: 80px; text-align: center;">% Pres.</th>
-                </tr>
-              </thead>
-              <tbody id="registroElettronicoCatechismoBody">
-                <!-- Generato dinamicamente via JS -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 24px; background: #f8fafc; border-top: 1px solid var(--border-light);">
-          <div style="font-size: 12px; color: var(--ink-500);">
-            💡 <em>Clicca su <strong>Presente</strong> o <strong>Assente</strong> per ciascun ragazzo. Poi premi Salva per registrare.</em>
-          </div>
-          <div style="display: flex; gap: 8px;">
-            <button type="button" class="btn btn-secondary" onclick="closeModal('modalAppelloCatechismo')">Annulla</button>
-            <button type="submit" class="btn btn-primary" id="btnSalvaRegistroCatechismo">💾 Salva Registro Presenze</button>
-          </div>
         </div>
       </form>
     </div>
