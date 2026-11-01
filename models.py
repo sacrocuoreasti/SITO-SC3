@@ -1,3 +1,4 @@
+from services.group_calendar import calendar_info
 import json
 import secrets
 import string
@@ -63,7 +64,10 @@ class Persona(db.Model):
     luogo_nascita = db.Column(db.String(100), nullable=True)
     provincia_nascita = db.Column(db.String(10), nullable=True)
     
+    consensi_aggiunta = db.Column(db.Text, nullable=True)
+
     # Residenza
+    civico_residenza = db.Column(db.String(30), nullable=True)
     indirizzo_residenza = db.Column(db.String(200), nullable=True)
     comune_residenza = db.Column(db.String(100), default='Asti')
     cap_residenza = db.Column(db.String(10), default='14100')
@@ -131,6 +135,7 @@ class Persona(db.Model):
             'luogo_nascita': self.luogo_nascita or '',
             'provincia_nascita': self.provincia_nascita or '',
             'indirizzo_residenza': self.indirizzo_residenza or '',
+            'civico_residenza': self.civico_residenza or '',
             'comune_residenza': self.comune_residenza or 'Asti',
             'cap_residenza': self.cap_residenza or '14100',
             'provincia_residenza': self.provincia_residenza or 'AT',
@@ -491,8 +496,10 @@ class Iscrizione(db.Model):
         except Exception:
             pass
 
+        from routes.iscrizioni import can_withdraw
         return {
             'id': self.id,
+            'puo_disiscriversi': can_withdraw(self),
             'attivita_id': self.attivita_id,
             'attivita_titolo': self.attivita.titolo if self.attivita else '',
             'attivita_categoria': self.attivita.categoria if self.attivita else '',
@@ -622,6 +629,7 @@ class GruppoCatechismo(db.Model):
             'orario_incontri': self.orario_incontri or '',
             'aula': self.aula or '',
             'google_calendar_url': self.google_calendar_url or '',
+            'calendar_embed_url': calendar_info(self),
             'note': self.note or '',
             'stato': self.stato or 'pubblico',
             'attivita_id': self.attivita_id,
@@ -636,6 +644,7 @@ class GruppoCatechismo(db.Model):
 # ================= GRUPPI DOPOSCUOLA =================
 class GruppoDoposcuola(db.Model):
     __tablename__ = 'gruppo_doposcuola'
+    google_calendar_url = db.Column(db.String(500), nullable=True)
     eta_min = db.Column(db.Integer, nullable=True)
     eta_max = db.Column(db.Integer, nullable=True)
 
@@ -662,6 +671,8 @@ class GruppoDoposcuola(db.Model):
     def to_dict(self, include_studenti=True):
         d = {
             'id': self.id,
+            'google_calendar_url': self.google_calendar_url or '',
+            'calendar_embed_url': calendar_info(self),
             'eta_min': self.eta_min,
             'eta_max': self.eta_max,
             'nome': self.nome,
@@ -690,6 +701,7 @@ class GruppoDoposcuola(db.Model):
 # ================= GRUPPI ORATORIO (ESTIVO & INVERNALE) =================
 class GruppoOratorio(db.Model):
     __tablename__ = 'gruppo_oratorio'
+    google_calendar_url = db.Column(db.String(500), nullable=True)
     eta_min = db.Column(db.Integer, nullable=True)
     eta_max = db.Column(db.Integer, nullable=True)
 
@@ -737,6 +749,8 @@ class GruppoOratorio(db.Model):
 
         d = {
             'id': self.id,
+            'google_calendar_url': self.google_calendar_url or '',
+            'calendar_embed_url': calendar_info(self),
             'eta_min': self.eta_min,
             'eta_max': self.eta_max,
             'nome': self.nome,
@@ -1037,6 +1051,10 @@ def init_default_configurazioni():
         # Verifica ed aggiunta colonne mancanti per SQLite
         from sqlalchemy import text
         col_checks = [
+            ('persona','civico_residenza','VARCHAR(30)'),
+            ('persona','consensi_aggiunta','TEXT'),
+            ('gruppo_oratorio','google_calendar_url','VARCHAR(500)'),
+            ('gruppo_doposcuola','google_calendar_url','VARCHAR(500)'),
             ('gruppo_oratorio', 'eta_min', 'INTEGER'),
             ('gruppo_oratorio', 'eta_max', 'INTEGER'),
             ('gruppo_catechismo', 'eta_min', 'INTEGER'),

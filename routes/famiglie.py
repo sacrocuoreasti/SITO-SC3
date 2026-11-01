@@ -1,3 +1,4 @@
+from services.profile_files import profile_payload, commit_profile
 from flask import Blueprint, request, jsonify
 from flask_login import current_user, login_required
 from models import db, NucleoFamiliare, Persona, Utente, RichiestaNucleo
@@ -130,7 +131,7 @@ def add_membro(id):
         return jsonify(error='Nucleo familiare non trovato'), 404
     if not can_manage_family(nucleo):
         return jsonify(error='Solo il capofamiglia o la segreteria possono aggiungere membri'), 403
-    data = request.get_json() or {}
+    data = profile_payload()
     cf = normalizza_cf(data.get('codice_fiscale', ''))
     nome = data.get('nome', '').strip()
     cognome = data.get('cognome', '').strip() or (nucleo.capofamiglia.cognome if nucleo.capofamiglia else '')
@@ -142,16 +143,17 @@ def add_membro(id):
     existing = db.session.get(Persona, cf)
     if existing:
         return jsonify(error='Persona già censita: usa la modifica della scheda o un invito, senza sovrascrivere dati esistenti'), 409
-    consents = None
-    if email or password:
+    try:
+        consents = consent_record(data, current_user.id)
+    except ValueError as error:
+        return jsonify(error=str(error)),400
+    if email and '@' not in email:
+        return jsonify(error='Email non valida'),400
+    if password:
         if '@' not in email or len(password) < 8:
             return jsonify(error='Per attivare l’account servono email e password di almeno 8 caratteri'), 400
         if Utente.query.filter_by(email=email).first():
             return jsonify(error='Email già utilizzata da un account'), 409
-        try:
-            consents = consent_record(data, current_user.id)
-        except ValueError as error:
-            return jsonify(error=str(error)), 400
     dati_cf = estrai_dati_cf(cf)
     born = dati_cf.get('data_nascita')
     if data.get('data_nascita'):
@@ -160,7 +162,7 @@ def add_membro(id):
         except ValueError:
             return jsonify(error='Data di nascita non valida'), 400
     capo = nucleo.capofamiglia
-    persona = Persona(codice_fiscale=cf, nome=nome, cognome=cognome, sesso=data.get('sesso') or dati_cf.get('sesso', 'M'),
+    persona = Persona(consensi_aggiunta=consents, civico_residenza=data.get('civico_residenza', '').strip() or (capo.civico_residenza if capo else None), codice_fiscale=cf, nome=nome, cognome=cognome, sesso=data.get('sesso') or dati_cf.get('sesso', 'M'),
                       data_nascita=born, luogo_nascita=data.get('luogo_nascita', '').strip(),
                       indirizzo_residenza=data.get('indirizzo_residenza', '').strip() or (capo.indirizzo_residenza if capo else None) or nucleo.indirizzo,
                       comune_residenza=data.get('comune_residenza', '').strip() or (capo.comune_residenza if capo else None) or nucleo.citta,
@@ -169,7 +171,7 @@ def add_membro(id):
                       telefono=data.get('telefono', '').strip(), email=email,
                       intolleranze_alimentari=data.get('intolleranze_alimentari', '').strip(),
                       allergie=data.get('allergie', '').strip(), terapie_medicinali=data.get('terapie_medicinali', '').strip(),
-                      nucleo_id=nucleo.id, ruolo_famiglia=role)
+                      nucleo_id=nucleo.id, ruolo_famiglia=role, note_generali=data.get('note_generali','').strip())
     db.session.add(persona)
     db.session.flush()
     if email and password:
@@ -177,8 +179,8 @@ def add_membro(id):
                       gestito_da_id=current_user.id, consensi_registrazione=consents, is_attivo=True)
         user.set_password(password)
         db.session.add(user)
-    db.session.commit()
-    return jsonify(success=True, message='Membro aggiunto al nucleo' + (' e account personale attivato' if email else ''), persona=persona.to_dict()), 201
+    commit_profile(persona, data)
+    return jsonify(success=True, message='Membro aggiunto al nucleo' + (' e account personale attivato' if password else ''), persona=persona.to_dict()), 201
 
 
 @famiglie_bp.route('/<int:id>/membri/<cf>/account', methods=['PUT'])
@@ -350,3 +352,19 @@ def enroll_family_group():
             members.append(allowed[cf])
     db.session.commit()
     return jsonify(success=True,message='Iscrizione al gruppo completata')
+
+
+@famiglie_bp.route('/calendari-gruppi', methods=['GET'])
+@login_required
+def get_family_group_calendars():
+    from services.enrollment_options import manageable_people
+    from services.group_calendar import calendar_info
+    calendars={}
+    for person in manageable_people():
+        for category in ('oratorio','catechismo','doposcuola'):
+            for group in getattr(person,'gruppi_'+category):
+                url=calendar_info(group)
+                if url:
+                    key=category+':'+str(group.id)
+                    calendars[key]={'id':key,'titolo':group.nome,'categoria':category,'calendar_embed_url':url,'google_calendar_url':url}
+    return jsonify(calendari=list(calendars.values()))

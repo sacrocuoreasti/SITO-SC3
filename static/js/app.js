@@ -584,6 +584,7 @@ async function validateCFField(input) {
   const data = await res.json();
 
   if (data.valido) {
+    updateDocumentAge('regDocumenti',ageFromDate(data.estratto.data_nascita));
     feedbackEl.textContent = `✓ Codice Fiscale valido (${data.estratto.sesso || ''}, nato/a il ${data.estratto.data_nascita || ''})`;
     feedbackEl.className = 'cf-feedback valid';
   } else {
@@ -612,7 +613,7 @@ async function validateCFFieldMembro(input) {
     feedbackEl.textContent = `✓ Codice Fiscale valido`;
     feedbackEl.className = 'cf-feedback valid';
     if (data.estratto.sesso) document.getElementById('membroSesso').value = data.estratto.sesso;
-    if (data.estratto.data_nascita) document.getElementById('membroDataNascita').value = data.estratto.data_nascita;
+    if (data.estratto.data_nascita) {document.getElementById('membroDataNascita').value = data.estratto.data_nascita;updateDocumentAge('membroDocumenti',ageFromDate(data.estratto.data_nascita));}
   } else {
     feedbackEl.textContent = `✗ Codice Fiscale non valido`;
     feedbackEl.className = 'cf-feedback invalid';
@@ -639,7 +640,7 @@ async function validateCFFieldPersona(input) {
     feedbackEl.textContent = `✓ CF Valido`;
     feedbackEl.className = 'cf-feedback valid';
     if (data.estratto.sesso) document.getElementById('personaSesso').value = data.estratto.sesso;
-    if (data.estratto.data_nascita) document.getElementById('personaDataNascita').value = data.estratto.data_nascita;
+    if (data.estratto.data_nascita) {document.getElementById('personaDataNascita').value = data.estratto.data_nascita;updateDocumentAge('personaDocumenti',ageFromDate(data.estratto.data_nascita));}
   } else {
     feedbackEl.textContent = `✗ CF non valido`;
     feedbackEl.className = 'cf-feedback invalid';
@@ -1029,9 +1030,7 @@ async function loadFamilyIscrizioni() {
                 <i>📄</i> Ricevuta
               </button>
             ` : ''}
-            <button class="btn btn-sm btn-danger" onclick="annullaMiaIscrizione(${i.id})">
-              ❌ Disiscriviti
-            </button>
+            ${withdrawButton(i)}
           </div>
         </td>
       </tr>
@@ -1366,7 +1365,7 @@ function renderGruppiOratorioGrid() {
           <div>
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
               <span style="font-size: 18px;">${currentOratorioTipoTab === 'estivo' ? '☀️' : '❄️'}</span>
-              <h3 style="margin: 0; font-size: 16.5px; font-weight: 700; color: var(--ink-900);">${escapeHtml(g.nome)}</h3>
+              <h3 style="margin: 0; font-size: 16.5px; font-weight: 700; color: var(--ink-900);">${escapeHtml(g.nome)}</h3>${groupCalendarMarkup(g)}
             </div>
             <span style="font-size: 12px; color: var(--ink-500); font-weight: 600;">Anno Pastorale: ${escapeHtml(g.anno_pastorale)}</span>
           </div>
@@ -1503,6 +1502,7 @@ async function openModalNuovoGruppoOratorio(tipoPredefinito = 'estivo') {
     console.error('Errore caricamento persone per animatori:', err);
   }
 
+  document.getElementById('nuovoOratorioGoogleCalendarUrl').value = '';
   setGroupAges('nuovoOratorio', {});
   openModal('modalNuovoGruppoOratorio');
 }
@@ -1514,6 +1514,7 @@ async function handleSalvaNuovoGruppoOratorio(e) {
 
   const payload = {
     ...readGroupAges('nuovoOratorio'),
+    google_calendar_url: document.getElementById('nuovoOratorioGoogleCalendarUrl').value.trim(),
     tipo_oratorio: document.getElementById('nuovoOratorioTipo').value,
     anno_pastorale: document.getElementById('nuovoOratorioAnno').value.trim(),
     nome: document.getElementById('nuovoOratorioNome').value.trim(),
@@ -1573,6 +1574,7 @@ async function openModalModificaGruppoOratorio(id) {
     console.error('Errore animatori:', err);
   }
 
+  document.getElementById('modOratorioGoogleCalendarUrl').value = g.google_calendar_url || '';
   setGroupAges('modOratorio', g);
   openModal('modalModificaGruppoOratorio');
 }
@@ -1586,6 +1588,7 @@ async function handleSalvaModificaGruppoOratorio(e) {
 
   const payload = {
     ...readGroupAges('modOratorio'),
+    google_calendar_url: document.getElementById('modOratorioGoogleCalendarUrl').value.trim(),
     tipo_oratorio: document.getElementById('modOratorioTipo').value,
     anno_pastorale: document.getElementById('modOratorioAnno').value.trim(),
     nome: document.getElementById('modOratorioNome').value.trim(),
@@ -2170,6 +2173,7 @@ function renderGruppiCatechismoGrid() {
         <div>👤 Catechista: <strong>${escapeHtml(g.catechista_nome || 'Non assegnato')}</strong></div>
         <div>🕒 Orario: <strong>${escapeHtml(g.orario_incontri || 'Non specificato')}</strong></div>
         <div>📍 Aula: <strong>${escapeHtml(g.aula || 'Non specificata')}</strong></div>
+        ${groupCalendarMarkup(g)}
         ${g.note ? `<div style="margin-top: 4px; font-style: italic; color: var(--ink-500);">📝 ${escapeHtml(g.note)}</div>` : ''}
       </div>
 
@@ -3210,6 +3214,7 @@ function renderGruppiDoposcuolaGrid() {
         <div>👤 Educatore: <strong>${escapeHtml(g.educatore_nome || 'Da assegnare')}</strong></div>
         <div>🕒 Pomeriggi: <strong>${escapeHtml(g.giorni_orari || g.orario_incontri || 'Non specificato')}</strong></div>
         <div>📍 Aula: <strong>${escapeHtml(g.aula || 'Non specificata')}</strong></div>
+        ${groupCalendarMarkup(g)}
         ${g.note ? `<div style="margin-top: 4px; font-style: italic; color: var(--ink-500);">📝 ${escapeHtml(g.note)}</div>` : ''}
       </div>
 
@@ -3285,6 +3290,7 @@ async function openModalNuovoGruppoDoposcuola() {
   document.getElementById('dopAula').value = '';
   document.getElementById('dopNote').value = '';
   await loadEducatoriDoposcuolaSelect('dopSelectEducatore');
+  document.getElementById('dopGoogleCalendarUrl').value = '';
   setGroupAges('dop', {});
   openModal('modalNuovoGruppoDoposcuola');
 }
@@ -3310,6 +3316,7 @@ async function handleSalvaGruppoDoposcuola(e) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...readGroupAges('dop'),
+    google_calendar_url: document.getElementById('dopGoogleCalendarUrl').value.trim(),
         nome,
         anno_scolastico: anno,
         stato,
@@ -3359,6 +3366,7 @@ async function openModalModificaGruppoDoposcuola(id) {
     }
   }
 
+  document.getElementById('modDopGoogleCalendarUrl').value = g.google_calendar_url || '';
   setGroupAges('modDop', g);
   openModal('modalModificaGruppoDoposcuola');
 }
@@ -3385,6 +3393,7 @@ async function handleSalvaModificaGruppoDoposcuola(e) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...readGroupAges('modDop'),
+    google_calendar_url: document.getElementById('modDopGoogleCalendarUrl').value.trim(),
         nome,
         anno_scolastico: anno,
         stato,
@@ -3907,6 +3916,7 @@ function renderTableSegreteria(items) {
           <button class="btn btn-sm btn-secondary" onclick="apriRicevutaIscrizione(${i.id})">
             📄 Ricevuta
           </button>
+          ${withdrawButton(i)}
         </div>
       </td>
     </tr>
@@ -4861,7 +4871,7 @@ async function apriSchedaVisualizzazionePersona(cf) {
     document.getElementById('viewSchedaSesso').textContent = p.sesso === 'M' ? 'Maschile (M)' : 'Femminile (F)';
     document.getElementById('viewSchedaDataNascita').textContent = p.data_nascita_it || p.data_nascita || '-';
     document.getElementById('viewSchedaEta').textContent = p.eta !== null ? `${p.eta} anni` : '-';
-    document.getElementById('viewSchedaComuneNascita').textContent = p.comune_nascita || '-';
+    document.getElementById('viewSchedaComuneNascita').textContent = p.luogo_nascita || p.comune_nascita || '-';
 
     document.getElementById('viewSchedaFamigliaNome').textContent = p.nome_famiglia || 'Non assegnato';
     document.getElementById('viewSchedaRuoloFamiglia').textContent = (p.ruolo_famiglia === 'Capofamiglia' ? 'Ruolo da specificare' : p.ruolo_famiglia || 'Non specificato') + (p.is_capofamiglia ? ' · Responsabile capofamiglia' : '');
@@ -4875,6 +4885,7 @@ async function apriSchedaVisualizzazionePersona(cf) {
     document.getElementById('viewSchedaEmail').textContent = p.email || '-';
 
     const battEl = document.getElementById('viewSchedaBattesimo');
+    battEl.parentElement.style.display=p.certificato_battesimo_url ? 'flex':'none';
     if (p.certificato_battesimo_url) {
       battEl.innerHTML = `<a href="${p.certificato_battesimo_url}" target="_blank" style="color:var(--primary); font-weight:700;">📄 Visualizza / Scarica Certificato</a>`;
     } else {
@@ -4898,6 +4909,9 @@ async function apriSchedaVisualizzazionePersona(cf) {
       noteEl.textContent = p.note_generali || 'Nessuna annotazione registrata.';
     }
 
+    for(const [key,value] of [['Civico',p.civico_residenza],['CAP',p.cap_residenza],['Provincia',p.provincia_residenza]]) document.getElementById('viewScheda'+key).textContent=value || '—';
+    const photo=document.getElementById('viewSchedaPhoto');if(p.foto_profilo_url) photo.src=p.foto_profilo_url;else photo.removeAttribute('src');photo.style.display=p.foto_profilo_url ? 'block':'none';
+    document.getElementById('viewSchedaDocumenti').innerHTML=Object.entries(documentKinds).filter(([kind])=>visibleDocumentKind(kind,p.eta) || (p.documenti || []).some(d=>d.tipo===kind)).map(([kind,label])=>`<h4>${escapeHtml(label)}</h4>${(p.documenti || []).filter(d=>d.tipo===kind).map(d=>`<p><a href="${d.download_url}">${escapeHtml(d.nome_originale)}</a>${d.numero_documento ? `<br>${escapeHtml(d.numero_documento)} · ${escapeHtml(d.rilasciato_da)} · ${escapeHtml(d.data_rilascio)} – ${escapeHtml(d.data_scadenza)}`:''}</p>`).join('') || '<p>Nessun allegato presente</p>'}`).join('');
     openModal('modalSchedaPersonaVisualizzazione');
   } catch (err) {
     showToast(err.message, 'error');
@@ -5618,10 +5632,11 @@ async function openModalAggiungiFiglio() {
   document.getElementById('membroRuolo').value = 'Figlio/a';
   document.getElementById('membroSesso').value = 'M';
   document.getElementById('membroDataNascita').value = '';
-  await renderRegistrationConsents('memberAccountConsents', false);
+  await renderRegistrationConsents('memberAccountConsents', true);
   document.getElementById('membroIntolleranze').value = '';
   document.getElementById('membroAllergie').value = '';
   await renderHealthSections('membro');
+  setupProfileExtras('membro','membroDocumenti',{civico_residenza:capo.civico_residenza,provincia_residenza:capo.provincia_residenza,cap_residenza:capo.cap_residenza});
   openModal('modalAggiungiFiglio');
 }
 
@@ -5645,19 +5660,19 @@ async function handleSalvaNuovoMembro(e) {
   }
 
   try {
-    const res = await fetch(`/api/famiglie/${nucleoId}/membri`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const upload = profileForm('membro', 'membroDocumenti', {
+        civico_residenza: document.getElementById('membroCivico').value, cap_residenza: document.getElementById('membroCAP').value, provincia_residenza: document.getElementById('membroProvincia').value,
+        telefono: document.getElementById('membroTelefono').value, note_generali: document.getElementById('membroNote').value,
+
         nome, cognome, codice_fiscale: cf, sesso, data_nascita: dataNascita,
         luogo_nascita: luogoNascita, indirizzo_residenza: indirizzo,
         ruolo_famiglia: ruolo, intolleranze_alimentari: intolleranze, allergie,
-        comune_residenza: document.getElementById('membroComune').value, cap_residenza: document.getElementById('membroCAP').value,
+        comune_residenza: document.getElementById('membroComune').value,
         terapie_medicinali: document.getElementById('membroTerapie').value,
         email: document.getElementById('membroEmail').value, password: document.getElementById('membroPassword').value,
         consensi_registrazione: readRegistrationConsents('memberAccountConsents')
-      })
     });
+    const res = await fetch(`/api/famiglie/${nucleoId}/membri`, {method:'POST',body:upload});
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Errore salvataggio membro');
 
@@ -5772,7 +5787,7 @@ function onIscrizioneFormChange(defaultCF = null) {
   const selected = new Set([...document.querySelectorAll('.family-participant:checked')].map(x => x.value));
   if (defaultCF) selected.add(defaultCF);
   document.getElementById('iscrizionePartecipantiCheckbox').innerHTML = enrollmentPeople.map(person => {
-    const already = enrollmentExisting.some(i => i.attivita_id === activity.id && i.codice_fiscale_partecipante === person.codice_fiscale);
+    const already = enrollmentExisting.some(i => i.attivita_id === activity.id && i.codice_fiscale_partecipante === person.codice_fiscale && i.stato !== 'annullata');
     const eligible = ageEligible(person, activity);
     return `<label class="choice-row"><input type="checkbox" class="family-participant" value="${person.codice_fiscale}" ${already || !eligible ? 'disabled' : ''} ${selected.has(person.codice_fiscale) && eligible && !already ? 'checked' : ''} onchange="updateFamilyEnrollmentSelection()"><span><strong>${escapeHtml(person.nominativo)}</strong><br><small>${person.eta === null ? 'Età non indicata' : person.eta + ' anni'}${already ? ' · Già iscritto/a' : !eligible ? ' · Fuori dalla fascia di età' : ''}</small></span></label>`;
   }).join('') || '<p>Aggiungi prima i componenti al tuo nucleo familiare.</p>';
@@ -6168,6 +6183,12 @@ async function openModalNuovaPersona() {
   document.getElementById('personaAllergie').value = '';
   document.getElementById('personaTerapie').value = '';
   await renderHealthSections('persona');
+  const options=await getFamilyOptions();
+  document.getElementById('personaRuolo').innerHTML=options.ruoli_famiglia.map(role=>`<option>${escapeHtml(role)}</option>`).join('');
+  document.getElementById('personaRuolo').value='Altro';
+  document.getElementById('personaDataNascita').value='';
+  document.getElementById('personaSesso').value='M';
+  setupProfileExtras('persona','personaDocumenti',{});
   openModal('modalNuovaPersona');
 }
 
@@ -6187,16 +6208,16 @@ async function handleSalvaNuovaPersona(e) {
   const allergie = document.getElementById('personaAllergie').value.trim();
 
   try {
-    const res = await fetch('/api/persone', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const upload = profileForm('persona', 'personaDocumenti', {
+        civico_residenza: document.getElementById('personaCivico').value, cap_residenza: document.getElementById('personaCAP').value, provincia_residenza: document.getElementById('personaProvincia').value,
+        ruolo_famiglia: document.getElementById('personaRuolo').value, note_generali: document.getElementById('personaNote').value,
+
         nome, cognome, codice_fiscale: cf, sesso, data_nascita: dataNascita,
         luogo_nascita: luogoNascita,
         telefono, email, indirizzo_residenza: indirizzo, comune_residenza: comune,
         intolleranze_alimentari: intolleranze, allergie, terapie_medicinali: document.getElementById('personaTerapie').value
-      })
     });
+    const res = await fetch('/api/persone', {method:'POST',body:upload});
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Errore inserimento anagrafica');
 
@@ -6549,7 +6570,7 @@ async function openModalModificaPersona(cf) {
       head.checked = p.is_capofamiglia;
       head.disabled = !currentUser.is_capofamiglia && !currentUser.tutti_i_ruoli.some(r=>['admin','segreteria','parroco'].includes(r));
     }
-    document.getElementById('modPersonaEmail').value = p.email || '';
+    document.getElementById('modPersonaEmail').value = p.email || (p.codice_fiscale===currentUser.codice_fiscale ? currentUser.email : '') || '';
     document.getElementById('modPersonaIntolleranze').value = p.intolleranze_alimentari || '';
     document.getElementById('modPersonaAllergie').value = p.allergie || '';
     if (document.getElementById('modPersonaNoteGenerali')) {
@@ -6576,7 +6597,8 @@ async function openModalModificaPersona(cf) {
       delBtn.style.display = 'none';
     }
 
-    renderDocuments('profiloDocumenti');
+    setupProfileExtras('modPersona','profiloDocumenti',p);
+    renderDocuments('profiloDocumenti',p.eta);
     document.getElementById('profiloDocumentiElenco').innerHTML = (p.documenti || []).map(d=>`<p><a href="${d.download_url}">${escapeHtml(documentKinds[d.tipo] || d.tipo)} — ${escapeHtml(d.nome_originale)}</a>${d.numero_documento ? `<br><small>${escapeHtml(d.numero_documento)} · ${escapeHtml(d.rilasciato_da)} · ${escapeHtml(d.data_rilascio)} – ${escapeHtml(d.data_scadenza)}</small>` : ''}</p>`).join('');
     openModal('modalModificaPersona');
   } catch (err) {
@@ -6603,11 +6625,9 @@ async function handleSalvaModificaPersona(e) {
   const noteGenerali = document.getElementById('modPersonaNoteGenerali')?.value.trim() || '';
 
   try {
-    const documents = collectDocuments('profiloDocumenti');
-    const res = await fetch(`/api/persone/${cf}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const upload = profileForm('modPersona', 'profiloDocumenti', {
+        civico_residenza: document.getElementById('modPersonaCivico').value, cap_residenza: document.getElementById('modPersonaCAP').value, provincia_residenza: document.getElementById('modPersonaProvincia').value,
+
         nome, cognome, sesso, data_nascita: dataNascita,
         luogo_nascita: luogoNascita, indirizzo_residenza: indirizzo,
         comune_residenza: comune, telefono: cellulare || telefono, email,
@@ -6616,12 +6636,11 @@ async function handleSalvaModificaPersona(e) {
         is_capofamiglia: document.getElementById('modPersonaCapofamiglia').disabled ? undefined : document.getElementById('modPersonaCapofamiglia').checked,
         terapie_medicinali: document.getElementById('modPersonaTerapie').value,
         note_generali: noteGenerali
-      })
     });
+    const res = await fetch(`/api/persone/${cf}`, {method:'PUT',body:upload});
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Errore modifica anagrafica');
 
-    if ([...documents.values()].some(value=>value instanceof File)) await apiJson(`/api/persone/${cf}/documenti`, {method:'POST',body:documents});
     showToast('Scheda anagrafica aggiornata con successo', 'success');
     closeModal('modalModificaPersona');
 
@@ -7431,22 +7450,19 @@ function raccogliCampiExtraDaContainer(containerId) {
 }
 
 // ================= AZIONI UTENTE: DISISCRIZIONE & ISCRIZIONE CATECHISMO =================
-async function annullaMiaIscrizione(id, titolo) {
-  if (!titolo) {
-    const iscr = (cacheIscrizioni || []).find(x => x.id === id);
-    titolo = iscr ? iscr.attivita_titolo : 'questa attività';
-  }
-  if (!confirm(`Sei sicuro di voler annullare la tua iscrizione a "${titolo}"?`)) return;
+async function annullaMiaIscrizione(id) {
+  if (!confirm('Confermi la disiscrizione? Pagamenti e ricevute saranno conservati.')) return;
   try {
-    const res = await fetch(`/api/iscrizioni/${id}`, { method: 'DELETE' });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Errore durante la disiscrizione');
-    showToast(data.message || 'Iscrizione annullata con successo', 'success');
-    await loadFamilyIscrizioni();
-    await loadDashboard();
-  } catch (err) {
-    showToast(err.message, 'error');
-  }
+    const result=await apiJson(`/api/iscrizioni/${id}/disiscrivi`,{method:'POST'});
+    showToast(result.message,'success');
+    await refreshEnrollmentOptions();
+    if(currentView==='famiglia') await loadFamilyIscrizioni();
+    if(currentView==='segreteria') await loadSegreteriaIscrizioni();
+    if(currentView==='attivita') await loadAttivita();
+    if(currentView==='dashboard') await loadDashboard();
+    const modal=document.getElementById('modalPartecipantiEvento');
+    if(modal?.classList.contains('active')) await openEventEnrollments(Number(modal.dataset.eventId));
+  } catch(error) {showToast(error.message,'error');}
 }
 
 async function openModalIscrizioneCatechismo(defaultCF = null) {
@@ -8308,10 +8324,9 @@ async function loadUserCalendari() {
   const container = document.getElementById('dashUserCalendariGrid');
   if (!container) return;
   try {
-    const res = await fetch('/api/impostazioni/calendari?solo_pubblici=true');
-    const data = await res.json();
+    const [data,groups]=await Promise.all([apiJson('/api/impostazioni/calendari?solo_pubblici=true'),apiJson('/api/famiglie/calendari-gruppi')]);
     const calendari = data.calendari || [];
-    if (!calendari.length) {
+    if (!calendari.length && !groups.calendari?.length) {
       container.innerHTML = `<div style="grid-column: 1/-1; padding: 16px; color: var(--ink-500); text-align: center;">Nessun calendario parrocchiale attivo al momento.</div>`;
       return;
     }
@@ -8333,7 +8348,7 @@ async function loadUserCalendari() {
           </a>
         </div>
       </div>
-    `).join('');
+    `).join('') + (groups.calendari || []).map(group=>`<div class="card" style="padding:14px"><strong>${escapeHtml(group.titolo)}</strong><p>${escapeHtml(group.categoria)}</p>${groupCalendarMarkup(group)}</div>`).join('');
   } catch (err) {
     console.error('Errore calendari dashboard:', err);
   }
@@ -8584,10 +8599,11 @@ async function handleRimuoviFotoProfilo() {
 // Documenti personali: file e dati inviati insieme, senza URL pubblici.
 const documentKinds = {identita:"Carta d’identità",battesimo:'Certificato di battesimo',comunione:'Certificato di comunione',cresima:'Certificato di cresima',matrimonio:'Certificato di matrimonio'};
 function passwordMismatch() { return document.getElementById('regPassword').value !== document.getElementById('regConfermaPassword').value; }
-function renderDocuments(containerId) {
+function renderDocuments(containerId,age=null) {
   const container = document.getElementById(containerId);
-  container.innerHTML = `<fieldset class="family-section"><legend>Documenti e certificati</legend><p>Allegati facoltativi. PDF, JPG, PNG o WebP: massimo 5 MB per file e 16 MB complessivi.</p>${Object.entries(documentKinds).map(([kind,label])=>`<div class="form-group"><label for="${containerId}_${kind}">${label}</label><input type="file" id="${containerId}_${kind}" name="documento_${kind}" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.webp" ${kind==='identita' ? `onchange="toggleIdentityMetadata('${containerId}')"` : ''}></div>${kind==='identita' ? `<div data-identity-fields>${[['numero_documento','Numero documento','text'],['rilasciato_da','Rilasciato da','text'],['data_rilascio','Data rilascio','date'],['data_scadenza','Data scadenza','date']].map(([key,label,type])=>`<div class="form-group"><label for="${containerId}_${key}">${label}</label><input id="${containerId}_${key}" name="documento_${key}" class="form-control" type="${type}" ${type==='text' ? `maxlength="${key==='numero_documento' ? 100 : 200}"` : ''}></div>`).join('')}</div>` : ''}`).join('')}</fieldset>`;
+  container.innerHTML = `<fieldset class="family-section"><legend>Documenti e certificati</legend><p>Allegati facoltativi. PDF, JPG, PNG o WebP: massimo 5 MB per file e 16 MB complessivi.</p>${Object.entries(documentKinds).map(([kind,label])=>`<div class="form-group" data-document-kind="${kind}"><label for="${containerId}_${kind}">${label}</label><input type="file" id="${containerId}_${kind}" name="documento_${kind}" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.webp" ${kind==='identita' ? `onchange="toggleIdentityMetadata('${containerId}')"` : ''}></div>${kind==='identita' ? `<div data-identity-fields>${[['numero_documento','Numero documento','text'],['rilasciato_da','Rilasciato da','text'],['data_rilascio','Data rilascio','date'],['data_scadenza','Data scadenza','date']].map(([key,label,type])=>`<div class="form-group"><label for="${containerId}_${key}">${label}</label><input id="${containerId}_${key}" name="documento_${key}" class="form-control" type="${type}" ${type==='text' ? `maxlength="${key==='numero_documento' ? 100 : 200}"` : ''}></div>`).join('')}</div>` : ''}`).join('')}</fieldset>`;
   toggleIdentityMetadata(containerId);
+  updateDocumentAge(containerId,age);
 }
 function toggleIdentityMetadata(id) {
   const selected = !!document.getElementById(id+'_identita').files.length;
@@ -8660,12 +8676,17 @@ async function refreshEnrollmentOptions() {
 }
 function activityEnrollmentAction(activity,staff=false) {
   const state=enrollmentOptions?.attivita?.[activity.id];
-  if(!staff && !state?.partecipanti?.length) return state?.gia_iscritto ? '<span class="badge badge-success">Iscrizione effettuata</span>' : '';
-  const label=!staff && state?.gia_iscritto ? 'Iscrivi altri familiari' : 'Iscriviti';
-  return `<button class="btn btn-sm btn-primary" onclick="openModalNuovaIscrizione(${activity.id})">${label}</button>`;
+  let markup='';
+  if(staff || state?.partecipanti?.length) {
+    const label=!staff && state?.gia_iscritto ? 'Iscrivi altri familiari' : 'Iscriviti';
+    markup=`<button class="btn btn-sm btn-primary" onclick="openModalNuovaIscrizione(${activity.id})">${label}</button>`;
+  } else if(state?.gia_iscritto) markup='<span class="badge badge-success">Iscrizione effettuata</span>';
+  if(staff) markup+=`<button class="btn btn-sm btn-secondary" onclick="openEventEnrollments(${activity.id})">Iscritti e disiscrizioni</button>`;
+  else markup+=(state?.iscrizioni || []).map(i=>withdrawButton({...i,stato:'confermata'},true)).join('');
+  return markup;
 }
 function availableGroupCards(category,groups) {
-  return groups.map(g=>`<form class="card family-section" onsubmit="enrollFamilyGroup(event,'${category}',${g.id})"><h3>${escapeHtml(g.nome)}</h3><p>${escapeHtml(ageRangeLabel(g))}</p><p>${escapeHtml(g.orario_incontri || g.giorni_orari || '')} ${escapeHtml(g.aula || '')}</p><fieldset><legend>Seleziona i figli da iscrivere</legend>${g.partecipanti.map(p=>`<label class="choice-row"><input class="group-participant" type="checkbox" value="${escapeHtml(p.codice_fiscale)}"><span>${escapeHtml(p.nominativo)}${p.eta == null ? '' : ' · '+p.eta+' anni'}</span></label>`).join('')}</fieldset><button type="submit" class="btn btn-primary">Iscrivi al gruppo</button></form>`).join('');
+  return groups.map(g=>`<form class="card family-section" onsubmit="enrollFamilyGroup(event,'${category}',${g.id})"><h3>${escapeHtml(g.nome)}</h3><p>${escapeHtml(ageRangeLabel(g))}</p>${groupCalendarMarkup(g)}<p>${escapeHtml(g.orario_incontri || g.giorni_orari || '')} ${escapeHtml(g.aula || '')}</p><fieldset><legend>Seleziona i figli da iscrivere</legend>${g.partecipanti.map(p=>`<label class="choice-row"><input class="group-participant" type="checkbox" value="${escapeHtml(p.codice_fiscale)}"><span>${escapeHtml(p.nominativo)}${p.eta == null ? '' : ' · '+p.eta+' anni'}</span></label>`).join('')}</fieldset><button type="submit" class="btn btn-primary">Iscrivi al gruppo</button></form>`).join('');
 }
 async function loadFamilyGroupView(category,loadAssigned) {
   const container=document.getElementById(category+'ParentContainer');
@@ -8693,4 +8714,66 @@ async function enrollFamilyGroup(event,category,id) {
     if(currentView===category) await ({oratorio:loadOratorioParentView,catechismo:loadCatechismoParentView,doposcuola:loadDoposcuolaParentView})[category]();
   } catch(error) {showToast(error.message,'error');}
   finally {button.disabled=false;}
+}
+
+function profileForm(prefix,documentsId,data) {
+  const form=collectDocuments(documentsId);
+  for(const [key,value] of form.entries()) if(typeof value==='string') data[key]=value;
+  const photo=document.getElementById(prefix+'Foto').files[0];
+  if(photo) {if(photo.size>3*1024*1024) throw new Error('La foto non può superare 3 MB');form.append('foto',photo);}
+  const total=[...form.values()].reduce((sum,value)=>sum+(typeof value==='string' ? 0 : value.size),0);
+  if(total>16*1024*1024) throw new Error('Foto e documenti superano il limite complessivo di 16 MB');
+  form.append('data',JSON.stringify(data));
+  return form;
+}
+function setupProfileExtras(prefix,docId,person) {
+  for(const [key,value] of [['Civico',person.civico_residenza || ''],['Provincia',person.provincia_residenza || 'AT'],['CAP',person.cap_residenza || '14100']]) document.getElementById(prefix+key).value=value;
+  document.getElementById(prefix+'Foto').value='';
+  const preview=document.getElementById(prefix+'FotoPreview');
+  if(person.foto_profilo_url) preview.src=person.foto_profilo_url;else preview.removeAttribute('src');preview.style.display=person.foto_profilo_url ? 'block':'none';
+  if(document.getElementById(prefix+'Note')) document.getElementById(prefix+'Note').value='';
+  renderDocuments(docId,person.eta ?? null);
+  document.getElementById(prefix+'DataNascita').onchange=()=>updateDocumentAge(docId,ageFromDate(document.getElementById(prefix+'DataNascita').value));
+}
+function ageFromDate(value) {
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return null;
+  const [year,month,day]=value.split('-').map(Number),today=new Date();
+  const age=today.getFullYear()-year-((today.getMonth()+1<month || (today.getMonth()+1===month && today.getDate()<day)) ? 1:0);
+  return age>=0 ? age:null;
+}
+function visibleDocumentKind(kind,age) {
+  const threshold={comunione:8,cresima:12,matrimonio:30}[kind];
+  return threshold===undefined || (age!==null && age>threshold);
+}
+function updateDocumentAge(id,age) {
+  const container=document.getElementById(id);
+  if(!container) return;
+  container.querySelectorAll('[data-document-kind]').forEach(group=>{
+    const input=group.querySelector('input[type="file"]');
+    const visible=visibleDocumentKind(group.dataset.documentKind,age) || !!input.files.length;
+    group.style.display=visible ? 'block':'none';input.disabled=!visible;
+  });
+}
+function groupCalendarMarkup(group) {
+  const url=group.calendar_embed_url;
+  if(!url || !url.startsWith('https://calendar.google.com/calendar/embed?')) return '';
+  return `<div class="group-calendar"><button type="button" class="btn btn-sm btn-secondary" data-calendar-url="${escapeHtml(url)}" onclick="loadGroupCalendar(this)">Mostra appuntamenti</button><a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Apri Google Calendar</a><div class="group-calendar-content"></div></div>`;
+}
+function loadGroupCalendar(button) {
+  const container=button.parentElement.querySelector('.group-calendar-content');
+  if(container.childElementCount) {container.hidden=!container.hidden;return;}
+  const url=button.dataset.calendarUrl;
+  if(!url.startsWith('https://calendar.google.com/calendar/embed?')) return;
+  const frame=document.createElement('iframe');frame.title='Appuntamenti del gruppo';frame.className='group-calendar-frame';frame.loading='lazy';frame.src=url;
+  container.appendChild(frame);button.textContent='Mostra / nascondi appuntamenti';
+}
+function withdrawButton(enrollment,showName=false) {
+  if(!enrollment.puo_disiscriversi || ['annullata','rifiutata'].includes(enrollment.stato)) return '';
+  return `<button type="button" class="btn btn-sm btn-danger" onclick="annullaMiaIscrizione(${enrollment.id})">Disiscrivi${showName ? ' · '+escapeHtml(enrollment.nominativo || ''):''}</button>`;
+}
+async function openEventEnrollments(id) {
+  const modal=document.getElementById('modalPartecipantiEvento');modal.dataset.eventId=id;
+  const data=await apiJson('/api/iscrizioni?attivita_id='+id);
+  document.getElementById('partecipantiEventoElenco').innerHTML=(data.iscrizioni || []).map(i=>`<div class="choice-row"><span>${escapeHtml(i.partecipante_nome)} · ${escapeHtml(i.stato)}</span>${withdrawButton(i)}</div>`).join('') || '<p>Nessuna iscrizione presente.</p>';
+  openModal('modalPartecipantiEvento');
 }

@@ -1,3 +1,4 @@
+from services.group_calendar import apply_calendar
 from services.group_age_service import apply_age_range, register_age_guard
 from flask import Blueprint, request, jsonify
 from flask_login import current_user
@@ -62,6 +63,7 @@ def create_gruppo():
         stato=data.get('stato', 'pubblico').strip(),
         attivita_id=data.get('attivita_id')
     )
+    apply_calendar(nuovo, data)
     apply_age_range(nuovo, data)
     db.session.add(nuovo)
     db.session.commit()
@@ -79,6 +81,7 @@ def update_gruppo(id):
         return jsonify({'error': 'Gruppo doposcuola non trovato'}), 404
 
     data = request.get_json() or {}
+    apply_calendar(g, data)
     apply_age_range(g, data)
     if 'nome' in data: g.nome = data['nome'].strip()
     if 'anno_scolastico' in data: g.anno_scolastico = data['anno_scolastico'].strip()

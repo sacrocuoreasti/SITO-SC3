@@ -1705,55 +1705,36 @@ Domenica: dopo le Sante Messe</p>
         <button class="btn-close-modal" onclick="closeModal('modalAggiungiFiglio')">×</button>
       </div>
       <form onsubmit="handleSalvaNuovoMembro(event)">
-        <div class="modal-body">
-          <div class="form-row">
-            <div class="form-group">
-              <label>Nome del componente *</label>
-              <input type="text" id="membroNome" class="form-control" placeholder="Nome" required>
-            </div>
-            <div class="form-group">
-              <label>Cognome *</label>
-              <input type="text" id="membroCognome" class="form-control" placeholder="Cognome" required>
-            </div>
-          </div>
-
-          <div class="form-group">
+        <div class="modal-body"><fieldset class="profile-section" data-profile-section="anagrafica"><legend>Anagrafica</legend><div class="form-group">
             <label>Codice Fiscale * (Chiave Universale)</label>
             <input type="text" id="membroCF" class="form-control uppercase" maxlength="16" placeholder="RSSGNN12B10A479X" oninput="validateCFFieldMembro(this)" required>
             <div id="membroCFFeedback" class="cf-feedback"></div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
+          </div><div class="form-group">
+              <label>Nome del componente *</label>
+              <input type="text" id="membroNome" class="form-control" placeholder="Nome" required>
+            </div><div class="form-group">
+              <label>Cognome *</label>
+              <input type="text" id="membroCognome" class="form-control" placeholder="Cognome" required>
+            </div><div class="form-group">
               <label>Sesso</label>
               <select id="membroSesso" class="form-control">
                 <option value="M">Maschio (M)</option>
                 <option value="F">Femmina (F)</option>
               </select>
-            </div>
-            <div class="form-group">
+            </div><div class="form-group">
               <label>Data di Nascita</label>
               <input type="date" id="membroDataNascita" class="form-control">
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
+            </div><div class="form-group">
               <label>Luogo di Nascita</label>
               <input type="text" id="membroLuogoNascita" class="form-control" placeholder="es. Asti">
-            </div>
-            <div class="form-group">
-              <label>Indirizzo di Residenza</label>
-              <input type="text" id="membroIndirizzo" class="form-control" placeholder="Via / Piazza e N. civico">
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group"><label for="membroComune">Comune di residenza</label><input id="membroComune" class="form-control"></div>
-            <div class="form-group"><label for="membroCAP">CAP</label><input id="membroCAP" class="form-control" maxlength="10"></div>
-          </div>
-          <fieldset class="family-section"><legend>Accesso personale (facoltativo)</legend><p>Email e password permettono al membro di accedere al proprio profilo. L’account è gestito dal capofamiglia.</p><div class="form-row"><div class="form-group"><label for="membroEmail">Email di accesso</label><input type="email" id="membroEmail" class="form-control" autocomplete="off"></div><div class="form-group"><label for="membroPassword">Password iniziale</label><input type="password" id="membroPassword" class="form-control" minlength="8" autocomplete="new-password"></div></div><div id="memberAccountConsents" class="registration-consents"></div></fieldset>
-          <div class="form-group">
+            </div><div class="form-group"><label for="membroFoto">Foto</label><input id="membroFoto" type="file" class="form-control" accept=".jpg,.jpeg,.png,.webp"></div><img id="membroFotoPreview" alt="Foto del profilo" style="max-width:100px;max-height:100px;display:none"></fieldset>
+<fieldset class="profile-section" data-profile-section="residenza"><legend>Residenza</legend><div class="form-group">
+              <label>Via / Corso / Piazza</label>
+              <input type="text" id="membroIndirizzo" class="form-control" placeholder="Via / Corso / Piazza">
+            </div><div class="form-group"><label for="membroCivico">Numero civico</label><input id="membroCivico" type="text" class="form-control" maxlength="30"></div><div class="form-group"><label for="membroCAP">CAP</label><input id="membroCAP" class="form-control" maxlength="10"></div><div class="form-group"><label for="membroComune">Comune di residenza</label><input id="membroComune" class="form-control"></div><div class="form-group"><label for="membroProvincia">Provincia</label><input id="membroProvincia" type="text" class="form-control" maxlength="10"></div></fieldset>
+<fieldset class="profile-section" data-profile-section="contatti"><legend>Contatti</legend><div class="form-group"><label for="membroEmail">Email</label><input type="email" id="membroEmail" class="form-control" autocomplete="off"></div><div class="form-group"><label for="membroTelefono">Cellulare</label><input id="membroTelefono" type="tel" class="form-control" ></div><div class="form-group"><label for="membroPassword">Password iniziale</label><input type="password" id="membroPassword" class="form-control" minlength="8" autocomplete="new-password"></div><p>Compila una password per attivare l’accesso personale del membro, gestito dal capofamiglia.</p></fieldset>
+<fieldset class="profile-section" data-profile-section="documenti"><legend>Documenti</legend><div id="membroDocumenti"></div></fieldset>
+<fieldset class="profile-section" data-profile-section="altro"><legend>Altro</legend><div class="form-group">
             <label>Ruolo nel Nucleo Familiare *</label>
             <select id="membroRuolo" class="form-control">
               <option value="Figlio/a">Figlio / Figlia</option>
@@ -1768,12 +1749,8 @@ Domenica: dopo le Sante Messe</p>
               <option value="Tutore Legale">Tutore Legale</option>
               <option value="Altro">Altro convivente</option>
             </select>
-          </div>
-
-          <fieldset class="family-section"><legend>Allergie</legend><div id="membroAllergiePills" class="allergy-chips-container"></div><label for="membroAllergie">Allergie note e altre informazioni</label><textarea id="membroAllergie" class="form-control" rows="2" placeholder="Indica le allergie; puoi aggiungere voci non presenti tra i suggerimenti."></textarea></fieldset>
-          <fieldset class="family-section"><legend>Intolleranze alimentari</legend><div id="membroIntolleranzePills" class="allergy-chips-container"></div><label for="membroIntolleranze">Intolleranze e altre esigenze alimentari</label><input id="membroIntolleranze" class="form-control" placeholder="Specificare eventuali altre intolleranze"></fieldset>
-          <fieldset class="family-section"><legend>Terapie e medicinali</legend><div id="membroTerapiePills" class="allergy-chips-container"></div><label for="membroTerapie">Terapie / medicinali prescritti e altre indicazioni</label><textarea id="membroTerapie" class="form-control" rows="3" placeholder="Nome del medicinale, indicazioni prescritte e contatto del referente, se necessario."></textarea><small>I suggerimenti classificano le informazioni: non sono prescrizioni né autorizzano la somministrazione.</small></fieldset>
-        </div>
+          </div><fieldset class="family-section"><legend>Allergie</legend><div id="membroAllergiePills" class="allergy-chips-container"></div><label for="membroAllergie">Allergie note e altre informazioni</label><textarea id="membroAllergie" class="form-control" rows="2" placeholder="Indica le allergie; puoi aggiungere voci non presenti tra i suggerimenti."></textarea></fieldset><fieldset class="family-section"><legend>Intolleranze alimentari</legend><div id="membroIntolleranzePills" class="allergy-chips-container"></div><label for="membroIntolleranze">Intolleranze e altre esigenze alimentari</label><input id="membroIntolleranze" class="form-control" placeholder="Specificare eventuali altre intolleranze"></fieldset><fieldset class="family-section"><legend>Terapie e medicinali</legend><div id="membroTerapiePills" class="allergy-chips-container"></div><label for="membroTerapie">Terapie / medicinali prescritti e altre indicazioni</label><textarea id="membroTerapie" class="form-control" rows="3" placeholder="Nome del medicinale, indicazioni prescritte e contatto del referente, se necessario."></textarea><small>I suggerimenti classificano le informazioni: non sono prescrizioni né autorizzano la somministrazione.</small></fieldset><div class="form-group"><label for="membroNote">Note</label><textarea id="membroNote" class="form-control"></textarea></div></fieldset>
+<fieldset class="family-section"><legend>Consensi obbligatori per il nuovo membro</legend><div id="memberAccountConsents" class="registration-consents"></div></fieldset></div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal('modalAggiungiFiglio')">Annulla</button>
           <button type="submit" class="btn btn-primary">Salva nel Nucleo Familiare</button>
@@ -2453,69 +2430,46 @@ Domenica: dopo le Sante Messe</p>
         <button class="btn-close-modal" onclick="closeModal('modalNuovaPersona')">×</button>
       </div>
       <form onsubmit="handleSalvaNuovaPersona(event)">
-        <div class="modal-body">
-          <div class="form-row">
-            <div class="form-group">
-              <label>Nome *</label>
-              <input type="text" id="personaNome" class="form-control" required>
-            </div>
-            <div class="form-group">
-              <label>Cognome *</label>
-              <input type="text" id="personaCognome" class="form-control" required>
-            </div>
-          </div>
-
-          <div class="form-group">
+        <div class="modal-body"><fieldset class="profile-section" data-profile-section="anagrafica"><legend>Anagrafica</legend><div class="form-group">
             <label>Codice Fiscale * (Chiave Univoca)</label>
             <input type="text" id="personaCF" class="form-control uppercase" maxlength="16" oninput="validateCFFieldPersona(this)" required>
             <div id="personaCFFeedback" class="cf-feedback"></div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
+          </div><div class="form-group">
+              <label>Nome *</label>
+              <input type="text" id="personaNome" class="form-control" required>
+            </div><div class="form-group">
+              <label>Cognome *</label>
+              <input type="text" id="personaCognome" class="form-control" required>
+            </div><div class="form-group">
               <label>Sesso</label>
               <select id="personaSesso" class="form-control">
                 <option value="M">Maschio (M)</option>
                 <option value="F">Femmina (F)</option>
               </select>
-            </div>
-            <div class="form-group">
+            </div><div class="form-group">
               <label>Data di Nascita</label>
               <input type="date" id="personaDataNascita" class="form-control">
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
+            </div><div class="form-group">
               <label>Luogo di Nascita</label>
               <input type="text" id="personaLuogoNascita" class="form-control" placeholder="es. Asti">
-            </div>
-            <div class="form-group">
-              <label>Telefono</label>
-              <input type="tel" id="personaTelefono" class="form-control">
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label>Email</label>
-              <input type="email" id="personaEmail" class="form-control">
-            </div>
-            <div class="form-group">
+            </div><div class="form-group"><label for="personaFoto">Foto</label><input id="personaFoto" type="file" class="form-control" accept=".jpg,.jpeg,.png,.webp"></div><img id="personaFotoPreview" alt="Foto del profilo" style="max-width:100px;max-height:100px;display:none"></fieldset>
+<fieldset class="profile-section" data-profile-section="residenza"><legend>Residenza</legend><div class="form-group">
               <label>Indirizzo Residenza</label>
               <input type="text" id="personaIndirizzo" class="form-control" placeholder="Via ...">
-            </div>
-          </div>
-
-          <div class="form-group">
+            </div><div class="form-group"><label for="personaCivico">Numero civico</label><input id="personaCivico" type="text" class="form-control" maxlength="30"></div><div class="form-group"><label for="personaCAP">CAP</label><input id="personaCAP" type="text" class="form-control" maxlength="10"></div><div class="form-group">
             <label>Comune</label>
             <input type="text" id="personaComune" class="form-control" value="Asti">
-          </div>
-
-          <fieldset class="family-section"><legend>Allergie</legend><div id="personaAllergiePills" class="allergy-chips-container"></div><label for="personaAllergie">Allergie note e altre informazioni</label><textarea id="personaAllergie" class="form-control" rows="2" placeholder="Indica le allergie; puoi aggiungere voci non presenti tra i suggerimenti."></textarea></fieldset>
-          <fieldset class="family-section"><legend>Intolleranze alimentari</legend><div id="personaIntolleranzePills" class="allergy-chips-container"></div><label for="personaIntolleranze">Intolleranze e altre esigenze alimentari</label><input id="personaIntolleranze" class="form-control" placeholder="Specificare eventuali altre intolleranze"></fieldset>
-          <fieldset class="family-section"><legend>Terapie e medicinali</legend><div id="personaTerapiePills" class="allergy-chips-container"></div><label for="personaTerapie">Terapie / medicinali prescritti e altre indicazioni</label><textarea id="personaTerapie" class="form-control" rows="3" placeholder="Nome del medicinale, indicazioni prescritte e contatto del referente, se necessario."></textarea><small>I suggerimenti classificano le informazioni: non sono prescrizioni né autorizzano la somministrazione.</small></fieldset>
-        </div>
+          </div><div class="form-group"><label for="personaProvincia">Provincia</label><input id="personaProvincia" type="text" class="form-control" maxlength="10"></div></fieldset>
+<fieldset class="profile-section" data-profile-section="contatti"><legend>Contatti</legend><div class="form-group">
+              <label>Email</label>
+              <input type="email" id="personaEmail" class="form-control">
+            </div><div class="form-group">
+              <label>Telefono</label>
+              <input type="tel" id="personaTelefono" class="form-control">
+            </div></fieldset>
+<fieldset class="profile-section" data-profile-section="documenti"><legend>Documenti</legend><div id="personaDocumenti"></div></fieldset>
+<fieldset class="profile-section" data-profile-section="altro"><legend>Altro</legend><div class="form-group"><label for="personaRuolo">Ruolo nel nucleo</label><select id="personaRuolo" class="form-control"><option>Altro</option><option>Padre</option><option>Madre</option><option value="Figlio/a">Figlio/a</option></select></div><p>Il capofamiglia si assegna dopo il collegamento al nucleo.</p><fieldset class="family-section"><legend>Allergie</legend><div id="personaAllergiePills" class="allergy-chips-container"></div><label for="personaAllergie">Allergie note e altre informazioni</label><textarea id="personaAllergie" class="form-control" rows="2" placeholder="Indica le allergie; puoi aggiungere voci non presenti tra i suggerimenti."></textarea></fieldset><fieldset class="family-section"><legend>Intolleranze alimentari</legend><div id="personaIntolleranzePills" class="allergy-chips-container"></div><label for="personaIntolleranze">Intolleranze e altre esigenze alimentari</label><input id="personaIntolleranze" class="form-control" placeholder="Specificare eventuali altre intolleranze"></fieldset><fieldset class="family-section"><legend>Terapie e medicinali</legend><div id="personaTerapiePills" class="allergy-chips-container"></div><label for="personaTerapie">Terapie / medicinali prescritti e altre indicazioni</label><textarea id="personaTerapie" class="form-control" rows="3" placeholder="Nome del medicinale, indicazioni prescritte e contatto del referente, se necessario."></textarea><small>I suggerimenti classificano le informazioni: non sono prescrizioni né autorizzano la somministrazione.</small></fieldset><div class="form-group"><label for="personaNote">Note</label><textarea id="personaNote" class="form-control"></textarea></div></fieldset>
+</div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal('modalNuovaPersona')">Annulla</button>
           <button type="submit" class="btn btn-primary">Registra in Anagrafica</button>
@@ -2533,49 +2487,51 @@ Domenica: dopo le Sante Messe</p>
       </div>
       <form onsubmit="handleSalvaModificaPersona(event)">
         <input type="hidden" id="modPersonaCF">
-        <div class="modal-body">
-          <div style="background: var(--bg-subtle); padding: 8px 14px; border-radius: var(--radius-sm); margin-bottom: 12px; font-size: 13px;">
-            Codice Fiscale univoco: <strong id="modPersonaCFDisplay"></strong>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
+        <div class="modal-body"><fieldset class="profile-section" data-profile-section="anagrafica"><legend>Anagrafica</legend><p>Codice Fiscale: <strong id="modPersonaCFDisplay"></strong></p><div class="form-group">
               <label>Nome *</label>
               <input type="text" id="modPersonaNome" class="form-control" required>
-            </div>
-            <div class="form-group">
+            </div><div class="form-group">
               <label>Cognome *</label>
               <input type="text" id="modPersonaCognome" class="form-control" required>
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
+            </div><div class="form-group">
               <label>Sesso</label>
               <select id="modPersonaSesso" class="form-control">
                 <option value="M">Maschio (M)</option>
                 <option value="F">Femmina (F)</option>
               </select>
-            </div>
-            <div class="form-group">
+            </div><div class="form-group">
               <label>Data di Nascita</label>
               <input type="date" id="modPersonaDataNascita" class="form-control">
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
+            </div><div class="form-group">
               <label>Luogo di Nascita</label>
               <input type="text" id="modPersonaLuogoNascita" class="form-control" placeholder="es. Asti">
+            </div><div class="form-group"><label for="modPersonaFoto">Foto</label><input id="modPersonaFoto" type="file" class="form-control" accept=".jpg,.jpeg,.png,.webp"></div><img id="modPersonaFotoPreview" alt="Foto del profilo" style="max-width:100px;max-height:100px;display:none"></fieldset>
+<fieldset class="profile-section" data-profile-section="residenza"><legend>Residenza</legend><div class="form-group">
+              <label>Via / Corso / Piazza</label>
+              <input type="text" id="modPersonaIndirizzo" class="form-control" placeholder="Via / Corso / Piazza">
+            </div><div class="form-group"><label for="modPersonaCivico">Numero civico</label><input id="modPersonaCivico" type="text" class="form-control" maxlength="30"></div><div class="form-group"><label for="modPersonaCAP">CAP</label><input id="modPersonaCAP" type="text" class="form-control" maxlength="10"></div><div class="form-group">
+              <label>Comune Residenza</label>
+              <input type="text" id="modPersonaComune" class="form-control" value="Asti">
+            </div><div class="form-group"><label for="modPersonaProvincia">Provincia</label><input id="modPersonaProvincia" type="text" class="form-control" maxlength="10"></div></fieldset>
+<fieldset class="profile-section" data-profile-section="contatti"><legend>Contatti</legend><div class="form-group">
+            <label>Indirizzo Email</label>
+            <input type="email" id="modPersonaEmail" class="form-control">
+          </div><div class="form-group">
+              <label>Cellulare</label>
+              <input type="tel" id="modPersonaCellulare" class="form-control">
+            </div><input type="hidden" id="modPersonaTelefono"></fieldset>
+<fieldset class="profile-section" data-profile-section="documenti"><legend>Documenti</legend><div id="profiloDocumenti"></div><div id="profiloDocumentiElenco"></div><div class="form-group" style="margin-top: 14px; border-top: 1px solid var(--border-light); padding-top: 14px;">
+            <label style="font-weight: 700;">Certificato di Battesimo</label>
+            <div id="modPersonaBattesimoBox" class="certificato-upload-box">
+              <div>
+                <span id="modPersonaBattesimoBadge" class="certificato-badge mancante">Nessun certificato caricato</span>
+                <a id="modPersonaBattesimoLink" href="#" target="_blank" style="margin-left: 10px; font-size: 12px; display: none;">Scarica / Visualizza File</a>
+              </div>
+              <button type="button" class="btn btn-sm btn-secondary" id="modPersonaBattesimoDelBtn" style="display: none;" onclick="rimuoviCertificatoBattesimoPersona()">Rimuovi</button>
             </div>
-            <div class="form-group">
-              <label>Indirizzo di Residenza</label>
-              <input type="text" id="modPersonaIndirizzo" class="form-control" placeholder="Via / Piazza e civico">
-            </div>
-          </div>
 
-          <div class="form-row">
-            <div class="form-group">
+          </div></fieldset>
+<fieldset class="profile-section" data-profile-section="altro"><legend>Altro</legend><div class="form-group">
               <label>Ruolo nel Nucleo Familiare</label>
               <select id="modPersonaRuoloFamiglia" class="form-control">
                 <option value="Figlio/a">Figlio/a</option>
@@ -2588,51 +2544,11 @@ Domenica: dopo le Sante Messe</p>
                 <option value="Parente">Parente</option>
                 <option value="Altro">Altro</option>
               </select><label class="choice-row"><input type="checkbox" id="modPersonaCapofamiglia">Responsabile capofamiglia (indipendente dal ruolo)</label>
-            </div>
-            <div class="form-group">
-              <label>Comune Residenza</label>
-              <input type="text" id="modPersonaComune" class="form-control" value="Asti">
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label>Telefono Fisso</label>
-              <input type="tel" id="modPersonaTelefono" class="form-control">
-            </div>
-            <div class="form-group">
-              <label>Cellulare</label>
-              <input type="tel" id="modPersonaCellulare" class="form-control">
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label>Indirizzo Email</label>
-            <input type="email" id="modPersonaEmail" class="form-control">
-          </div>
-
-          <fieldset class="family-section"><legend>Allergie</legend><div id="modPersonaAllergiePills" class="allergy-chips-container"></div><label for="modPersonaAllergie">Allergie note e altre informazioni</label><textarea id="modPersonaAllergie" class="form-control" rows="2" placeholder="Indica le allergie; puoi aggiungere voci non presenti tra i suggerimenti."></textarea></fieldset>
-          <fieldset class="family-section"><legend>Intolleranze alimentari</legend><div id="modPersonaIntolleranzePills" class="allergy-chips-container"></div><label for="modPersonaIntolleranze">Intolleranze e altre esigenze alimentari</label><input id="modPersonaIntolleranze" class="form-control" placeholder="Specificare eventuali altre intolleranze"></fieldset>
-          <fieldset class="family-section"><legend>Terapie e medicinali</legend><div id="modPersonaTerapiePills" class="allergy-chips-container"></div><label for="modPersonaTerapie">Terapie / medicinali prescritti e altre indicazioni</label><textarea id="modPersonaTerapie" class="form-control" rows="3" placeholder="Nome del medicinale, indicazioni prescritte e contatto del referente, se necessario."></textarea><small>I suggerimenti classificano le informazioni: non sono prescrizioni né autorizzano la somministrazione.</small></fieldset>
-          <div id="profiloDocumenti"></div><div id="profiloDocumentiElenco"></div>
-<div class="form-group">
+            </div><fieldset class="family-section"><legend>Allergie</legend><div id="modPersonaAllergiePills" class="allergy-chips-container"></div><label for="modPersonaAllergie">Allergie note e altre informazioni</label><textarea id="modPersonaAllergie" class="form-control" rows="2" placeholder="Indica le allergie; puoi aggiungere voci non presenti tra i suggerimenti."></textarea></fieldset><fieldset class="family-section"><legend>Intolleranze alimentari</legend><div id="modPersonaIntolleranzePills" class="allergy-chips-container"></div><label for="modPersonaIntolleranze">Intolleranze e altre esigenze alimentari</label><input id="modPersonaIntolleranze" class="form-control" placeholder="Specificare eventuali altre intolleranze"></fieldset><fieldset class="family-section"><legend>Terapie e medicinali</legend><div id="modPersonaTerapiePills" class="allergy-chips-container"></div><label for="modPersonaTerapie">Terapie / medicinali prescritti e altre indicazioni</label><textarea id="modPersonaTerapie" class="form-control" rows="3" placeholder="Nome del medicinale, indicazioni prescritte e contatto del referente, se necessario."></textarea><small>I suggerimenti classificano le informazioni: non sono prescrizioni né autorizzano la somministrazione.</small></fieldset><div class="form-group">
             <label>Note Generali o Particolari</label>
             <textarea id="modPersonaNoteGenerali" class="form-control" rows="2" placeholder="Note o annotazioni particolari..."></textarea>
-          </div>
-
-          <!-- Sezione Certificato di Battesimo -->
-          <div class="form-group" style="margin-top: 14px; border-top: 1px solid var(--border-light); padding-top: 14px;">
-            <label style="font-weight: 700;">Certificato di Battesimo</label>
-            <div id="modPersonaBattesimoBox" class="certificato-upload-box">
-              <div>
-                <span id="modPersonaBattesimoBadge" class="certificato-badge mancante">Nessun certificato caricato</span>
-                <a id="modPersonaBattesimoLink" href="#" target="_blank" style="margin-left: 10px; font-size: 12px; display: none;">Scarica / Visualizza File</a>
-              </div>
-              <button type="button" class="btn btn-sm btn-secondary" id="modPersonaBattesimoDelBtn" style="display: none;" onclick="rimuoviCertificatoBattesimoPersona()">Rimuovi</button>
-            </div>
-
-          </div>
-        </div>
+          </div></fieldset>
+</div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal('modalModificaPersona')">Annulla</button>
           <button type="submit" class="btn btn-primary">Salva Modifiche Anagrafica</button>
@@ -3250,7 +3166,7 @@ Domenica: dopo le Sante Messe</p>
         <button class="btn-close-modal" onclick="closeModal('modalNuovoGruppoDoposcuola')">×</button>
       </div>
       <form onsubmit="handleSalvaGruppoDoposcuola(event)">
-        <div class="modal-body"><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="dopEtaMin">Età minima (anni)</label><input id="dopEtaMin" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="dopEtaMax">Età massima (anni)</label><input id="dopEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset>
+        <div class="modal-body"><div class="form-group"><label for="dopGoogleCalendarUrl">Link Google Calendar</label><input id="dopGoogleCalendarUrl" type="url" class="form-control" placeholder="https://calendar.google.com/calendar/embed?src=..."></div><p>Il calendario deve essere condiviso con i partecipanti. Gli appuntamenti si aggiornano da Google.</p><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="dopEtaMin">Età minima (anni)</label><input id="dopEtaMin" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="dopEtaMax">Età massima (anni)</label><input id="dopEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset>
           <div class="form-group">
             <label>Nome del Gruppo *</label>
             <input type="text" id="dopNomeGruppo" class="form-control" placeholder="es. Primaria - Compiti e Studio" required>
@@ -3318,7 +3234,7 @@ Domenica: dopo le Sante Messe</p>
       </div>
       <form onsubmit="handleSalvaModificaGruppoDoposcuola(event)">
         <input type="hidden" id="modDopGruppoId">
-        <div class="modal-body"><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="modDopEtaMin">Età minima (anni)</label><input id="modDopEtaMin" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="modDopEtaMax">Età massima (anni)</label><input id="modDopEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset>
+        <div class="modal-body"><div class="form-group"><label for="modDopGoogleCalendarUrl">Link Google Calendar</label><input id="modDopGoogleCalendarUrl" type="url" class="form-control" placeholder="https://calendar.google.com/calendar/embed?src=..."></div><p>Il calendario deve essere condiviso con i partecipanti. Gli appuntamenti si aggiornano da Google.</p><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="modDopEtaMin">Età minima (anni)</label><input id="modDopEtaMin" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="modDopEtaMax">Età massima (anni)</label><input id="modDopEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset>
           <div class="form-group">
             <label>Nome del Gruppo *</label>
             <input type="text" id="modDopNomeGruppo" class="form-control" required>
@@ -3620,65 +3536,7 @@ Domenica: dopo le Sante Messe</p>
         <button class="btn-close-modal" onclick="closeModal('modalSchedaPersonaVisualizzazione')">×</button>
       </div>
 
-      <div class="modal-body" style="padding: 20px;">
-        <div id="viewSchedaAllergieAlert" style="display: none; background: #fef2f2; border: 1px solid #fecaca; border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 16px;">
-          <div style="font-weight: 700; color: #991b1b; display: flex; align-items: center; gap: 6px;">
-            <span>⚠️ ATTENZIONE MEDICO-SANITARIA SEGNALATA:</span>
-          </div>
-          <div id="viewSchedaAllergieDetails" style="font-size: 13px; color: #7f1d1d; margin-top: 4px;"></div>
-        </div>
-
-        <div class="dossier-grid">
-          <!-- Card 1: Dati Anagrafici -->
-          <div class="dossier-card">
-            <h4>👤 Anagrafica & Nascita</h4>
-            <div class="dossier-row"><span class="dossier-label">Nome:</span><span class="dossier-val" id="viewSchedaNome">-</span></div>
-            <div class="dossier-row"><span class="dossier-label">Cognome:</span><span class="dossier-val" id="viewSchedaCognome">-</span></div>
-            <div class="dossier-row"><span class="dossier-label">Sesso:</span><span class="dossier-val" id="viewSchedaSesso">-</span></div>
-            <div class="dossier-row"><span class="dossier-label">Data di Nascita:</span><span class="dossier-val" id="viewSchedaDataNascita">-</span></div>
-            <div class="dossier-row"><span class="dossier-label">Età:</span><span class="dossier-val" id="viewSchedaEta">-</span></div>
-            <div class="dossier-row"><span class="dossier-label">Luogo di Nascita:</span><span class="dossier-val" id="viewSchedaComuneNascita">-</span></div>
-          </div>
-
-          <!-- Card 2: Famiglia -->
-          <div class="dossier-card">
-            <h4>👨‍👩‍👧 Nucleo Familiare</h4>
-            <div class="dossier-row"><span class="dossier-label">Famiglia:</span><span class="dossier-val" id="viewSchedaFamigliaNome">-</span></div>
-            <div class="dossier-row"><span class="dossier-label">Ruolo nel Nucleo:</span><span class="dossier-val" id="viewSchedaRuoloFamiglia">-</span></div>
-            <div class="dossier-row"><span class="dossier-label">Capofamiglia (CF):</span><span class="dossier-val" id="viewSchedaCapofamigliaCF">-</span></div>
-            <div class="dossier-row"><span class="dossier-label">Account Utente:</span><span class="dossier-val" id="viewSchedaHasAccount">-</span></div>
-          </div>
-
-          <!-- Card 3: Residenza & Recapiti -->
-          <div class="dossier-card">
-            <h4>📍 Residenza & Contatti</h4>
-            <div class="dossier-row"><span class="dossier-label">Indirizzo:</span><span class="dossier-val" id="viewSchedaIndirizzo">-</span></div>
-            <div class="dossier-row"><span class="dossier-label">Comune:</span><span class="dossier-val" id="viewSchedaComuneResidenza">-</span></div>
-            <div class="dossier-row"><span class="dossier-label">Telefono Fisso:</span><span class="dossier-val" id="viewSchedaTelefono">-</span></div>
-            <div class="dossier-row"><span class="dossier-label">Cellulare / Fam.:</span><span class="dossier-val" id="viewSchedaCellulare">-</span></div>
-            <div class="dossier-row"><span class="dossier-label">Email:</span><span class="dossier-val" id="viewSchedaEmail">-</span></div>
-          </div>
-
-          <!-- Card 4: Sacramenti & Liste -->
-          <div class="dossier-card">
-            <h4>⛪ Sacramenti & Badge Parrocchiali</h4>
-            <div class="dossier-row"><span class="dossier-label">Certificato Battesimo:</span><span class="dossier-val" id="viewSchedaBattesimo">-</span></div>
-            <div style="margin-top: 10px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                <span class="dossier-label">Badge & Liste Assegnate:</span>
-                <button type="button" class="btn btn-xs btn-outline-primary" onclick="openModalGestisciBadgePersona(currentViewingPersonaId)" style="font-size: 11px; padding: 2px 8px;">🏅 Gestisci Badge</button>
-              </div>
-              <div id="viewSchedaListePills" style="display: flex; gap: 6px; flex-wrap: wrap;"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Note Generali & Note Mediche complete -->
-        <div style="margin-top: 14px; background: #fff; border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 12px 16px;">
-          <strong style="font-size: 12.5px; color: var(--ink-700); display: block; margin-bottom: 4px;">📝 Note Pastorali o Annotazioni Interne:</strong>
-          <p id="viewSchedaNoteGenerali" style="margin: 0; font-size: 13px; color: var(--ink-600); line-height: 1.5; font-style: italic;">Nessuna annotazione registrata.</p>
-        </div>
-      </div>
+      <div class="modal-body" style="padding: 20px;"><section class="profile-section" data-profile-section="anagrafica"><h3>Anagrafica</h3><div class="dossier-row"><span class="dossier-label">Nome</span><span class="dossier-val" id="viewSchedaNome">—</span></div><div class="dossier-row"><span class="dossier-label">Cognome</span><span class="dossier-val" id="viewSchedaCognome">—</span></div><div class="dossier-row"><span class="dossier-label">Data di nascita</span><span class="dossier-val" id="viewSchedaDataNascita">—</span></div><div class="dossier-row"><span class="dossier-label">Luogo di nascita</span><span class="dossier-val" id="viewSchedaComuneNascita">—</span></div><div class="dossier-row"><span class="dossier-label">Sesso</span><span class="dossier-val" id="viewSchedaSesso">—</span></div><div class="dossier-row"><span class="dossier-label">Età</span><span class="dossier-val" id="viewSchedaEta">—</span></div><img id="viewSchedaPhoto" alt="Foto del profilo" style="max-width:140px;max-height:140px;display:none"></section><section class="profile-section" data-profile-section="residenza"><h3>Residenza</h3><div class="dossier-row"><span class="dossier-label">Via / Corso / Piazza</span><span class="dossier-val" id="viewSchedaIndirizzo">—</span></div><div class="dossier-row"><span class="dossier-label">Civico</span><span class="dossier-val" id="viewSchedaCivico">—</span></div><div class="dossier-row"><span class="dossier-label">CAP</span><span class="dossier-val" id="viewSchedaCAP">—</span></div><div class="dossier-row"><span class="dossier-label">Comune</span><span class="dossier-val" id="viewSchedaComuneResidenza">—</span></div><div class="dossier-row"><span class="dossier-label">Provincia</span><span class="dossier-val" id="viewSchedaProvincia">—</span></div></section><section class="profile-section" data-profile-section="contatti"><h3>Contatti</h3><div class="dossier-row"><span class="dossier-label">Email</span><span class="dossier-val" id="viewSchedaEmail">—</span></div><div class="dossier-row"><span class="dossier-label">Cellulare</span><span class="dossier-val" id="viewSchedaCellulare">—</span></div><span id="viewSchedaTelefono" hidden></span></section><section class="profile-section" data-profile-section="documenti"><h3>Documenti</h3><div class="dossier-row"><span class="dossier-label">Certificato di battesimo precedente</span><span class="dossier-val" id="viewSchedaBattesimo">—</span></div><div id="viewSchedaDocumenti"></div></section><section class="profile-section" data-profile-section="altro"><h3>Altro</h3><div class="dossier-row"><span class="dossier-label">Famiglia</span><span class="dossier-val" id="viewSchedaFamigliaNome">—</span></div><div class="dossier-row"><span class="dossier-label">Ruolo e capofamiglia</span><span class="dossier-val" id="viewSchedaRuoloFamiglia">—</span></div><div class="dossier-row"><span class="dossier-label">CF capofamiglia</span><span class="dossier-val" id="viewSchedaCapofamigliaCF">—</span></div><div class="dossier-row"><span class="dossier-label">Accesso personale</span><span class="dossier-val" id="viewSchedaHasAccount">—</span></div><div id="viewSchedaAllergieAlert"><h4>Allergie, intolleranze e terapie</h4><div id="viewSchedaAllergieDetails"></div></div><h4>Note</h4><p id="viewSchedaNoteGenerali"></p><h4>Liste e badge</h4><button type="button" class="btn btn-sm btn-secondary" onclick="openModalGestisciBadgePersona(currentViewingPersonaId)">Gestisci badge</button><div id="viewSchedaListePills"></div></section></div>
 
       <!-- In Basso: Pulsanti Azione Richiesti dal Cliente -->
       <div class="modal-footer" style="background: #f8fafc; border-top: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
@@ -3898,7 +3756,7 @@ Domenica: dopo le Sante Messe</p>
         <button class="btn-close-modal" onclick="closeModal('modalNuovoGruppoOratorio')">×</button>
       </div>
       <form onsubmit="handleSalvaNuovoGruppoOratorio(event)">
-        <div class="modal-body"><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="nuovoOratorioEtaMin">Età minima (anni)</label><input id="nuovoOratorioEtaMin" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="nuovoOratorioEtaMax">Età massima (anni)</label><input id="nuovoOratorioEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset>
+        <div class="modal-body"><div class="form-group"><label for="nuovoOratorioGoogleCalendarUrl">Link Google Calendar</label><input id="nuovoOratorioGoogleCalendarUrl" type="url" class="form-control" placeholder="https://calendar.google.com/calendar/embed?src=..."></div><p>Il calendario deve essere condiviso con i partecipanti. Gli appuntamenti si aggiornano da Google.</p><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="nuovoOratorioEtaMin">Età minima (anni)</label><input id="nuovoOratorioEtaMin" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="nuovoOratorioEtaMax">Età massima (anni)</label><input id="nuovoOratorioEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset>
           <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
             <div class="form-group">
               <label>Stagione Oratorio *</label>
@@ -3967,7 +3825,7 @@ Domenica: dopo le Sante Messe</p>
       </div>
       <form onsubmit="handleSalvaModificaGruppoOratorio(event)">
         <input type="hidden" id="modOratorioId">
-        <div class="modal-body"><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="modOratorioEtaMin">Età minima (anni)</label><input id="modOratorioEtaMin" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="modOratorioEtaMax">Età massima (anni)</label><input id="modOratorioEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset>
+        <div class="modal-body"><div class="form-group"><label for="modOratorioGoogleCalendarUrl">Link Google Calendar</label><input id="modOratorioGoogleCalendarUrl" type="url" class="form-control" placeholder="https://calendar.google.com/calendar/embed?src=..."></div><p>Il calendario deve essere condiviso con i partecipanti. Gli appuntamenti si aggiornano da Google.</p><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="modOratorioEtaMin">Età minima (anni)</label><input id="modOratorioEtaMin" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="modOratorioEtaMax">Età massima (anni)</label><input id="modOratorioEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset>
           <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
             <div class="form-group">
               <label>Stagione Oratorio *</label>
@@ -4404,5 +4262,8 @@ Domenica: dopo le Sante Messe</p>
   <div class="toast-container" id="toastContainer"></div>
 
   <script src="{{ url_for('static', filename='js/app.js', v=asset_version) }}" defer></script>
+
+<div class="modal-overlay" id="modalPartecipantiEvento"><div class="modal-window"><div class="modal-header"><h3>Iscritti e disiscrizioni</h3><button type="button" class="btn-close-modal" onclick="closeModal('modalPartecipantiEvento')">×</button></div><div class="modal-body" id="partecipantiEventoElenco"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="closeModal('modalPartecipantiEvento')">Chiudi</button></div></div></div>
+
 </body>
 </html>

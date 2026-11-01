@@ -1,3 +1,4 @@
+from services.profile_files import profile_payload, commit_profile
 from flask import Blueprint, request, jsonify
 from flask_login import current_user, login_required
 from models import db, Persona, NucleoFamiliare, Utente
@@ -97,7 +98,7 @@ def get_persona(cf):
 
 @persone_bp.route('', methods=['POST'])
 def create_persona():
-    data = request.get_json() or {}
+    data = profile_payload()
     cf = normalizza_cf(data.get('codice_fiscale', ''))
     nome = data.get('nome', '').strip()
     cognome = data.get('cognome', '').strip()
@@ -135,6 +136,7 @@ def create_persona():
         data_nascita=data_nascita,
         luogo_nascita=data.get('luogo_nascita', '').strip(),
         provincia_nascita=data.get('provincia_nascita', '').strip(),
+        civico_residenza=data.get('civico_residenza', '').strip(),
         indirizzo_residenza=data.get('indirizzo_residenza', '').strip(),
         comune_residenza=data.get('comune_residenza', 'Asti').strip(),
         cap_residenza=data.get('cap_residenza', '14100').strip(),
@@ -150,7 +152,7 @@ def create_persona():
     )
 
     db.session.add(persona)
-    db.session.commit()
+    commit_profile(persona, data)
 
     return jsonify({
         'success': True,
@@ -168,7 +170,7 @@ def update_persona(cf):
     if not staff_user() and cf != current_user.codice_fiscale and not (p.nucleo and can_manage_family(p.nucleo)):
         return jsonify(error='La gestione degli altri membri è riservata al capofamiglia'), 403
 
-    data = request.get_json() or {}
+    data = profile_payload()
     if 'nucleo_id' in data and data['nucleo_id'] != p.nucleo_id:
         return jsonify(error='Usa la procedura di invito per cambiare nucleo familiare'), 400
     role = data.get('ruolo_famiglia', p.ruolo_famiglia)
@@ -198,6 +200,8 @@ def update_persona(cf):
         except Exception:
             pass
     if 'luogo_nascita' in data: p.luogo_nascita = data['luogo_nascita'].strip()
+    if 'civico_residenza' in data: p.civico_residenza = data['civico_residenza'].strip()
+    if 'provincia_residenza' in data: p.provincia_residenza = data['provincia_residenza'].strip()
     if 'indirizzo_residenza' in data: p.indirizzo_residenza = data['indirizzo_residenza'].strip()
     if 'comune_residenza' in data: p.comune_residenza = data['comune_residenza'].strip()
     if 'cap_residenza' in data: p.cap_residenza = data['cap_residenza'].strip()
@@ -210,7 +214,7 @@ def update_persona(cf):
     if 'ruolo_famiglia' in data: p.ruolo_famiglia = data['ruolo_famiglia'].strip()
     if 'nucleo_id' in data: p.nucleo_id = data['nucleo_id']
 
-    db.session.commit()
+    commit_profile(p, data)
     return jsonify({
         'success': True,
         'message': 'Scheda anagrafica aggiornata',

@@ -50,8 +50,10 @@ def enrollment_options():
     records = Iscrizione.query.filter(Iscrizione.codice_fiscale_partecipante.in_(family_cfs)).all() if family_cfs else []
     activities = {}
     for activity in Attivita.query.filter_by(is_attiva=True, is_pubblicato=True).all():
-        enrolled = {r.codice_fiscale_partecipante for r in records if r.attivita_id == activity.id}
+        enrolled = {r.codice_fiscale_partecipante for r in records if r.attivita_id == activity.id and r.stato != 'annullata'}
         free = activity.posti_disponibili
         candidates = [p.codice_fiscale for p in people if p.codice_fiscale not in enrolled and age_eligible(p,activity)] if free is None or free > 0 else []
-        activities[activity.id] = {'partecipanti':candidates, 'gia_iscritto':bool(enrolled)}
+        from routes.iscrizioni import can_withdraw
+        withdrawals=[{'id':r.id,'nominativo':r.partecipante.nominativo,'puo_disiscriversi':can_withdraw(r)} for r in records if r.attivita_id==activity.id and r.stato != 'annullata']
+        activities[activity.id] = {'partecipanti':candidates, 'gia_iscritto':bool(enrolled), 'iscrizioni':withdrawals}
     return {'attivita':activities, 'gruppi':{category:available_groups(category) for category in GROUP_MODELS}}

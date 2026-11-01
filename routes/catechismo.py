@@ -1,3 +1,4 @@
+from services.group_calendar import apply_calendar
 from services.group_age_service import apply_age_range, register_age_guard
 from flask import Blueprint, request, jsonify
 from flask_login import current_user
@@ -106,7 +107,6 @@ def create_gruppo():
         aula=data.get('aula', '').strip(),
         note=data.get('note', '').strip(),
         stato=data.get('stato', 'pubblico').strip(),
-        google_calendar_url=data.get('google_calendar_url', '').strip(),
         attivita_id=data.get('attivita_id')
     )
 
@@ -119,6 +119,7 @@ def create_gruppo():
         if nomi:
             nuovo.catechista_nome = ", ".join(nomi)
 
+    apply_calendar(nuovo, data)
     apply_age_range(nuovo, data)
     db.session.add(nuovo)
     db.session.commit()
@@ -136,6 +137,7 @@ def update_gruppo(id):
         return jsonify({'error': 'Gruppo non trovato'}), 404
 
     data = request.get_json() or {}
+    apply_calendar(g, data)
     apply_age_range(g, data)
     if 'nome' in data: g.nome = data['nome'].strip()
     if 'anno_pastorale' in data: g.anno_pastorale = data['anno_pastorale'].strip()
@@ -147,7 +149,6 @@ def update_gruppo(id):
     if 'aula' in data: g.aula = data['aula'].strip()
     if 'note' in data: g.note = data['note'].strip()
     if 'stato' in data: g.stato = data['stato'].strip()
-    if 'google_calendar_url' in data: g.google_calendar_url = data['google_calendar_url'].strip()
     if 'attivita_id' in data: g.attivita_id = data['attivita_id']
 
     if 'catechisti_ids' in data:

@@ -1,3 +1,4 @@
+from services.group_calendar import apply_calendar
 from services.group_age_service import apply_age_range, register_age_guard
 from flask import Blueprint, request, jsonify
 from flask_login import current_user
@@ -99,6 +100,7 @@ def create_gruppo_oratorio():
             if u and u not in nuovo.animatori:
                 nuovo.animatori.append(u)
 
+    apply_calendar(nuovo, data)
     apply_age_range(nuovo, data)
     db.session.add(nuovo)
     db.session.commit()
@@ -123,6 +125,7 @@ def update_gruppo_oratorio(id):
         return jsonify({'error': 'Gruppo Oratorio non trovato'}), 404
 
     data = request.get_json() or {}
+    apply_calendar(g, data)
     apply_age_range(g, data)
     if 'nome' in data: g.nome = data['nome'].strip()
     if 'anno_pastorale' in data: g.anno_pastorale = data['anno_pastorale'].strip()

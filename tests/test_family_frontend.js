@@ -8,7 +8,7 @@ const elements = new Map();
 const selected = [];
 const requests = [];
 const nodes = id => {
-  if (!elements.has(id)) elements.set(id, { value:'', style:{}, hidden:false, disabled:false, classList:{add(){},remove(){}}, textContent:'', _html:'',
+  if (!elements.has(id)) elements.set(id, { value:'', style:{}, hidden:false, disabled:false, classList:{add(){},remove(){},contains(){return false;}}, textContent:'', _html:'',
     set innerHTML(value) { this._html=value; if (id==='iscrizioneAttivitaSelect') this.value='7'; },
     get innerHTML() { return this._html; },
   });
@@ -17,6 +17,7 @@ const nodes = id => {
 const people = [{codice_fiscale:'RSSMRA80A01H501U',nominativo:'Genitore di prova',eta:46}, {codice_fiscale:'RSSLGI14A01H501A',nominativo:'Figlio di prova',eta:12}];
 const fixtures = {
   '/api/attivita':{attivita:[{id:7,titolo:'Attività selezionata',eta_min:0,eta_max:99,quota_iscrizione:10,campi_personalizzati:[{nome:'Taglia',chiave:'taglia',obbligatorio:true}]}]},
+  '/api/famiglie/calendari-gruppi':{calendari:[]},
   '/api/famiglie/opportunita':{attivita:{7:{partecipanti:people.map(p=>p.codice_fiscale),gia_iscritto:false}},gruppi:{oratorio:[],catechismo:[],doposcuola:[]}},
   '/api/famiglie/mia':{nucleo:{id:1,componenti:people},puo_gestire:true},
   '/api/iscrizioni?solo_mie=true':{iscrizioni:[]},
@@ -24,7 +25,7 @@ const fixtures = {
   '/api/auth/registration-options':{consensi:{privacy:{titolo:'Privacy',testo:'Per la famiglia'},foto_video:{titolo:'Foto e video',testo:'Per la famiglia'}},salute:{allergie:['Polline'],intolleranze_alimentari:['Lattosio'],terapie_medicinali:['Terapia prescritta']}},
 };
 const context = vm.createContext({
-  console, AbortController, setTimeout, clearTimeout,
+  console, AbortController, setTimeout, clearTimeout, confirm:()=>true,
   window:{addEventListener(){}},
   document:{addEventListener(){},querySelector(selector){return /^\.(oratorio|catechismo|doposcuola)-nav$/.test(selector) ? nodes(selector) : null;},getElementById:nodes,querySelectorAll(selector){
     if(selector==='.family-participant:checked')return selected.map(value=>({value}));
@@ -124,5 +125,33 @@ vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['
   assert.ok(!dashboard.includes('openModalNuovaIscrizione'));
   assert.ok(!dashboard.includes('openModalOfferteDonazioni'));
   assert.ok(!template.includes('Iscrivi un Partecipante'));
+  assert.equal(context.visibleDocumentKind('identita',null),true);
+  assert.equal(context.visibleDocumentKind('battesimo',0),true);
+  for(const [kind,threshold] of [['comunione',8],['cresima',12],['matrimonio',30]]) {
+    assert.equal(context.visibleDocumentKind(kind,null),false);
+    assert.equal(context.visibleDocumentKind(kind,threshold),false);
+    assert.equal(context.visibleDocumentKind(kind,threshold+1),true);
+  }
+  for(const modal of ['modalNuovaPersona','modalModificaPersona','modalAggiungiFiglio','modalSchedaPersonaVisualizzazione']) {
+    const start=template.indexOf('id="'+modal+'"');
+    const end=template.indexOf('class="modal-footer"',start);
+    const contents=template.slice(start,end);
+    assert.equal((contents.match(/data-profile-section=/g)||[]).length,5);
+    for(const section of ['anagrafica','residenza','contatti','documenti','altro']) assert.ok(contents.includes('data-profile-section="'+section+'"'));
+  }
+  await context.renderRegistrationConsents('memberAccountConsents',true);
+  assert.equal((nodes('memberAccountConsents').innerHTML.match(/ required/g)||[]).length,2);
+  assert.ok(!nodes('memberAccountConsents').innerHTML.includes(' checked'));
+  const url='https://calendar.google.com/calendar/embed?src=test%40group.calendar.google.com';
+  const calendar=context.groupCalendarMarkup({calendar_embed_url:url});
+  assert.ok(calendar.includes('Mostra appuntamenti'));
+  assert.ok(!calendar.includes('<iframe'));
+  assert.equal(context.groupCalendarMarkup({calendar_embed_url:'javascript:alert(1)'}),'');
+  assert.ok(context.withdrawButton({id:5,puo_disiscriversi:true,stato:'confermata'}).includes('annullaMiaIscrizione(5)'));
+  assert.equal(context.withdrawButton({id:5,puo_disiscriversi:true,stato:'annullata'}),'');
+  assert.equal(context.withdrawButton({id:5,puo_disiscriversi:false,stato:'confermata'}),'');
+  fixtures['/api/iscrizioni/5/disiscrivi']={success:true,message:'Disiscrizione completata'};
+  await context.annullaMiaIscrizione(5);
+  assert.ok(requests.some(r=>r.url==='/api/iscrizioni/5/disiscrivi' && r.options.method==='POST'));
   console.log('Alpha famiglia: attività fissata, selezione multipla, quota, invio unico, consensi e salute verificati.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, has_request_context
 from flask_login import current_user
 from models import db, Iscrizione, Attivita, Persona, NucleoFamiliare, Lista
 from services.cf_validator import normalizza_cf
@@ -143,7 +143,7 @@ def _register_participant(data):
         codice_fiscale_partecipante=cf
     ).first()
 
-    if esistente:
+    if esistente and esistente.stato != 'annullata':
         return jsonify({'error': f'{persona.nominativo} è già iscritto/a a {attivita.titolo}'}), 409
 
     # Controllo posti disponibili
@@ -163,7 +163,7 @@ def _register_participant(data):
     if not isinstance(campi_pers_input, dict):
         campi_pers_input = {}
 
-    nuova = Iscrizione(
+    nuova = esistente or Iscrizione(
         attivita_id=attivita_id,
         codice_fiscale_partecipante=cf,
         iscritto_da_id=iscritto_da_id,
@@ -180,6 +180,11 @@ def _register_participant(data):
         campi_personalizzati=json.dumps(campi_pers_input)
     )
 
+    if esistente:
+        nuova.stato = 'confermata'
+        nuova.iscritto_da_id = current_user.id
+        nuova.note_iscrizione = data.get('note_iscrizione', nuova.note_iscrizione or '').strip()
+        nuova.campi_personalizzati = json.dumps(campi_pers_input)
     db.session.add(nuova)
 
     # Associazione automatica alla Lista dell'attività (lato segreteria, un utente può stare in più liste)
@@ -250,7 +255,12 @@ def update_stato(id):
     if nuovo_stato not in ['in_attesa', 'confermata', 'rifiutata', 'annullata']:
         return jsonify({'error': 'Stato non valido'}), 400
 
-    isc.stato = nuovo_stato
+    if not staff_user() and (nuovo_stato != 'annullata' or not can_withdraw(isc)):
+        return jsonify(error='Non autorizzato a modificare lo stato'),403
+    if nuovo_stato == 'annullata':
+        cancel_participation(isc)
+    else:
+        isc.stato = nuovo_stato
     db.session.commit()
     return jsonify({
         'success': True,
@@ -303,29 +313,29 @@ def update_squadra(id):
         'iscrizione': isc.to_dict()
     })
 
+def can_withdraw(isc):
+    if not has_request_context() or not current_user.is_authenticated: return False
+    if staff_user() or current_user.codice_fiscale == isc.codice_fiscale_partecipante: return True
+    family = isc.partecipante.nucleo if isc.partecipante else None
+    return bool(family and can_manage_family(family))
+
+
+def cancel_participation(isc):
+    isc.stato='annullata'
+    for group_list in Lista.query.filter_by(attivita_id=isc.attivita_id).all():
+        if isc.partecipante in group_list.membri:
+            group_list.membri.remove(isc.partecipante)
+
+
+@iscrizioni_bp.route('/<int:id>/disiscrivi', methods=['POST'])
 @iscrizioni_bp.route('/<int:id>', methods=['DELETE'])
 def delete_iscrizione(id):
-    isc = db.session.get(Iscrizione, id)
-    if not isc:
-        return jsonify({'error': 'Iscrizione non trovata'}), 404
-
-    # Controllo permessi disiscrizione
-    if current_user.is_authenticated:
-        roles = current_user.get_all_roles()
-        is_staff = any(r in ['admin', 'segreteria', 'parroco'] for r in roles)
-        if not is_staff:
-            user_cf = (current_user.codice_fiscale or '').upper()
-            family_cfs = []
-            if current_user.persona and current_user.persona.nucleo:
-                family_cfs = [(c.codice_fiscale or '').upper() for c in current_user.persona.nucleo.componenti]
-            part_cf = (isc.codice_fiscale_partecipante or '').upper()
-            is_owner = (isc.iscritto_da_id == current_user.id or part_cf == user_cf or part_cf in family_cfs)
-            if not is_owner:
-                return jsonify({'error': 'Non sei autorizzato a disiscrivere questo partecipante'}), 403
-
-    db.session.delete(isc)
+    isc = db.session.get(Iscrizione,id)
+    if not isc: return jsonify(error='Iscrizione non trovata'),404
+    if not can_withdraw(isc): return jsonify(error='Non sei autorizzato a disiscrivere questo partecipante'),403
+    cancel_participation(isc)
     db.session.commit()
-    return jsonify({'success': True, 'message': 'Disiscrizione completata con successo'})
+    return jsonify(success=True,message='Disiscrizione completata. Pagamenti e ricevute restano conservati.',iscrizione=isc.to_dict())
 
 @iscrizioni_bp.route('/bulk-pagamento', methods=['POST'])
 def bulk_pagamento():
