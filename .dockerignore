@@ -13,3 +13,8 @@ database/.session-key
 
 backups
 database/backups
+
+database/.release-state.json
+database/.deployment-restored.json
+
+database/.deployment-verified.json

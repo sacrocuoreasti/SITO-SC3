@@ -155,7 +155,43 @@ Render Free ha già perso sostituendo un'istanza durante il deploy.
 
 Database, password hash, dati sanitari e allegati sono privati: i backup sono
 esclusi da Git e dalle immagini Docker. Non caricarli su GitHub pubblico.
-Non eseguire il primo deploy di questa versione finché il database live della
-versione precedente non è stato recuperato e verificato: quella versione non
-espone un export completo, mentre Render Free non offre shell o disco persistente.
-Un export Excel conserva una parte dei dati e non sostituisce il backup SQLite.
+L'utente ha autorizzato il primo deploy di alpha 2.0.0 accettando l'eventuale
+ripristino dei dati oggi online dalla copia iniziale. Questa eccezione non vale
+per gli aggiornamenti successivi.
+
+### Pubblicazioni successive con conservazione dei dati
+
+Da `main`, dopo aver committato le modifiche al codice, eseguire:
+
+```sh
+python scripts/release.py
+```
+
+Il comando richiede l'accesso amministratore senza salvarne la password:
+
+1. Esegue i controlli; poi sospende temporaneamente le operazioni sul sito e
+   attende la conclusione delle richieste già in corso.
+2. Scarica un archivio completo dal sito, verifica SQLite e checksum, conserva
+   copie private in `backups/` e prepara uno snapshot cifrato AES-GCM.
+3. Incrementa la versione, committa su GitHub soltanto codice, manifest tecnico
+   e `.deployment/restore.enc` cifrato, quindi avvia il deploy tramite push.
+4. Il server ripristina database e allegati prima di avviarsi e resta in
+   manutenzione. Il client confronta tutti i valori delle colonne preesistenti,
+   comprese password, consensi e pagamenti, e i checksum degli allegati.
+5. Solo dopo il confronto positivo il sito viene riaperto. Il campo volatile
+   `last_login` è escluso perché la verifica richiede un nuovo accesso.
+
+Build e avvio fermano le nuove versioni prive di snapshot corrispondente.
+La chiave non è nel repository: viene derivata da `BACKUP_ENCRYPTION_KEY`,
+oppure dalla `GOOGLE_SCRIPT_SECRET` già configurata su Render. Non modificare
+questo segreto senza preparare una nuova copia cifrata prima del cambio.
+
+Se la preparazione viene annullata prima del push, le operazioni riprendono.
+Per annullare esplicitamente sul vecchio server: `python scripts/release.py --cancel`.
+Se il deploy è già partito, la manutenzione resta attiva finché i dati non sono
+stati verificati; non aggirare il controllo.
+
+Questo flusso conserva i dati attraverso gli aggiornamenti controllati. Render
+Free resta privo di disco persistente: un riavvio o sospensione non pianificati
+possono riportare lo stato all'ultimo snapshot di rilascio. Per proteggere anche
+le scritture successive contro questi eventi serve uno storage persistente.

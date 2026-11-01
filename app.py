@@ -3,7 +3,7 @@ import secrets
 import gzip
 from functools import lru_cache
 from pathlib import Path
-from flask import Flask, render_template, send_from_directory, jsonify, request, abort
+from flask import Flask, render_template, send_from_directory, jsonify, request, abort, g
 from flask_login import LoginManager, current_user
 from sqlalchemy import event, text
 from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
@@ -21,7 +21,43 @@ login_manager = LoginManager()
 def create_app(config_class=Config):
     app = Flask(__name__, static_folder='static', template_folder='templates')
     app.config.from_object(config_class)
-    app.config['APP_VERSION'] = (Path(app.root_path) / 'VERSION').read_text().strip()
+    app.config['APP_VERSION'] = app.config.get('APP_VERSION') or (Path(app.root_path) / 'VERSION').read_text().strip()
+    from sqlalchemy.engine import make_url
+    from services.deployment_backup import ReleaseGate, restore_snapshot, backup_secret
+    database_url = make_url(app.config['SQLALCHEMY_DATABASE_URI'])
+    database_path = database_url.database if database_url.get_backend_name() == 'sqlite' and database_url.database != ':memory:' else None
+    deployment_directory = Path(app.config.get('DEPLOYMENT_DIRECTORY', Path(app.root_path) / '.deployment'))
+    restored = None
+    if os.environ.get('RENDER') == 'true' and (not app.testing or app.config.get('DEPLOYMENT_RESTORE_IN_TESTS')):
+        key = backup_secret()
+        if database_path:
+            restored = restore_snapshot(deployment_directory, app.config['APP_VERSION'], database_path, app.config['UPLOAD_FOLDER'], key)
+    gate = ReleaseGate(Path(database_path).parent / '.release-state.json' if database_path else None)
+    app.config['RELEASE_GATE'] = gate
+    app.config['DEPLOYMENT_DIRECTORY'] = str(deployment_directory)
+    verified_marker = Path(database_path).parent / '.deployment-verified.json' if database_path else None
+    import json
+    verified_release = json.loads(verified_marker.read_text()).get('release_id') if verified_marker and verified_marker.exists() else None
+    if restored and not gate.state and verified_release != restored['release_id']:
+        gate.freeze(restored['target_version'], restored['release_id'])
+
+    @app.before_request
+    def release_admission():
+        if not request.path.startswith('/api/'):
+            return
+        if request.blueprint == 'backup_bp' or request.endpoint in {'auth_bp.login', 'auth_bp.logout', 'auth_bp.get_current_user'}:
+            return
+        if not gate.admit():
+            response = jsonify(error='Aggiornamento in corso. Riprova tra poco.', success=False)
+            response.headers['Retry-After'] = '30'
+            return response, 503
+        g.release_admitted = True
+
+    @app.teardown_request
+    def release_finished(error):
+        if g.pop('release_admitted', False):
+            gate.leave()
+
 
     @app.context_processor
     def release_context():
@@ -138,7 +174,7 @@ def create_app(config_class=Config):
     def health():
         try:
             db.session.execute(text('SELECT 1'))
-            return jsonify(status='ok', app='Parrocchia Sacro Cuore Asti', revision=os.environ.get('RENDER_GIT_COMMIT', 'local'), version=app.config['APP_VERSION'])
+            return jsonify(status='ok', app='Parrocchia Sacro Cuore Asti', revision=os.environ.get('RENDER_GIT_COMMIT', 'local'), version=app.config['APP_VERSION'], maintenance=bool(gate.state), backup_ready=bool(os.environ.get('BACKUP_ENCRYPTION_KEY') or os.environ.get('GOOGLE_SCRIPT_SECRET')))
         except SQLAlchemyError:
             db.session.rollback()
             app.logger.exception('Health check database fallito')

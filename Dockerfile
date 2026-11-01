@@ -14,6 +14,7 @@ COPY . .
 
 # Cartelle persistenti
 RUN mkdir -p database uploads
+RUN python scripts/check_release.py
 
 ENV PORT=5001
 EXPOSE 5001

@@ -72,8 +72,8 @@ class AlphaFamilyTests(unittest.TestCase):
         return dict({'nome':'New', 'cognome':'Test', 'codice_fiscale':fiscal_code('VRDLGI90A01H501'), 'email':'new@example.test', 'password':'password-test-123', 'ruolo_famiglia':'Madre', 'consensi_registrazione':{'privacy':True, 'foto_video':True}}, **extra)
 
     def test_version_and_family_head_independent_of_role(self):
-        self.assertIn(b'alpha 2.0.0', self.client.get('/').data)
-        self.assertEqual(self.client.get('/health').json['version'], 'alpha 2.0.0')
+        self.assertIn((Path(__file__).resolve().parents[1]/'VERSION').read_text().strip().encode(), self.client.get('/').data)
+        self.assertEqual(self.client.get('/health').json['version'], (Path(__file__).resolve().parents[1]/'VERSION').read_text().strip())
         me = self.client.get('/api/auth/me').json['user']
         self.assertTrue(me['is_capofamiglia'])
         self.assertEqual(me['persona']['ruolo_famiglia'], 'Figlio/a')
