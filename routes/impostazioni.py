@@ -1,7 +1,7 @@
 from datetime import datetime
 from flask import Blueprint, request, jsonify
 from flask_login import current_user
-from models import db, ImpostazioniSito, Attivita, NotiziaEvento, CalendarioComunita
+from models import db, ImpostazioniSito, Attivita, NotiziaEvento, CalendarioComunita, Celebrazione
 
 impostazioni_bp = Blueprint('impostazioni_bp', __name__, url_prefix='/api/impostazioni')
 
@@ -63,7 +63,8 @@ def get_dati_pubblici():
         'impostazioni': imp.to_dict(),
         'attivita': [a.to_dict() for a in attivita],
         'avvisi': [av.to_dict() for av in avvisi],
-        'calendari': [c.to_dict() for c in calendari]
+        'calendari': [c.to_dict() for c in calendari],
+        'celebrazioni': [c.to_dict() for c in Celebrazione.query.filter_by(is_attivo=True).order_by(Celebrazione.ordine.asc(), Celebrazione.id.asc()).all()]
     })
 
 # ---------------- GESTIONE EVENTI & AVVISI (PUBBLICATI VS BOZZE) ----------------

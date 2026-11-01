@@ -1,0 +1,57 @@
+GOOGLE APPS SCRIPT — INVIO EMAIL HTML DAL PORTALE
+
+1. Accedi a https://script.google.com/ con l'account Gmail/Workspace che dovrà
+   inviare le email (per inviare da noreply@sacrocuoreasti.com, usa quell'account).
+   Crea un Nuovo progetto e chiamalo "CuoreInRete Mailer".
+
+2. Sostituisci tutto il contenuto di Code.gs con il file Code.gs di questa
+   cartella. Salva. Nel menu delle funzioni scegli setupMailer e premi Esegui.
+   Completa personalmente l'autorizzazione Google per l'invio di email.
+   Se Google o l'amministratore Workspace impediscono l'autorizzazione,
+   risolvi le restrizioni dell'account prima di proseguire.
+
+3. Apri Impostazioni progetto (ingranaggio) > Proprietà script.
+   Troverai MAILER_SECRET, creata automaticamente. Copia il valore soltanto
+   in Render, non nel codice, nel repository o in chat. Non ricreare la chiave
+   a ogni invio. MAILER_NAME è una proprietà facoltativa per il nome mittente.
+
+4. In alto a destra: Esegui il deployment > Nuovo deployment.
+   Scegli tipo "App web". Imposta:
+     Esegui come: Me (account proprietario)
+     Chi può accedere: Chiunque (anche senza login Google)
+   Esegui il deployment e copia l'URL che termina con /exec, NON /dev.
+   La chiamata è protetta dalla firma HMAC: conoscere l'URL non permette invii.
+   Non scegliere "Chiunque con un account Google": Render non ha una sessione Google.
+   Se "Chiunque" non è disponibile, serve l'intervento dell'amministratore Workspace.
+
+5. Render > servizio sacrocuoreasti > Environment: aggiungi queste variabili:
+     EMAIL_PROVIDER       google_apps_script
+     GOOGLE_SCRIPT_URL    URL /exec appena copiato
+     GOOGLE_SCRIPT_SECRET stesso valore della proprietà MAILER_SECRET
+   Salva e attendi il nuovo deploy. Non servono SMTP_PASS o password Gmail.
+
+6. Apri l'URL /exec in una finestra privata senza account Google:
+   deve comparire {"ok":true,"service":"CuoreInRete Mailer"}, senza login.
+   Questo verifica l'accessibilità, non effettua invii.
+   Dal sito usa "Recupera password" con un account realmente registrato.
+   Controlla casella e Spam. Se il sito segnala invio riuscito, Google ha
+   accettato il messaggio; la consegna finale dipende dal recapito email.
+
+7. Per aggiornare il codice in futuro, salva e vai su Gestisci deployment >
+   Modifica > Versione > Nuova versione > Esegui deployment.
+   Aggiornando lo stesso deployment mantieni lo stesso URL /exec.
+
+NOTE
+- Il mittente reale è l'account proprietario della web app; MailApp non permette
+  di sostituirlo con un indirizzo arbitrario.
+- Restano valide le quote giornaliere Google, diverse tra Gmail e Workspace.
+- setupMailer autorizza MailApp e mostra la quota, ma non invia email.
+- La chiave deve contenere almeno 32 caratteri e coincidere su Google e Render.
+- In caso di errore o timeout lo script non registra nei log corpi, email o OTP.
+- Se esponi la chiave, sostituisci MAILER_SECRET nelle Proprietà script e
+  GOOGLE_SCRIPT_SECRET su Render con lo stesso nuovo valore casuale.
+
+DOCUMENTAZIONE GOOGLE
+https://developers.google.com/apps-script/guides/web
+https://developers.google.com/apps-script/reference/mail/mail-app
+https://developers.google.com/apps-script/guides/services/quotas

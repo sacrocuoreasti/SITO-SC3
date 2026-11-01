@@ -23,6 +23,24 @@ window.addEventListener('error', (event) => {
   console.warn('Protezione Stabilità Render: Errore globale intercettato:', event.message);
 });
 
+async function apiJson(url, options = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20000);
+  try {
+    const response = await fetch(url, { ...options, signal: options.signal || controller.signal });
+    const type = response.headers.get('content-type') || '';
+    if (!type.includes('application/json')) throw new Error('Il server è in riavvio o non risponde. Riprova tra poco.');
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `Errore del server (${response.status})`);
+    return data;
+  } catch (error) {
+    if (error.name === 'AbortError') throw new Error('Il server impiega troppo tempo a rispondere. Riprova tra poco.');
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function safeFetchJson(url, options = {}, fallback = {}) {
   try {
     const controller = new AbortController();
@@ -46,15 +64,44 @@ async function safeFetchJson(url, options = {}, fallback = {}) {
 
 // ================= GESTIONE CALENDARIO GOOGLE PUBBLICO =================
 let currentPublicCalMode = 'MONTH';
+let calendarLoadTimer = null;
 const SHARED_GOOGLE_CAL_SRC = 'c_bff35669d70591ceec1aa976821e3eea2aca33b728e666885c4162712e0275c2@group.calendar.google.com';
+
+function loadPublicCalendar(mode = currentPublicCalMode) {
+  const iframe = document.getElementById('publicGoogleCalendarIframe');
+  const overlay = document.getElementById('calendarLoadingOverlay');
+  if (!iframe) return;
+  const url = `https://calendar.google.com/calendar/embed?src=${encodeURIComponent(SHARED_GOOGLE_CAL_SRC)}&ctz=Europe%2FRome&mode=${mode}&showTitle=0&showNav=1&showDate=1&showPrint=0&showTabs=1&showCalendars=0&showTz=1&bgcolor=%23ffffff`;
+  if (iframe.getAttribute('src') === url) return;
+  clearTimeout(calendarLoadTimer);
+  if (overlay) {
+    overlay.style.display = 'flex';
+    overlay.innerHTML = '<span>Caricamento calendario…</span>';
+  }
+  iframe.hidden = false;
+  iframe.src = url;
+  calendarLoadTimer = setTimeout(() => {
+    if (overlay) overlay.innerHTML = `<span>Google Calendar non risponde. Puoi aprirlo in una nuova scheda.</span><a class="btn btn-secondary" href="${url}" target="_blank" rel="noopener noreferrer">Apri il calendario ↗</a><button type="button" class="btn btn-secondary" onclick="retryPublicCalendar()">Riprova</button>`;
+  }, 12000);
+}
+
+function retryPublicCalendar() {
+  const iframe = document.getElementById('publicGoogleCalendarIframe');
+  if (iframe) iframe.removeAttribute('src');
+  loadPublicCalendar();
+}
+
+function onCalendarIframeLoaded() {
+  const iframe = document.getElementById('publicGoogleCalendarIframe');
+  if (!iframe || !iframe.getAttribute('src')) return;
+  clearTimeout(calendarLoadTimer);
+  const overlay = document.getElementById('calendarLoadingOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
 
 function setPublicCalendarMode(mode) {
   currentPublicCalMode = mode;
-  const iframe = document.getElementById('publicGoogleCalendarIframe');
-  if (iframe) {
-    const encSrc = encodeURIComponent(SHARED_GOOGLE_CAL_SRC);
-    iframe.src = `https://calendar.google.com/calendar/embed?src=${encSrc}&ctz=Europe%2FRome&mode=${mode}&showTitle=0&showNav=1&showDate=1&showPrint=0&showTabs=1&showCalendars=0&showTz=1&bgcolor=%23ffffff`;
-  }
+  loadPublicCalendar(mode);
 
   document.querySelectorAll('.cal-view-btn').forEach(btn => {
     btn.classList.remove('active');
@@ -75,7 +122,15 @@ function setPublicCalendarMode(mode) {
 // ================= INITIALIZATION =================
 document.addEventListener('DOMContentLoaded', async () => {
   setupDropzone();
-  await Promise.allSettled([loadPublicHomepage(), checkAuthStatus()]);
+  // Avvio indipendente: la homepage e il login non attendono servizi secondari.
+  loadPublicHomepage();
+  checkAuthStatus();
+  const loginEmail = document.getElementById('inputLoginEmail');
+  if (loginEmail) loginEmail.addEventListener('input', () => {
+    document.getElementById('inputLoginPassword').required = !(
+      document.body.dataset.localQuickLogin === 'true' && loginEmail.value.trim() === 'a'
+    );
+  });
 
   // Chiusura comoda dei modali al clic sullo sfondo o tasto ESC
   document.addEventListener('click', (e) => {
@@ -93,7 +148,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ================= PUBLIC HOMEPAGE =================
 async function loadPublicHomepage() {
   try {
-    const data = await safeFetchJson('/api/impostazioni/dati-pubblici', {}, { impostazioni: {}, attivita: [], avvisi: [], calendari: [] });
+    const data = await safeFetchJson('/api/impostazioni/dati-pubblici', {}, null);
+    if (!data) {
+      const grid = document.getElementById('publicAttivitaGrid');
+      if (grid) grid.innerHTML = '<div role="status">Il server non risponde. <button type="button" class="btn btn-secondary" onclick="loadPublicHomepage()">Riprova il caricamento</button></div>';
+      return;
+    }
     const imp = data.impostazioni || {};
 
     // Hero Customization (defensivo)
@@ -137,8 +197,8 @@ async function loadPublicHomepage() {
     if (imp.segreteria_orari && document.getElementById('homeSegreteriaOrari')) document.getElementById('homeSegreteriaOrari').textContent = imp.segreteria_orari;
 
     // Carica orari celebrazioni pubbliche e calendari comunitari
-    await loadCelebrazioniPubbliche();
-    await loadPublicCalendari();
+    loadCelebrazioniPubbliche(data.celebrazioni);
+    loadPublicCalendari(data.calendari);
 
     // Render Attività Pubblicate
     const attGrid = document.getElementById('publicAttivitaGrid');
@@ -158,7 +218,7 @@ async function loadPublicHomepage() {
             </div>
             ${a.locandina_url ? `
               <div style="margin: 10px 0; border-radius: 8px; overflow: hidden; max-height: 150px; cursor: pointer; border: 1px solid var(--border-light); background: #f8fafc;" onclick="openPreviewLocandina('${a.locandina_url}', ${a.id})">
-                <img src="${a.locandina_url}" alt="Locandina ${escapeHtml(a.titolo)}" style="width: 100%; height: 150px; object-fit: cover; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'" onerror="this.parentElement.style.display='none'">
+                <img loading="lazy" decoding="async" src="${a.locandina_url}" alt="Locandina ${escapeHtml(a.titolo)}" style="width: 100%; height: 150px; object-fit: cover; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'" onerror="this.parentElement.style.display='none'">
                 <div style="font-size: 11px; padding: 3px 6px; background: rgba(0,0,0,0.65); color: #fff; text-align: center; margin-top: -24px; position: relative;">🔍 Ingrandisci Locandina</div>
               </div>
             ` : ''}
@@ -334,13 +394,11 @@ async function handleLoginSubmit(e) {
   const password = document.getElementById('inputLoginPassword').value;
 
   try {
-    const res = await fetch('/api/auth/login', {
+    const data = await apiJson('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Errore di autenticazione');
 
     currentUser = data.user;
     showToast(data.message, 'success');
@@ -1018,7 +1076,7 @@ function renderAttivitaCatalog(items) {
 
         ${a.locandina_url ? `
           <div style="margin: 10px 0; border-radius: 8px; overflow: hidden; max-height: 160px; cursor: pointer; border: 1px solid var(--border-light); background: #f8fafc;" onclick="openPreviewLocandina('${a.locandina_url}', ${a.id})">
-            <img src="${a.locandina_url}" alt="Locandina ${escapeHtml(a.titolo)}" style="width: 100%; height: 160px; object-fit: cover; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'" onerror="this.parentElement.style.display='none'">
+            <img loading="lazy" decoding="async" src="${a.locandina_url}" alt="Locandina ${escapeHtml(a.titolo)}" style="width: 100%; height: 160px; object-fit: cover; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'" onerror="this.parentElement.style.display='none'">
             <div style="font-size: 11px; padding: 3px 6px; background: rgba(0,0,0,0.65); color: #fff; text-align: center; margin-top: -24px; position: relative;">🔍 Ingrandisci Locandina</div>
           </div>
         ` : ''}
@@ -6998,13 +7056,11 @@ async function handleInviaCodiceRecupero() {
   btn.textContent = 'Invio codice in corso...';
 
   try {
-    const res = await fetch('/api/auth/recupera-password/richiedi', {
+    const data = await apiJson('/api/auth/recupera-password/richiedi', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Errore invio codice');
 
     showToast(data.message, 'success');
     document.getElementById('recuperoEmailTarget').textContent = email;
@@ -7042,13 +7098,11 @@ async function handleConfermaNuovaPassword() {
   btn.textContent = 'Salvataggio in corso...';
 
   try {
-    const res = await fetch('/api/auth/recupera-password/conferma', {
+    const data = await apiJson('/api/auth/recupera-password/conferma', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, codice, nuova_password: nuovaPw })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Errore reimpostazione password');
 
     showToast(data.message, 'success');
     closeModal('modalRecuperaPassword');
@@ -7071,10 +7125,9 @@ let cacheCelebrazioni = [];
 let cacheCelebrazioniPubbliche = [];
 let currentCelebrazioniTab = 'messe';
 
-async function loadCelebrazioniPubbliche() {
+async function loadCelebrazioniPubbliche(preloaded) {
   try {
-    const res = await fetch('/api/celebrazioni');
-    const data = await res.json();
+    const data = Array.isArray(preloaded) ? { celebrazioni: preloaded } : await safeFetchJson('/api/celebrazioni', {}, { celebrazioni: [] });
     cacheCelebrazioniPubbliche = data.celebrazioni || [];
     cambiaTabCelebrazioniPubbliche(currentCelebrazioniTab);
   } catch (err) {
@@ -8238,12 +8291,11 @@ function copiaIbanOfferte() {
 // ================= GESTIONE CALENDARI GOOGLE COMUNITARI =================
 let cacheSegreteriaCalendari = [];
 
-async function loadPublicCalendari() {
+async function loadPublicCalendari(preloaded) {
   const grid = document.getElementById('publicCalendariGrid');
   if (!grid) return;
   try {
-    const res = await fetch('/api/impostazioni/calendari?solo_pubblici=true');
-    const data = await res.json();
+    const data = Array.isArray(preloaded) ? { calendari: preloaded } : await safeFetchJson('/api/impostazioni/calendari?solo_pubblici=true', {}, { calendari: [] });
     const calendari = data.calendari || [];
     if (!calendari.length) {
       grid.innerHTML = `

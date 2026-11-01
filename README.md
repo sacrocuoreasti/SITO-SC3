@@ -88,3 +88,33 @@ JavaScript a ogni push/PR. I test coprono API pubbliche, autenticazione, permess
 amministrativi, risposte JSON di errore, recupero dopo errori database, richieste
 concorrenti e conservazione delle impostazioni al riavvio. Non usano il database
 reale e non inviano email.
+
+## Email con Google Apps Script (Render Free)
+
+Il codice da incollare è in `integrations/google-apps-script/Code.gs`.
+Procedura completa in `integrations/google-apps-script/INSTALLAZIONE.txt`.
+Il piano Render Free blocca le porte SMTP: l’integrazione usa HTTPS, senza
+password Gmail. Le chiamate sono firmate con HMAC SHA-256 e scadono dopo
+cinque minuti. Lo script registra per dieci minuti solo gli identificativi delle
+richieste, per impedire invii ripetuti; non conserva destinatari, corpi email o OTP.
+
+Variabili Render:
+
+```text
+EMAIL_PROVIDER=google_apps_script
+GOOGLE_SCRIPT_URL=https://script.google.com/macros/s/ID_DEPLOYMENT/exec
+GOOGLE_SCRIPT_SECRET=<valore MAILER_SECRET dalle proprietà dello script>
+```
+
+Il mittente è l'account Google proprietario che esegue la web app. L'API non
+consente di scegliere arbitrariamente un altro indirizzo mittente. Le quote di
+Google continuano ad applicarsi. Una risposta positiva conferma la presa in
+carico, non la consegna nella casella del destinatario.
+L'endpoint `/api/utenti/email-status` è riservato allo staff e mostra solo lo
+stato della configurazione, senza segreti né invii di prova.
+Per hosting con SMTP disponibile resta supportato `EMAIL_PROVIDER=smtp`,
+con STARTTLS sulla porta 587 e TLS sulla porta 465.
+
+Riferimenti: [limiti Render Free](https://render.com/docs/free#other-limitations),
+[web app Apps Script](https://developers.google.com/apps-script/guides/web),
+[MailApp](https://developers.google.com/apps-script/reference/mail/mail-app).

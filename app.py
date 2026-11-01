@@ -1,5 +1,7 @@
 import os
 import secrets
+import gzip
+from functools import lru_cache
 from pathlib import Path
 from flask import Flask, render_template, send_from_directory, jsonify, request, abort
 from flask_login import LoginManager, current_user
@@ -8,6 +10,11 @@ from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from werkzeug.exceptions import HTTPException
 from config import Config
 from models import db, Utente
+
+@lru_cache(maxsize=8)
+def compressed_asset(data):
+    return gzip.compress(data, compresslevel=5, mtime=0)
+
 
 login_manager = LoginManager()
 
@@ -116,7 +123,9 @@ def create_app(config_class=Config):
 
     @app.route('/')
     def index():
-        return render_template('index.html')
+        version = os.environ.get('RENDER_GIT_COMMIT') or str(max(os.stat(app.static_folder + '/' + name).st_mtime_ns for name in ['css/style.css', 'js/app.js']))
+        local_quick_login = os.environ.get('LOCAL_QUICK_LOGIN') == '1' and not os.environ.get('RENDER') and request.remote_addr in {'127.0.0.1', '::1'}
+        return render_template('index.html', asset_version=version, local_quick_login=local_quick_login)
 
     @app.route('/health')
     def health():
@@ -159,6 +168,25 @@ def create_app(config_class=Config):
     def response_headers(response):
         if request.path.startswith('/api/') or request.path == '/health':
             response.headers['Cache-Control'] = 'no-store'
+        # Comprime solo documenti pubblici e asset, mai risposte API con dati personali.
+        if request.path == '/' or request.path.startswith('/static/'):
+            response.vary.add('Accept-Encoding')
+            if request.path == '/':
+                response.headers['Cache-Control'] = 'no-cache'
+            elif request.args.get('v') and response.status_code == 200:
+                response.headers['Cache-Control'] = 'public, max-age=86400'
+            if (request.method == 'GET' and response.status_code == 200
+                    and request.accept_encodings['gzip'] > 0
+                    and response.mimetype in {'text/html', 'text/css', 'text/javascript', 'application/javascript'}
+                    and 'Content-Encoding' not in response.headers and 'Range' not in request.headers):
+                response.direct_passthrough = False
+                data = response.get_data()
+                if len(data) > 1024:
+                    response.set_data(compressed_asset(data))
+                    response.headers['Content-Encoding'] = 'gzip'
+                    etag, _ = response.get_etag()
+                    if etag:
+                        response.set_etag(etag, weak=True)
         response.headers['X-Content-Type-Options'] = 'nosniff'
         return response
 

@@ -37,3 +37,39 @@ async function run() {
   console.log('Frontend: 6 scenari superati; timer ripuliti.');
 }
 run().catch(error => { console.error(error); process.exitCode = 1; });
+
+const iframe = {
+  attributes: {}, hidden: true,
+  getAttribute(key) { return this.attributes[key] || null; },
+  removeAttribute(key) { delete this.attributes[key]; },
+  set src(value) { this.attributes.src = value; this.loads = (this.loads || 0) + 1; },
+};
+const overlay = { style: {}, innerHTML: '' };
+let timers = new Map();
+let timerId = 0;
+const calendar = vm.createContext({
+  setTimeout(callback) { timers.set(++timerId, callback); return timerId; },
+  clearTimeout(id) { timers.delete(id); },
+  document: {
+    getElementById(id) { return id === 'publicGoogleCalendarIframe' ? iframe : id === 'calendarLoadingOverlay' ? overlay : null; },
+    querySelectorAll() { return []; },
+  },
+});
+const calStart = source.indexOf('let currentPublicCalMode');
+const calEnd = source.indexOf('// ================= INITIALIZATION', calStart);
+vm.runInContext(source.slice(calStart, calEnd), calendar);
+assert.equal(iframe.loads || 0, 0); // Nessuna richiesta Google all'apertura del sito.
+calendar.loadPublicCalendar();
+assert.equal(iframe.loads, 1);
+calendar.loadPublicCalendar();
+assert.equal(iframe.loads, 1); // Nessun ricaricamento duplicato.
+calendar.onCalendarIframeLoaded();
+assert.equal(overlay.style.display, 'none');
+assert.equal(timers.size, 0);
+calendar.setPublicCalendarMode('WEEK');
+assert.equal(iframe.loads, 2);
+Array.from(timers.values())[0]();
+assert.ok(overlay.innerHTML.includes('Apri il calendario'));
+calendar.retryPublicCalendar();
+assert.equal(iframe.loads, 3);
+console.log('Calendario: caricamento su richiesta, timeout, cambio vista e riprova verificati.');

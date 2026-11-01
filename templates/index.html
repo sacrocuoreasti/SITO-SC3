@@ -5,12 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Parrocchia Sacro Cuore di Gesù — Asti</title>
   <meta name="description" content="Portale ufficiale della Parrocchia Sacro Cuore di Asti per la gestione delle iscrizioni alle attività parrocchiali, catechismo, Estate Ragazzi e vita comunitaria.">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=asset_version) }}">
 </head>
-<body>
+<body data-local-quick-login="{{ 'true' if local_quick_login else 'false' }}">
 
   <!-- ================= HOMEPAGE PUBBLICA (PRIMA DELL'ACCESSO) ================= -->
   <div class="public-homepage" id="publicHomepage">
@@ -155,16 +152,16 @@
           <!-- Iframe Interattivo Google Calendar con Overlay di Caricamento Antiglitch -->
           <div class="calendar-iframe-container">
             <div id="calendarLoadingOverlay" class="calendar-loading-overlay">
-              <div class="spinner" style="width: 32px; height: 32px; border: 3px solid #e2e8f0; border-top-color: #8B1E1E; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
-              <span style="font-size: 13.5px; color: var(--ink-700); font-weight: 600;">Caricamento appuntamenti parrocchiali...</span>
+              <span style="font-size: 14px; color: var(--ink-700);">Consulta gli appuntamenti della comunità.</span>
+              <button type="button" class="btn btn-primary" onclick="loadPublicCalendar()">Mostra il calendario</button>
             </div>
             <iframe id="publicGoogleCalendarIframe" 
-              src="https://calendar.google.com/calendar/embed?src=c_bff35669d70591ceec1aa976821e3eea2aca33b728e666885c4162712e0275c2%40group.calendar.google.com&ctz=Europe%2FRome&mode=MONTH&showTitle=0&showNav=1&showDate=1&showPrint=0&showTabs=1&showCalendars=0&showTz=1&bgcolor=%23fafafa"
+              title="Calendario parrocchiale"
               style="border: 0; width: 100%; height: 100%; display: block;"
               frameborder="0" 
               scrolling="no" 
               loading="lazy"
-              onload="onCalendarIframeLoaded()">
+              onload="onCalendarIframeLoaded()" hidden>
             </iframe>
           </div>
 
@@ -272,11 +269,11 @@ Domenica: dopo le Sante Messe</p>
         <form id="formLogin" onsubmit="handleLoginSubmit(event)">
           <div class="form-group">
             <label>Indirizzo Email</label>
-            <input type="email" id="inputLoginEmail" class="form-control" placeholder="nome@esempio.it" required>
+            <input type="text" inputmode="email" autocomplete="username" id="inputLoginEmail" class="form-control" placeholder="nome@esempio.it" required>
           </div>
           <div class="form-group">
             <label>Password</label>
-            <input type="password" id="inputLoginPassword" class="form-control" placeholder="••••••••" required>
+            <input type="password" autocomplete="current-password" id="inputLoginPassword" class="form-control" placeholder="••••••••" required>
           </div>
           <div style="display: flex; justify-content: flex-end; margin-top: -6px; margin-bottom: 14px;">
             <a href="javascript:void(0)" onclick="openModalRecuperaPassword()" style="font-size: 12.5px; color: var(--primary); text-decoration: none; font-weight: 600;">
@@ -4464,6 +4461,6 @@ Domenica: dopo le Sante Messe</p>
   <!-- Toast Notification Container -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <script src="/static/js/app.js"></script>
+  <script src="{{ url_for('static', filename='js/app.js', v=asset_version) }}" defer></script>
 </body>
 </html>

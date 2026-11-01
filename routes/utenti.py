@@ -5,6 +5,12 @@ import json
 
 utenti_bp = Blueprint('utenti_bp', __name__, url_prefix='/api/utenti')
 
+@utenti_bp.route('/email-status', methods=['GET'])
+def email_status():
+    from services.email_service import email_configuration_status
+    return jsonify(email_configuration_status())
+
+
 @utenti_bp.route('', methods=['GET'])
 def get_utenti():
     """Restituisce tutti gli account utente con le anagrafiche e i privilegi associati."""
@@ -156,16 +162,21 @@ def reset_password(id):
     # Invia notifica email all'utente
     invia_email_notifica = data.get('invia_email', True)
     email_inviata = False
+    email_errore = None
     if invia_email_notifica and utente.email:
         nominativo = utente.persona.nominativo if utente.persona else utente.email.split('@')[0]
-        email_inviata, _ = invia_notifica_nuova_password(utente.email, nuova_pw, nominativo)
+        email_inviata, email_errore = invia_notifica_nuova_password(utente.email, nuova_pw, nominativo)
 
     msg = f'Password per {utente.email} reimpostata con successo su: {nuova_pw}'
     if email_inviata:
         msg += ' (inviata anche via email all\'utente)'
 
+    if invia_email_notifica and not email_inviata:
+        msg += ' — Email non inviata: ' + (email_errore or 'servizio non disponibile')
+
     return jsonify({
         'success': True,
+        'email_errore': email_errore if not email_inviata else None,
         'nuova_password': nuova_pw,
         'email_inviata': email_inviata,
         'message': msg

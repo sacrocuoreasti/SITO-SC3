@@ -185,6 +185,53 @@ class StabilityTests(unittest.TestCase):
             db.session.remove()
             db.engine.dispose()
 
+    def test_compression_reduces_public_assets_and_preserves_payload(self):
+        import gzip
+        for path in ['/', '/static/js/app.js?v=test', '/static/css/style.css?v=test']:
+            plain = self.client.get(path)
+            compressed = self.client.get(path, headers={'Accept-Encoding': 'gzip'})
+            self.assertEqual(compressed.headers.get('Content-Encoding'), 'gzip')
+            self.assertEqual(gzip.decompress(compressed.data), plain.data)
+            self.assertLess(len(compressed.data), len(plain.data) * 0.35)
+            self.assertIn('Accept-Encoding', compressed.headers['Vary'])
+        self.assertNotIn('Content-Encoding', self.client.get('/api/auth/me', headers={'Accept-Encoding': 'gzip'}).headers)
+        self.assertNotIn('Content-Encoding', self.client.get('/', headers={'Accept-Encoding': 'gzip;q=0'}).headers)
+
+    def test_homepage_has_no_external_render_blockers(self):
+        html = self.client.get('/').data.decode()
+        self.assertNotIn('fonts.googleapis.com', html)
+        iframe = html.split('id="publicGoogleCalendarIframe"', 1)[1].split('</iframe>', 1)[0]
+        self.assertNotIn('src=', iframe)
+        self.assertIn('Mostra il calendario', html)
+        self.assertIn('defer></script>', html)
+        data = self.client.get('/api/impostazioni/dati-pubblici').json
+        self.assertIsInstance(data['calendari'], list)
+        self.assertIsInstance(data['celebrazioni'], list)
+
+    def test_email_diagnostic_requires_staff_and_exposes_no_secret(self):
+        self.assertEqual(self.client.get('/api/utenti/email-status').status_code, 401)
+        self.login('user@example.test')
+        self.assertEqual(self.client.get('/api/utenti/email-status').status_code, 403)
+        self.login()
+        with patch.dict(os.environ, {'GOOGLE_SCRIPT_URL': 'https://script.google.com/macros/s/test/exec', 'GOOGLE_SCRIPT_SECRET': 'test-private-key' * 4}, clear=True):
+            response = self.client.get('/api/utenti/email-status')
+            self.assertTrue(response.json['configured'])
+            self.assertNotIn('test-private-key', response.data.decode())
+
+    def test_quick_login_is_local_opt_in_and_always_disabled_on_render(self):
+        with self.app.app_context():
+            user = Utente.query.filter_by(email='admin@example.test').first()
+            user.email = 'admin@sacrocuoreasti.com'
+            db.session.commit()
+        payload = {'email': 'a', 'password': ''}
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(self.client.post('/api/auth/login', json=payload).status_code, 400)
+        with patch.dict(os.environ, {'LOCAL_QUICK_LOGIN': '1', 'RENDER': 'true'}, clear=True):
+            self.assertEqual(self.client.post('/api/auth/login', json=payload).status_code, 400)
+        with patch.dict(os.environ, {'LOCAL_QUICK_LOGIN': '1'}, clear=True):
+            self.assertEqual(self.client.post('/api/auth/login', json=payload, environ_base={'REMOTE_ADDR': '192.0.2.1'}, headers={'X-Forwarded-For': '127.0.0.1'}).status_code, 400)
+            self.assertEqual(self.client.post('/api/auth/login', json=payload).status_code, 200)
+
 
 if __name__ == '__main__':
     unittest.main()
