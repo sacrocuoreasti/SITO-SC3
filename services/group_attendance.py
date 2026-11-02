@@ -1,12 +1,13 @@
 """Registro per gruppo/giornata: dati storici conservati, nuovi salvataggi idempotenti."""
 from datetime import datetime
 from flask_login import current_user
-from sqlalchemy import or_,and_,text
+from sqlalchemy import or_,and_,text,false
 from werkzeug.exceptions import Forbidden,BadRequest
 from models import db,Presenza,Attivita
 from services.enrollment_options import GROUP_MODELS
 from services.family_service import staff_user
 from services.cf_validator import normalizza_cf
+from services.catechismo_parents import group_people,is_parent_group,expected_members
 
 
 def can_record(category,group):
@@ -23,7 +24,7 @@ def can_record(category,group):
 
 def group_records(category,group,people=None):
     _,collection=GROUP_MODELS[category]
-    people=list(getattr(group,collection)) if people is None else people
+    people=group_people(group,collection) if people is None else people
     cfs=[p.codice_fiscale for p in people]
     if not cfs: return []
     legacy=and_(Presenza.gruppo_categoria.is_(None),Presenza.gruppo_id.is_(None))
@@ -31,6 +32,7 @@ def group_records(category,group,people=None):
     else:
         ids=db.session.query(Attivita.id).filter(Attivita.categoria==category)
         legacy=and_(legacy,Presenza.attivita_id.in_(ids))
+        if is_parent_group(group): legacy=false()
     query=Presenza.query.filter(Presenza.codice_fiscale_persona.in_(cfs),or_(and_(Presenza.gruppo_categoria==category,Presenza.gruppo_id==group.id),legacy))
     unique={}
     for record in query.order_by(Presenza.id.asc()).all():
@@ -47,7 +49,9 @@ def save_group_records(category,group,data):
     rows=data.get('presenze')
     if not isinstance(rows,list) or not rows: raise BadRequest('Nessuna presenza da salvare')
     _,collection=GROUP_MODELS[category]
-    allowed={p.codice_fiscale:p for p in getattr(group,collection)}
+    allowed={p.codice_fiscale:p for p in (expected_members(group,day.isoformat()) if is_parent_group(group) else group_people(group,collection))}
+    if is_parent_group(group):
+        allowed.update({r.codice_fiscale_persona:r.persona for r in group_records(category,group) if r.data==day})
     normalized=[];seen=set()
     for row in rows:
         if not isinstance(row,dict) or type(row.get('presente')) is not bool: raise BadRequest('Indica presente o assente per ogni partecipante')
@@ -63,7 +67,7 @@ def save_group_records(category,group,data):
     else: db.session.query(type(group)).filter_by(id=group.id).with_for_update().one()
     db.session.refresh(group)
     db.session.expire(group,[collection])
-    if any(cf not in {p.codice_fiscale for p in getattr(group,collection)} for cf,_ in normalized): raise Forbidden('Il gruppo è cambiato: ricarica l’appello')
+    if any(cf not in {p.codice_fiscale for p in group_people(group,collection)} for cf,_ in normalized): raise Forbidden('Il gruppo è cambiato: ricarica l’appello')
     history=group_records(category,group)
     activity_id=group.attivita_id
     if not activity_id:
@@ -100,7 +104,7 @@ def registry_data(category,group,month=None,whole_year=False):
         if not row['titolo_incontro'] and record.titolo_incontro: row['titolo_incontro']=record.titolo_incontro
     dates,warning=(group_year_dates(group,list(by_date.values())) if whole_year else merge_calendar_dates(group,list(by_date.values()),month))
     students=[]
-    for person in getattr(group,collection):
+    for person in group_people(group,collection):
         own=[r for r in records if r.codice_fiscale_persona==person.codice_fiscale]
         valid=[r for r in own if r.concorre_percentuale is not False]
         present=sum(r.presente for r in own);valid_present=sum(r.presente for r in valid)

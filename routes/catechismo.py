@@ -73,7 +73,7 @@ def get_gruppi_catechismo():
             gruppi_db = filtered
 
     # Ritorna i gruppi specifici configurati
-    gruppi = [g.to_dict(include_ragazzi=True) for g in gruppi_db]
+    gruppi = [g.to_dict(include_ragazzi=bool(can_record('catechismo',g))) for g in gruppi_db]
 
     # Attività associate ai gruppi visibili
     attivita_ids = {g['attivita_id'] for g in gruppi if g.get('attivita_id')}
@@ -297,7 +297,8 @@ def get_storico_gruppo(id):
     # Statistiche di presenza per ciascun ragazzo del gruppo (escludendo incontri che non concorrono alla percentuale)
     stats_ragazzi = []
     tot_date = len(date_map)
-    for r in g.ragazzi:
+    from services.catechismo_parents import members
+    for r in members(g):
         p_rag = [p for p in presenze if p.codice_fiscale_persona == r.codice_fiscale]
         tot_inc = len(p_rag)
         pres_inc = sum(1 for p in p_rag if p.presente)
@@ -338,49 +339,19 @@ def get_allergie_gruppo(id):
     if not g:
         return jsonify({'error': 'Gruppo non trovato'}), 404
 
-    ragazzi_allergie = []
-    for r in g.ragazzi:
-        note_med = getattr(r, 'note_generali', '') or ''
-        ha_condizioni = bool(r.allergie or r.intolleranze_alimentari or note_med)
-        telefono_genitore = ''
-        nominativo_genitore = ''
-        nome_famiglia = ''
-        if r.nucleo:
-            nome_famiglia = r.nucleo.nome_famiglia or ''
-            if r.nucleo.capofamiglia:
-                telefono_genitore = r.nucleo.capofamiglia.telefono or ''
-                nominativo_genitore = r.nucleo.capofamiglia.nominativo or ''
-        if not telefono_genitore and r.telefono:
-            telefono_genitore = r.telefono
-
-        ragazzi_allergie.append({
-            'codice_fiscale': r.codice_fiscale,
-            'nominativo': r.nominativo,
-            'eta': r.eta,
-            'sesso': r.sesso or 'M',
-            'allergie': r.allergie or '',
-            'intolleranze_alimentari': r.intolleranze_alimentari or '',
-            'note_mediche': note_med,
-            'ha_condizioni': ha_condizioni,
-            'ha_segnalazione': ha_condizioni,
-            'telefono_genitore': telefono_genitore,
-            'nominativo_genitore': nominativo_genitore,
-            'famiglia_nome': nome_famiglia,
-            'capofamiglia_nome': nominativo_genitore,
-            'telefono_famiglia': telefono_genitore,
-            'cellulare': r.telefono or '',
-            'indirizzo': r.indirizzo_residenza or ''
-        })
-
-    con_allergie = sum(1 for x in ragazzi_allergie if x['ha_condizioni'])
-    return jsonify({
-        'gruppo': g.to_dict(include_ragazzi=False),
-        'totale_ragazzi': len(g.ragazzi),
-        'con_allergie_count': con_allergie,
-        'ragazzi_con_segnalazioni': con_allergie,
-        'ragazzi': ragazzi_allergie,
-        'segnalazioni': ragazzi_allergie
-    })
+    if not can_record('catechismo',g): raise Forbidden('Elenco non disponibile per questo profilo')
+    from services.catechismo_parents import members,parents_of
+    people=[]
+    for person in members(g):
+        parents=parents_of(person)
+        people.append({'codice_fiscale':person.codice_fiscale,'nome':person.nome,'cognome':person.cognome,
+            'nominativo':person.nominativo,'eta':person.eta,'allergie':person.allergie or '',
+            'intolleranze_alimentari':person.intolleranze_alimentari or '',
+            'terapie_medicinali':person.terapie_medicinali or '', 'note_mediche':person.note_generali or '',
+            'ha_segnalazione':bool(person.allergie or person.intolleranze_alimentari or person.terapie_medicinali or person.note_generali),
+            'genitori':[{'nominativo':p.nominativo,'telefono':p.telefono or '','ruolo':p.ruolo_famiglia} for p in parents],
+            'referente':({'nominativo':person.nucleo.capofamiglia.nominativo,'telefono':person.nucleo.capofamiglia.telefono or ''} if not parents and person.nucleo and person.nucleo.capofamiglia and person.nucleo.capofamiglia!=person else None)})
+    return jsonify(gruppo=g.to_dict(include_ragazzi=False),ragazzi=people,totale_ragazzi=len(people))
 
 
 @catechismo_bp.route('/gruppi/<int:id>/registro', methods=['GET'])
@@ -388,7 +359,18 @@ def get_registro_elettronico_gruppo(id):
     group=db.session.get(GruppoCatechismo,id)
     if not group: return jsonify(error='Gruppo non trovato'),404
     if not can_record('catechismo',group): raise Forbidden('Registro non disponibile per questo profilo')
-    return jsonify(registry_data('catechismo',group,request.args.get('mese'),whole_year=request.args.get('periodo')=='anno'))
+    result=registry_data('catechismo',group,request.args.get('mese'),whole_year=request.args.get('periodo')=='anno')
+    from services.catechismo_parents import is_parent_group,expected_members
+    day=request.args.get('giorno')
+    if is_parent_group(group) and day:
+        from werkzeug.exceptions import BadRequest
+        try:
+            if date.fromisoformat(day).isoformat()!=day: raise ValueError()
+        except ValueError: raise BadRequest('Data non valida')
+        expected={p.codice_fiscale for p in expected_members(group,day)}
+        expected.update(r.codice_fiscale_persona for r in group_records('catechismo',group) if r.data.isoformat()==day)
+        result['studenti']=[p for p in result['studenti'] if p['codice_fiscale'] in expected]
+    return jsonify(result)
 
 
 @catechismo_bp.route('/gruppi/<int:id>/ragazzi/batch', methods=['POST'])
@@ -421,6 +403,19 @@ def add_ragazzi_batch(id):
         'count': added_count,
         'gruppo': g.to_dict(include_ragazzi=True)
     })
+
+
+@catechismo_bp.route('/gruppi/<int:id>/assegnabili', methods=['GET'])
+def assignable_people(id):
+    from services.family_service import staff_user
+    from services.enrollment_options import age_eligible
+    from services.catechismo_parents import members,is_parent_group
+    if not staff_user(): raise Forbidden('Assegnazione riservata alla segreteria')
+    group=db.session.get(GruppoCatechismo,id)
+    if not group: return jsonify(error='Gruppo non trovato'),404
+    existing={p.codice_fiscale for p in members(group)}
+    candidates=[] if is_parent_group(group) else [p.to_dict() for p in Persona.query.order_by(Persona.cognome,Persona.nome).all() if p.codice_fiscale not in existing and age_eligible(p,group)]
+    return jsonify(persone=candidates,total=len(candidates))
 
 
 @catechismo_bp.route('/miei-figli', methods=['GET'])

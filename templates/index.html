@@ -776,6 +776,11 @@ Domenica: dopo le Sante Messe</p>
               <p>Seleziona una data per aprire l’appello. Sono inclusi gli appuntamenti dell’anno pastorale e tutte le presenze già salvate.</p>
               <div id="catechismoDatesWarning" role="status"></div>
               <div id="catechismoDatesList" aria-live="polite"></div>
+              <details class="catechismo-history" ontoggle="if(this.open) openModalStoricoIncontriCatechismo(catechismoRegisterGroupId)">
+                <summary>Storico incontri e statistiche di frequenza</summary>
+                <small id="storicoGruppoNomeSubtitle"></small>
+                <div id="storicoIncontriContent"></div>
+              </details>
               <form class="catechismo-manual-date" onsubmit="apriDataManualeCatechismo(event)">
                 <label for="catechismoManualDate">Incontro fuori calendario</label>
                 <input type="date" id="catechismoManualDate" class="form-control" required>
@@ -844,7 +849,7 @@ Domenica: dopo le Sante Messe</p>
               <thead>
                 <tr>
                   <th style="width: 36px; text-align: center;">#</th>
-                  <th style="min-width: 180px;">Ragazzo / Allievo</th>
+                  <th style="min-width: 180px;">Partecipante</th>
                   <th style="width: 210px; text-align: center; background: #e0f2fe; color: #0369a1; border-left: 2px solid #38bdf8; border-right: 2px solid #38bdf8;">
                     Appello Data Selezionata
                   </th>
@@ -860,7 +865,7 @@ Domenica: dopo le Sante Messe</p>
         </div>
         <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 24px; background: #f8fafc; border-top: 1px solid var(--border-light);">
           <div style="font-size: 12px; color: var(--ink-500);">
-            💡 <em>Clicca su <strong>Presente</strong> o <strong>Assente</strong> per ciascun ragazzo. Poi premi Salva per registrare.</em>
+            💡 <em>Clicca su <strong>Presente</strong> o <strong>Assente</strong> per ciascun partecipante. Poi premi Salva per registrare.</em>
           </div>
           <div style="display: flex; gap: 8px;">
             <button type="button" class="btn btn-secondary" onclick="tornaDateCatechismo()">Annulla</button>
@@ -2194,7 +2199,7 @@ Domenica: dopo le Sante Messe</p>
         <button class="btn-close-modal" onclick="closeModal('modalNuovoGruppoCatechismo')">×</button>
       </div>
       <form onsubmit="handleSalvaGruppoCatechismo(event)">
-        <div class="modal-body"><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="catEtaMin">Età minima (anni)</label><input id="catEtaMin" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="catEtaMax">Età massima (anni)</label><input id="catEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset>
+        <div class="modal-body"><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="catEtaMin">Età minima (anni)</label><input id="catEtaMin" oninput="aggiornaFormGenitori('cat')" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="catEtaMax">Età massima (anni)</label><input id="catEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset><p id="catParentHint" hidden>Gruppo genitori: iscrizioni automatiche dai nuclei dei ragazzi dello stesso anno pastorale. Il calendario unisce gli appuntamenti con “+ Incontro Genitori”, senza duplicare le persone.</p>
           <div class="form-group">
             <label>Nome del Gruppo *</label>
             <input type="text" id="catNomeGruppo" class="form-control" placeholder="es. 1° Anno Comunione - Gruppo A" required>
@@ -2220,12 +2225,7 @@ Domenica: dopo le Sante Messe</p>
             </div>
           </div>
 
-          <div class="form-group">
-            <label>Percorso / Anno</label>
-            <input type="text" id="catAnnoPercorso" class="form-control" placeholder="es. 3ª Elementare / 1ª Comunione">
-          </div>
-
-          <div class="form-group">
+<div class="form-group">
             <label>Catechisti di Riferimento * (seleziona uno o più catechisti)</label>
             <div id="catNuovoCatechistiContainer" style="max-height: 140px; overflow-y: auto; border: 1px solid var(--border-light); border-radius: var(--radius-sm); padding: 8px 12px; background: #fff; display: flex; flex-direction: column; gap: 6px;">
               <!-- Checkboxes catechisti generati dinamicamente -->
@@ -2247,7 +2247,7 @@ Domenica: dopo le Sante Messe</p>
           <div class="form-group">
             <label>📅 Link Google Calendar (opzionale)</label>
             <input type="url" id="catGoogleCalendarUrl" class="form-control" placeholder="https://calendar.google.com/calendar/u/0?cid=...">
-            <small style="color: var(--ink-500); font-size: 11.5px;">Usa il link di un calendario Google pubblico: gli incontri appariranno nella vista mensile e nelle date del registro.</small>
+            <small style="color: var(--ink-500); font-size: 11.5px;">Usa il link di un calendario Google pubblico: gli incontri appariranno nella vista mensile e nelle date del registro. Per i gruppi con età minima superiore a 25 anni, genitori e calendario sono ricavati automaticamente dalle iscrizioni dei figli nello stesso anno pastorale.</small>
           </div>
 
           <div class="form-group">
@@ -3059,7 +3059,7 @@ Domenica: dopo le Sante Messe</p>
       </div>
       <form onsubmit="handleSalvaModificaGruppoCatechismo(event)">
         <input type="hidden" id="modCatGruppoId">
-        <div class="modal-body"><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="modCatEtaMin">Età minima (anni)</label><input id="modCatEtaMin" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="modCatEtaMax">Età massima (anni)</label><input id="modCatEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset>
+        <div class="modal-body"><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="modCatEtaMin">Età minima (anni)</label><input id="modCatEtaMin" oninput="aggiornaFormGenitori('modCat')" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="modCatEtaMax">Età massima (anni)</label><input id="modCatEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset><p id="modCatParentHint" hidden>Gruppo genitori: iscrizioni automatiche dai nuclei dei ragazzi dello stesso anno pastorale. Il calendario unisce gli appuntamenti con “+ Incontro Genitori”, senza duplicare le persone.</p>
           <div class="form-group">
             <label>Nome del Gruppo *</label>
             <input type="text" id="modCatNomeGruppo" class="form-control" required>
@@ -3083,11 +3083,7 @@ Domenica: dopo le Sante Messe</p>
               </select>
             </div>
           </div>
-          <div class="form-group">
-            <label>Anno di Catechismo / Classe</label>
-            <input type="text" id="modCatAnnoCatechismo" class="form-control" placeholder="es. 1° Anno Comunione, Cresima">
-          </div>
-          <div class="form-group">
+<div class="form-group">
             <label>Catechisti Assegnati (seleziona uno o più catechisti)</label>
             <div id="modCatCatechistiContainer" style="max-height: 140px; overflow-y: auto; border: 1px solid var(--border-light); border-radius: var(--radius-sm); padding: 8px 12px; background: #fff; display: flex; flex-direction: column; gap: 6px;">
               <!-- Checkboxes catechisti generati dinamicamente -->
@@ -3104,14 +3100,10 @@ Domenica: dopo le Sante Messe</p>
               <input type="text" id="modCatAula" class="form-control" placeholder="es. Aula 2, Salone Don Bosco">
             </div>
           </div>
-          <div class="form-group">
-            <label>Attività di Riferimento</label>
-            <select id="modCatAttivitaSelect" class="form-control"></select>
-          </div>
-          <div class="form-group">
+<div class="form-group">
             <label>📅 Link Google Calendar (opzionale)</label>
             <input type="url" id="modCatGoogleCalendarUrl" class="form-control" placeholder="https://calendar.google.com/calendar/u/0?cid=...">
-            <small style="color: var(--ink-500); font-size: 11.5px;">Incolla il link di un calendario Google pubblico. Date e titoli degli incontri si aggiornano nel sito; le presenze si segnano nel registro.</small>
+            <small style="color: var(--ink-500); font-size: 11.5px;">Incolla il link di un calendario Google pubblico. Date e titoli degli incontri si aggiornano nel sito; le presenze si segnano nel registro. Per i gruppi con età minima superiore a 25 anni, genitori e calendario sono ricavati automaticamente dalle iscrizioni dei figli nello stesso anno pastorale.</small>
           </div>
 
           <div class="form-group">
@@ -3127,33 +3119,12 @@ Domenica: dopo le Sante Messe</p>
     </div>
   </div>
 
-  <!-- Modal Storico Incontri & Presenze Gruppo Catechismo -->
-  <div class="modal-overlay" id="modalStoricoIncontriCatechismo">
-    <div class="modal-window" style="max-width: 680px;">
-      <div class="modal-header">
-        <div>
-          <h3><i>📅</i> Storico Incontri & Appello</h3>
-          <small id="storicoGruppoNomeSubtitle" style="color:var(--ink-500); font-size:13px;"></small>
-        </div>
-        <button class="btn-close-modal" onclick="closeModal('modalStoricoIncontriCatechismo')">×</button>
-      </div>
-      <div class="modal-body">
-        <div id="storicoIncontriContent">
-          <!-- Popolato via JS con incontri per data e statistiche per ragazzo -->
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" onclick="closeModal('modalStoricoIncontriCatechismo')">Chiudi</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Modal Scheda Allergie & Intolleranze Gruppo Catechismo -->
   <div class="modal-overlay" id="modalAllergieGruppoCatechismo">
     <div class="modal-window" style="max-width: 720px;">
       <div class="modal-header">
         <div>
-          <h3><i>⚠️</i> Allergie, Intolleranze & Contatti di Emergenza</h3>
+          <h3>Elenco iscritti</h3>
           <small id="allergieGruppoNomeSubtitle" style="color:var(--ink-500); font-size:13px;"></small>
         </div>
         <button class="btn-close-modal" onclick="closeModal('modalAllergieGruppoCatechismo')">×</button>
@@ -3610,7 +3581,7 @@ Domenica: dopo le Sante Messe</p>
           <div class="card" style="padding: 14px; margin-bottom: 16px; background: var(--bg-subtle);">
             <div class="form-group" style="margin-bottom: 0;">
               <label style="font-weight: 700; color: var(--wine-700);">🎯 Gruppo di Destinazione *</label>
-              <select id="massaSelectGruppoDestinazione" class="form-control" required style="font-weight: 600;">
+              <select id="massaSelectGruppoDestinazione" onchange="aggiornaAssegnabiliMassa()" class="form-control" required style="font-weight: 600;">
                 <option value="">-- Seleziona il gruppo di destinazione --</option>
               </select>
             </div>

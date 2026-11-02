@@ -5,6 +5,7 @@ from models import db
 from services.enrollment_options import GROUP_MODELS,manageable_people,group_candidates,age_eligible
 from services.group_attendance import can_record,group_records
 from services.calendar_events import group_events,CalendarUnavailable
+from services.catechismo_parents import group_people
 
 calendari_gruppi_bp=Blueprint('calendari_gruppi_bp',__name__,url_prefix='/api/calendari-gruppi')
 
@@ -16,7 +17,7 @@ def get_month(category,id):
     group=db.session.get(model,id)
     if not group: raise NotFound()
     manages=can_record(category,group)
-    enrolled=[p for p in manageable_people() if p in getattr(group,collection)]
+    enrolled=[p for p in manageable_people() if p in group_people(group,collection)]
     eligible=group.stato=='pubblico' and any(age_eligible(p,group) for p in group_candidates())
     if not manages and not enrolled and not eligible: raise Forbidden('Calendario non disponibile per questo profilo')
     try: data=group_events(group,request.args.get('mese'))

@@ -594,6 +594,8 @@ class GruppoCatechismo(db.Model):
     attivita = db.relationship('Attivita')
 
     def to_dict(self, include_ragazzi=True):
+        from services.catechismo_parents import members,is_parent_group
+        participants=members(self)
         catechisti_list = []
         if self.catechisti:
             for u in self.catechisti:
@@ -630,15 +632,16 @@ class GruppoCatechismo(db.Model):
             'aula': self.aula or '',
             'google_calendar_url': self.google_calendar_url or '',
             'calendar_embed_url': calendar_info(self),
-            'calendar_api_url': f'/api/calendari-gruppi/catechismo/{self.id}' if calendar_info(self) else '',
+            'calendar_api_url': f'/api/calendari-gruppi/catechismo/{self.id}' if calendar_info(self) or is_parent_group(self) else '',
+            'gruppo_genitori': is_parent_group(self),
             'note': self.note or '',
             'stato': self.stato or 'pubblico',
             'attivita_id': self.attivita_id,
             'attivita_titolo': self.attivita.titolo if self.attivita else '',
-            'totale_ragazzi': len(self.ragazzi)
+            'totale_ragazzi': len(participants)
         }
         if include_ragazzi:
-            d['ragazzi'] = [r.to_dict(include_family=True) for r in self.ragazzi]
+            d['ragazzi'] = [r.to_dict(include_family=True) for r in participants]
         return d
 
 

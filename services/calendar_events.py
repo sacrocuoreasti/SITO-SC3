@@ -128,6 +128,8 @@ def expand_events(parsed,start,end):
 
 def group_events(group,month=None):
     start,end=month_range(month)
+    from services.catechismo_parents import is_parent_group,parent_events
+    if is_parent_group(group): return parent_events(group,month)
     url=calendar_info(group)
     if not url: return {'eventi':[],'configurato':False,'mese':start.strftime('%Y-%m'),'obsoleto':False}
     source=parse_qs(urlsplit(url).query)['src'][0]

@@ -1855,7 +1855,11 @@ async function openCatechismoDates(gruppoId) {
   showCatechismoRegisterSection('dates');
   document.getElementById('catechismoDatesTitle').textContent=group.nome+' · Incontri e appelli';
   document.getElementById('catechismoDatesDetails').textContent=[group.anno_pastorale,group.catechista_nome,group.aula].filter(Boolean).join(' · ');
+  const manualDate=document.querySelector('.catechismo-manual-date');
+  if(manualDate) manualDate.style.display=group.gruppo_genitori?'none':'flex';
   document.getElementById('catechismoDatesWarning').textContent='';
+  document.getElementById('storicoIncontriContent').innerHTML='';
+  document.querySelector('.catechismo-history')?.removeAttribute('open');
   document.getElementById('catechismoDatesList').innerHTML='<p>Caricamento delle date del gruppo…</p>';
   document.getElementById('catechismoManualDate').value=GroupCalendar.localDate();
   document.getElementById('catechismoDatesTitle').focus?.();
@@ -2021,10 +2025,10 @@ function renderGruppiCatechismoGrid() {
           <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
             <span class="badge badge-info" style="font-size: 11px;">📁 ${escapeHtml(g.anno_pastorale || '2026/2027')}</span>
             ${badgeStato}
-            <span style="font-size: 12px; color: var(--accent-gold); font-weight: 600;">${escapeHtml(g.anno_catechismo || 'Anno Generale')}</span>
+            ${g.gruppo_genitori ? '<span class="badge badge-info">Gruppo genitori · iscrizioni automatiche</span>':''}
           </div>
         </div>
-        <span class="badge badge-success" style="font-size: 12px;">${g.totale_ragazzi} ragazzi</span>
+        <span class="badge badge-success" style="font-size: 12px;">${g.totale_ragazzi} ${g.gruppo_genitori ? 'genitori':'ragazzi'}</span>
       </div>
 
       <div style="font-size: 12.5px; color: var(--ink-700); line-height: 1.5; background: var(--bg-subtle); padding: 10px; border-radius: var(--radius-md);">
@@ -2035,29 +2039,12 @@ function renderGruppiCatechismoGrid() {
         ${g.note ? `<div style="margin-top: 4px; font-style: italic; color: var(--ink-500);">📝 ${escapeHtml(g.note)}</div>` : ''}
       </div>
 
-      <div style="flex: 1;">
-        <strong style="font-size: 12px; text-transform: uppercase; color: var(--ink-500); display: block; margin-bottom: 6px;">Ragazzi nel Gruppo:</strong>
-        ${g.ragazzi && g.ragazzi.length ? `
-          <div style="display: flex; flex-direction: column; gap: 4px; max-height: 140px; overflow-y: auto;">
-            ${g.ragazzi.map(r => `
-              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 4px 6px; background: #fff; border: 1px solid var(--border-light); border-radius: var(--radius-sm);">
-                <span><strong>${escapeHtml(r.nominativo)}</strong> <small style="color:var(--ink-500);">(${r.eta !== null ? `${r.eta} anni` : r.codice_fiscale})</small></span>
-                ${!cacheIsCatechistaOnly ? `<button onclick="rimuoviRagazzoDaGruppo(${g.id}, '${r.codice_fiscale}')" style="background:none; border:none; color:#dc2626; cursor:pointer; font-weight:bold; font-size:14px;" title="Rimuovi dal gruppo">×</button>` : ''}
-              </div>
-            `).join('')}
-          </div>
-        ` : `<small style="color:var(--ink-500);">Nessun ragazzo ancora assegnato al gruppo.</small>`}
-      </div>
-
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; border-top: 1px solid var(--border-light); padding-top: 10px;">
         <button class="btn btn-sm btn-primary" onclick="openCatechismoDates(${g.id})">
           📅 Incontri e appelli
         </button>
-        <button class="btn btn-sm btn-secondary" onclick="openModalStoricoIncontriCatechismo(${g.id})">
-          📅 Storico Incontri
-        </button>
         <button class="btn btn-sm btn-secondary" onclick="openModalAllergieGruppoCatechismo(${g.id})" style="color: #b45309; border-color: #fde68a; background: #fffbeb;">
-          ⚠️ Allergie & Info
+          Elenco
         </button>
         <button class="btn btn-sm btn-secondary" onclick="openModalModificaGruppoCatechismo(${g.id})">
           ✏️ Modifica
@@ -2066,9 +2053,6 @@ function renderGruppiCatechismoGrid() {
 
       ${!cacheIsCatechistaOnly ? `
         <div style="display: flex; gap: 6px; margin-top: 6px;">
-          <button class="btn btn-sm btn-secondary" style="flex: 1;" onclick="openModalAssegnaRagazzoCatechismo(${g.id})">
-            + Aggiungi Ragazzo
-          </button>
           <button class="btn btn-sm btn-danger" onclick="eliminaGruppoCatechismo(${g.id})" title="Elimina gruppo">
             🗑️
           </button>
@@ -2106,7 +2090,7 @@ async function openModalAppelloCatechismo(gruppoId, selectedDay = null) {
   bodyEl.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--ink-500);"><div class="spinner" style="margin:0 auto 10px;"></div>Caricamento registro elettronico e presenze passate in corso...</td></tr>`;
 
   try {
-    const res = await fetch(`/api/catechismo/gruppi/${gruppoId}/registro?mese=${document.getElementById('appelloDataIncontro').value.slice(0,7)}`);
+    const res = await fetch(`/api/catechismo/gruppi/${gruppoId}/registro?mese=${document.getElementById('appelloDataIncontro').value.slice(0,7)}&giorno=${selectedDay}`);
     const data = await res.json();
     if(request!==catechismoRegisterRequest) return;
     if (!res.ok) throw new Error(data.error || 'Errore caricamento registro');
@@ -2392,7 +2376,6 @@ async function loadCatechistiCheckboxes(containerId, selectedIds = []) {
 
 async function openModalNuovoGruppoCatechismo() {
   document.getElementById('catNomeGruppo').value = '';
-  document.getElementById('catAnnoPercorso').value = '';
   const selAnno = document.getElementById('catAnnoPastorale');
   if (selAnno) selAnno.value = '2026/2027';
   if (document.getElementById('catStatoGruppo')) document.getElementById('catStatoGruppo').value = 'pubblico';
@@ -2410,7 +2393,6 @@ async function handleSalvaGruppoCatechismo(e) {
   const nome = document.getElementById('catNomeGruppo').value.trim();
   const annoPastorale = document.getElementById('catAnnoPastorale')?.value || '2026/2027';
   const stato = document.getElementById('catStatoGruppo')?.value || 'pubblico';
-  const annoPercorso = document.getElementById('catAnnoPercorso').value.trim();
   const chks = document.querySelectorAll('.nuovo_cat_chk:checked');
   const catechistiIds = Array.from(chks).map(x => parseInt(x.value));
   const orario = document.getElementById('catOrario').value.trim();
@@ -2427,7 +2409,6 @@ async function handleSalvaGruppoCatechismo(e) {
         nome,
         anno_pastorale: annoPastorale,
         stato,
-        anno_catechismo: annoPercorso,
         catechisti_ids: catechistiIds,
         orario_incontri: orario,
         aula,
@@ -2457,7 +2438,6 @@ async function openModalModificaGruppoCatechismo(id) {
   if (document.getElementById('modCatStatoGruppo')) {
     document.getElementById('modCatStatoGruppo').value = g.stato || 'pubblico';
   }
-  document.getElementById('modCatAnnoCatechismo').value = g.anno_catechismo || '';
   document.getElementById('modCatOrario').value = g.orario_incontri || '';
   document.getElementById('modCatAula').value = g.aula || '';
   if (document.getElementById('modCatGoogleCalendarUrl')) {
@@ -2469,23 +2449,6 @@ async function openModalModificaGruppoCatechismo(id) {
   const selCatIds = g.catechisti_ids && g.catechisti_ids.length ? g.catechisti_ids : (g.catechista_utente_id ? [g.catechista_utente_id] : []);
   await loadCatechistiCheckboxes('modCatCatechistiContainer', selCatIds);
 
-  // Popola selezione attività collegate
-  try {
-    const resAtt = await fetch('/api/attivita');
-    const dataAtt = await resAtt.json();
-    const attivitaList = dataAtt.attivita || [];
-    const selAtt = document.getElementById('modCatAttivitaSelect');
-    if (selAtt) {
-      selAtt.innerHTML = '<option value="">-- Nessuna attività specifica collegata --</option>' + attivitaList.map(a => `
-        <option value="${a.id}" ${g.attivita_id === a.id ? 'selected' : ''}>
-          ${escapeHtml(a.titolo)} (${escapeHtml(a.categoria.toUpperCase())})
-        </option>
-      `).join('');
-    }
-  } catch (err) {
-    console.error('Errore attivita select:', err);
-  }
-
   setGroupAges('modCat', g);
   openModal('modalModificaGruppoCatechismo');
 }
@@ -2496,14 +2459,12 @@ async function handleSalvaModificaGruppoCatechismo(e) {
   const nome = document.getElementById('modCatNomeGruppo').value.trim();
   const annoPastorale = document.getElementById('modCatAnnoPastorale').value;
   const stato = document.getElementById('modCatStatoGruppo')?.value || 'pubblico';
-  const annoCatechismo = document.getElementById('modCatAnnoCatechismo').value.trim();
   const chks = document.querySelectorAll('.mod_cat_chk:checked');
   const catechistiIds = Array.from(chks).map(x => parseInt(x.value));
   const orario = document.getElementById('modCatOrario').value.trim();
   const aula = document.getElementById('modCatAula').value.trim();
   const googleCalendarUrl = (document.getElementById('modCatGoogleCalendarUrl')?.value || '').trim();
   const selAtt = document.getElementById('modCatAttivitaSelect');
-  const attId = selAtt && selAtt.value ? parseInt(selAtt.value) : null;
   const note = document.getElementById('modCatNote').value.trim();
 
   try {
@@ -2515,12 +2476,10 @@ async function handleSalvaModificaGruppoCatechismo(e) {
         nome,
         anno_pastorale: annoPastorale,
         stato,
-        anno_catechismo: annoCatechismo,
         catechisti_ids: catechistiIds,
         orario_incontri: orario,
         aula,
         google_calendar_url: googleCalendarUrl,
-        attivita_id: attId,
         note
       })
     });
@@ -2541,6 +2500,7 @@ async function openModalStoricoIncontriCatechismo(id) {
     const res = await fetch(`/api/catechismo/gruppi/${id}/storico`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Errore recupero storico');
+    if(id!==catechismoRegisterGroupId) return;
 
     const g = data.gruppo;
     document.getElementById('storicoGruppoNomeSubtitle').textContent = `${g.nome} · Anno ${g.anno_pastorale || '2025/2026'} · Catechista: ${g.catechista_nome || 'N/D'}`;
@@ -2624,7 +2584,7 @@ async function openModalStoricoIncontriCatechismo(id) {
       </div>
     `;
 
-    openModal('modalStoricoIncontriCatechismo');
+    // Lo storico è consultabile nella sezione Incontri e appelli.
   } catch (err) {
     showToast(err.message, 'error');
   }
@@ -2644,62 +2604,16 @@ async function openModalAllergieGruppoCatechismo(id) {
     document.getElementById('allergieGruppoNomeSubtitle').textContent = `${g.nome} · Anno ${g.anno_pastorale || '2025/2026'} · Catechista: ${g.catechista_nome || 'N/D'}`;
     const content = document.getElementById('allergieGruppoContent');
 
-    const ragazzi = data.ragazzi || [];
-    const conSegnalazioni = data.ragazzi_con_segnalazioni || 0;
-
-    content.innerHTML = `
-      <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: ${conSegnalazioni > 0 ? '#fef3c7' : '#f0fdf4'}; border-radius: 8px; margin-bottom: 16px; border: 1px solid ${conSegnalazioni > 0 ? '#fde68a' : '#bbf7d0'};">
-        <div>
-          <strong style="color: ${conSegnalazioni > 0 ? '#92400e' : '#166534'}; font-size: 14px;">
-            ${conSegnalazioni > 0 ? `⚠️ ${conSegnalazioni} ragazzi con allergie/intolleranze segnalate` : '✓ Nessuna allergia o intolleranza segnalata nel gruppo'}
-          </strong>
-          <small style="display: block; color: var(--ink-700); font-size: 12px;">Totale ragazzi iscritti al gruppo: ${data.totale_ragazzi}</small>
-        </div>
-      </div>
-
-      <div style="display: flex; flex-direction: column; gap: 12px; max-height: 400px; overflow-y: auto; padding-right: 4px;">
-        ${!ragazzi.length ? `
-          <div style="padding: 24px; text-align: center; color: var(--ink-500);">Nessun ragazzo ancora assegnato a questo gruppo.</div>
-        ` : ragazzi.map(r => `
-          <div style="padding: 14px; border-radius: 8px; border: 1px solid ${r.ha_segnalazione ? '#f59e0b' : 'var(--border-light)'}; background: ${r.ha_segnalazione ? '#fffbeb' : '#fff'};">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-              <div>
-                <strong style="font-size: 14.5px; color: var(--ink-900);">${escapeHtml(r.nominativo)}</strong>
-                <span style="font-size: 12px; color: var(--ink-500); margin-left: 6px;">(${r.eta !== null ? `${r.eta} anni` : 'Età N/D'} · Sesso: ${r.sesso})</span>
-              </div>
-              ${r.ha_segnalazione ? `
-                <span class="badge" style="background: #f59e0b; color: #fff; font-size: 11px;">ATTENZIONE MEDICA</span>
-              ` : `
-                <span class="badge badge-neutral" style="font-size: 11px;">Ordinario</span>
-              `}
-            </div>
-
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; font-size: 12.5px; margin-bottom: 8px;">
-              <div>
-                <span style="color: var(--ink-500); display: block;">Allergie:</span>
-                <strong style="color: ${r.allergie ? '#b45309' : 'var(--ink-700)'};">${escapeHtml(r.allergie || 'Nessuna')}</strong>
-              </div>
-              <div>
-                <span style="color: var(--ink-500); display: block;">Intolleranze Alimentari:</span>
-                <strong style="color: ${r.intolleranze_alimentari ? '#b45309' : 'var(--ink-700)'};">${escapeHtml(r.intolleranze_alimentari || 'Nessuna')}</strong>
-              </div>
-            </div>
-
-            ${r.note_mediche ? `
-              <div style="font-size: 12px; background: rgba(0,0,0,0.03); padding: 6px 10px; border-radius: 4px; margin-bottom: 8px; color: var(--ink-800);">
-                <strong>Note Sanitarie / Farmaci:</strong> ${escapeHtml(r.note_mediche)}
-              </div>
-            ` : ''}
-
-            <div style="font-size: 12px; color: var(--ink-700); border-top: 1px dashed var(--border-light); padding-top: 8px; display: flex; flex-wrap: wrap; gap: 12px;">
-              <div>👨‍👩‍👧 <strong>Famiglia:</strong> ${escapeHtml(r.famiglia_nome || 'N/D')} (${escapeHtml(r.capofamiglia_nome || 'Genitore')})</div>
-              <div>📞 <strong>Emergenza:</strong> <a href="tel:${escapeHtml(r.telefono_famiglia || r.cellulare || '')}" style="color: var(--primary); font-weight: 700;">${escapeHtml(r.telefono_famiglia || r.cellulare || 'Non indicato')}</a></div>
-              ${r.indirizzo ? `<div>📍 ${escapeHtml(r.indirizzo)}</div>` : ''}
-            </div>
-          </div>
-        `).join('')}
-      </div>
-    `;
+    const ragazzi = [...(data.ragazzi || [])].sort((a,b)=>(a.cognome+' '+a.nome).localeCompare(b.cognome+' '+b.nome,'it'));
+    content.innerHTML=`${!cacheIsCatechistaOnly && !g.gruppo_genitori ? `<button type="button" class="btn btn-primary" onclick="closeModal('modalAllergieGruppoCatechismo');openModalAssegnaRagazzoCatechismo(${g.id})">+ Aggiungi ragazzo</button>`:''}
+      <h4>${g.gruppo_genitori ? 'Genitori iscritti automaticamente':'Ragazzi nel gruppo'} · ${ragazzi.length}</h4>
+      ${ragazzi.map(r=>`<details class="catechismo-person"><summary>${escapeHtml(r.cognome+' '+r.nome)}</summary>
+        <h4>Contatti familiari</h4>
+        ${(r.genitori||[]).length ? r.genitori.map(p=>`<p><strong>${escapeHtml(p.ruolo)}: ${escapeHtml(p.nominativo)}</strong><br>${escapeHtml(p.telefono||'Numero non indicato')}</p>`).join('') : (r.referente ? `<p>Referente familiare: <strong>${escapeHtml(r.referente.nominativo)}</strong><br>${escapeHtml(r.referente.telefono||'Numero non indicato')}</p>`:'<p>Nessun genitore registrato nel nucleo.</p>')}
+        <h4>Fascicolo sanitario</h4>
+        <dl><dt>Allergie</dt><dd>${escapeHtml(r.allergie||'Non indicate')}</dd><dt>Intolleranze</dt><dd>${escapeHtml(r.intolleranze_alimentari||'Non indicate')}</dd><dt>Terapie e medicinali</dt><dd>${escapeHtml(r.terapie_medicinali||'Non indicati')}</dd><dt>Note sanitarie</dt><dd>${escapeHtml(r.note_mediche||'Non indicate')}</dd></dl>
+        ${!cacheIsCatechistaOnly && !g.gruppo_genitori ? `<button type="button" class="btn btn-sm btn-danger" onclick="rimuoviRagazzoDaGruppo(${g.id},'${r.codice_fiscale}')">Rimuovi dal gruppo</button>`:''}
+      </details>`).join('') || '<p>Nessun iscritto al gruppo.</p>'}`;
 
     openModal('modalAllergieGruppoCatechismo');
   } catch (err) {
@@ -2756,10 +2670,10 @@ function stampaSchedaAllergieGruppo() {
                 ${r.data_nascita_it || ''} (${r.eta !== null ? `${r.eta} anni` : ''})
               </td>
               <td>${escapeHtml(r.allergie || 'Nessuna')}</td>
-              <td>${escapeHtml(r.intolleranze_alimentari || 'Nessuna')}</td>
+              <td>${escapeHtml(r.intolleranze_alimentari || 'Nessuna')}<br>Terapie: ${escapeHtml(r.terapie_medicinali||'Non indicate')}<br>Note: ${escapeHtml(r.note_mediche||'Non indicate')}</td>
               <td>
-                <strong>${escapeHtml(r.capofamiglia_nome || r.famiglia_nome || 'Genitore')}</strong><br>
-                Tel: <strong>${escapeHtml(r.telefono_famiglia || r.cellulare || 'N/D')}</strong><br>
+                <strong>${escapeHtml((r.genitori||[]).map(p=>p.nominativo).join(', ') || r.referente?.nominativo || 'Non indicato')}</strong><br>
+                Tel: <strong>${escapeHtml((r.genitori||[]).map(p=>p.telefono).filter(Boolean).join(', ') || r.referente?.telefono || 'N/D')}</strong><br>
                 <small>${escapeHtml(r.indirizzo || '')}</small>
               </td>
             </tr>
@@ -2781,9 +2695,9 @@ async function openModalAssegnaRagazzoCatechismo(gruppoId, gruppoNome) {
     gruppoNome = g ? g.nome : '';
   }
   document.getElementById('assegnaCatGruppoId').value = gruppoId;
-  document.getElementById('assegnaCatGruppoNome').textContent = `Gruppo: ${gruppoNome}`;
+  document.getElementById('assegnaCatGruppoNome').textContent = `Gruppo: ${gruppoNome || cacheGruppiCatechismo.find(g=>g.id===gruppoId)?.nome || ''}`;
 
-  const res = await fetch('/api/persone');
+  const res = await fetch(`/api/catechismo/gruppi/${gruppoId}/assegnabili`);
   const d = await res.json();
   const select = document.getElementById('selectRagazzoCatechismo');
   select.innerHTML = (d.persone || []).map(p => `
@@ -2810,6 +2724,7 @@ async function handleSalvaAssegnaRagazzo(e) {
     showToast(d.message, 'success');
     closeModal('modalAssegnaRagazzoCatechismo');
     await loadCatechismo();
+    await openModalAllergieGruppoCatechismo(Number(gruppoId));
   } catch (err) {
     showToast(err.message, 'error');
   }
@@ -2820,8 +2735,10 @@ async function rimuoviRagazzoDaGruppo(gruppoId, cf) {
   try {
     const res = await fetch(`/api/catechismo/gruppi/${gruppoId}/ragazzi/${cf}`, { method: 'DELETE' });
     const d = await res.json();
+    if (!res.ok) throw new Error(d.error || 'Errore rimozione');
     showToast(d.message, 'success');
     await loadCatechismo();
+    await openModalAllergieGruppoCatechismo(gruppoId);
   } catch (err) {
     showToast(err.message, 'error');
   }
@@ -7246,6 +7163,7 @@ let cacheAssegnatiMassaMap = new Set();
 let cacheGruppoMassaMap = new Map();
 
 async function openModalAssegnaPersoneMassa(tipo = 'catechismo') {
+  massaAssignableRequest++;
   currentMassaTipo = tipo;
   currentMassaFiltroEta = '';
   const tipoInput = document.getElementById('massaTipoGruppo');
@@ -7300,7 +7218,7 @@ async function openModalAssegnaPersoneMassa(tipo = 'catechismo') {
 
     const [resG, resP] = await Promise.all([
       fetch(gruppiUrl),
-      fetch('/api/persone')
+      tipo==='catechismo' ? Promise.resolve({json:async()=>({persone:[]})}) : fetch('/api/persone')
     ]);
 
     const dataG = await resG.json();
@@ -7315,7 +7233,7 @@ async function openModalAssegnaPersoneMassa(tipo = 'catechismo') {
     if (tipo === 'catechismo') {
       cacheGruppiCatechismo = dataG.gruppi || [];
       if (selectGruppo) {
-        cacheGruppiCatechismo.forEach(g => {
+        cacheGruppiCatechismo.filter(g=>!g.gruppo_genitori).forEach(g => {
           selectGruppo.innerHTML += `<option value="${g.id}">${escapeHtml(g.nome)} (${escapeHtml(g.anno_pastorale || '2026/2027')}) - ${escapeHtml(g.catechista_nome || 'Da assegnare')}</option>`;
           (g.ragazzi || []).forEach(r => {
             cacheAssegnatiMassaMap.add(r.codice_fiscale);
@@ -7365,6 +7283,22 @@ async function openModalAssegnaPersoneMassa(tipo = 'catechismo') {
   }
 }
 
+let massaAssignableRequest=0;
+async function aggiornaAssegnabiliMassa() {
+  const request=++massaAssignableRequest;
+  const id=document.getElementById('massaSelectGruppoDestinazione').value;
+  if(currentMassaTipo!=='catechismo') {filtraPersoneMassa();return;}
+  cacheMassaPersone=[];
+  filtraPersoneMassa();
+  if(!id) return;
+  try {
+    const data=await apiJson(`/api/catechismo/gruppi/${id}/assegnabili`);
+    if(request!==massaAssignableRequest) return;
+    cacheMassaPersone=data.persone||[];
+    filtraPersoneMassa();
+  } catch(error) {if(request===massaAssignableRequest) showToast(error.message,'error');}
+}
+
 function selezionaFiltroEtaMassa(filtro) {
   currentMassaFiltroEta = filtro;
   document.querySelectorAll('.massa-eta-btn').forEach(btn => {
@@ -7385,7 +7319,13 @@ function filtraPersoneMassa() {
   const q = (document.getElementById('massaSearchPersone')?.value || '').toLowerCase().trim();
   const soloNonAss = document.getElementById('massaSoloNonAssegnati')?.checked || false;
 
+  const groupId=Number(document.getElementById('massaSelectGruppoDestinazione')?.value);
+  const groups=currentMassaTipo==='catechismo' ? cacheGruppiCatechismo : (currentMassaTipo==='doposcuola' ? cacheGruppiDoposcuola:cacheGruppiOratorio);
+  const group=groups.find(g=>g.id===groupId);
+  const existing=new Set((group?.ragazzi||group?.studenti||[]).map(p=>p.codice_fiscale));
   const filtrati = cacheMassaPersone.filter(p => {
+    if(!group || group.gruppo_genitori || existing.has(p.codice_fiscale)) return false;
+    if((group.eta_min!=null || group.eta_max!=null) && (p.eta==null || (group.eta_min!=null && p.eta<group.eta_min) || (group.eta_max!=null && p.eta>group.eta_max))) return false;
     // Ricerca testo
     if (q) {
       const match = (p.nominativo || '').toLowerCase().includes(q) ||
@@ -7416,7 +7356,7 @@ function filtraPersoneMassa() {
   if (!tbody) return;
 
   if (!filtrati.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--ink-500);">Nessuna persona corrispondente ai filtri impostati.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--ink-500);">${group ? 'Nessuna persona assegnabile con i filtri impostati.':'Seleziona prima il gruppo di destinazione per vedere le persone assegnabili.'}</td></tr>`;
     aggiornaContatoreMassa();
     return;
   }
@@ -8377,6 +8317,14 @@ function collectDocuments(id) {
 function setGroupAges(prefix,group) {
   document.getElementById(prefix+'EtaMin').value = group.eta_min ?? '';
   document.getElementById(prefix+'EtaMax').value = group.eta_max ?? '';
+  if(['cat','modCat'].includes(prefix)) aggiornaFormGenitori(prefix);
+}
+function aggiornaFormGenitori(prefix) {
+  const automatic=Number(document.getElementById(prefix+'EtaMin').value)>25;
+  const calendar=document.getElementById(prefix+'GoogleCalendarUrl')?.closest?.('.form-group');
+  if(calendar) calendar.style.display=automatic?'none':'block';
+  const hint=document.getElementById(prefix+'ParentHint');
+  if(hint) hint.hidden=!automatic;
 }
 function readGroupAges(prefix) {
   return Object.fromEntries(['Min','Max'].map(key=>{const value=document.getElementById(prefix+'Eta'+key).value;return ['eta_'+key.toLowerCase(),value==='' ? null : Number(value)];}));

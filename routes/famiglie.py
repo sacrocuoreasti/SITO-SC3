@@ -357,14 +357,15 @@ def enroll_family_group():
 @famiglie_bp.route('/calendari-gruppi', methods=['GET'])
 @login_required
 def get_family_group_calendars():
-    from services.enrollment_options import manageable_people
+    from services.enrollment_options import manageable_people,person_groups
     from services.group_calendar import calendar_info
+    from services.catechismo_parents import is_parent_group
     calendars={}
     for person in manageable_people():
         for category in ('oratorio','catechismo','doposcuola'):
-            for group in getattr(person,'gruppi_'+category):
+            for group in person_groups(person,category):
                 url=calendar_info(group)
-                if url:
+                if url or is_parent_group(group):
                     key=category+':'+str(group.id)
                     calendars[key]={'id':key,'titolo':group.nome,'categoria':category,'calendar_embed_url':url,'google_calendar_url':url,'calendar_api_url':f'/api/calendari-gruppi/{category}/{group.id}'}
     return jsonify(calendari=list(calendars.values()))
@@ -373,13 +374,13 @@ def get_family_group_calendars():
 @famiglie_bp.route('/registri-gruppi/<category>', methods=['GET'])
 @login_required
 def get_family_group_registers(category):
-    from services.enrollment_options import GROUP_MODELS,manageable_people
+    from services.enrollment_options import GROUP_MODELS,manageable_people,person_groups
     from services.group_attendance import group_records
     if category not in GROUP_MODELS: return jsonify(error='Categoria non trovata'),404
     _,collection=GROUP_MODELS[category]
     groups={}
     for person in manageable_people():
-        for group in getattr(person,'gruppi_'+category):
+        for group in person_groups(person,category):
             if group.id not in groups:
                 groups[group.id]=group.to_dict(**({'include_studenti':False} if category=='doposcuola' else {'include_ragazzi':False}))
                 groups[group.id]['componenti']=[]

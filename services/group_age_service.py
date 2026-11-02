@@ -41,6 +41,11 @@ def register_age_guard(blueprint, model, collection):
         try: group = db.session.get(model,int(group_id))
         except (TypeError,ValueError): return
         if not group: return
+        from services.catechismo_parents import is_parent_group
+        if model.__name__=='GruppoCatechismo' and not path.endswith('/iscrivi-figlio'):
+            from services.family_service import staff_user
+            if not staff_user(): raise Forbidden('Assegnazione riservata alla segreteria')
+        if is_parent_group(group): raise BadRequest('I genitori sono iscritti automaticamente tramite i figli: non servono assegnazioni manuali.')
         members = data.get('codici_fiscali', [data.get('codice_fiscale','')])
         if not isinstance(members,list): raise BadRequest('Elenco dei partecipanti non valido')
         for cf in members:

@@ -62,10 +62,19 @@ def enrollment_options():
 def assigned_groups(category):
     groups={}
     for person in manageable_people():
-        for group in getattr(person,'gruppi_'+category):
+        for group in person_groups(person,category):
             if group.id not in groups:
                 info=group.to_dict(**({'include_studenti':False} if category=='doposcuola' else {'include_ragazzi':False}))
                 info['componenti_iscritti']=[]
                 groups[group.id]=info
             groups[group.id]['componenti_iscritti'].append({'codice_fiscale':person.codice_fiscale,'nominativo':person.nominativo,'eta':person.eta})
     return list(groups.values())
+
+
+def person_groups(person,category):
+    from services.catechismo_parents import members,is_parent_group
+    groups=list(getattr(person,'gruppi_'+category))
+    if category=='catechismo':
+        for group in GruppoCatechismo.query.all():
+            if is_parent_group(group) and group not in groups and person in members(group): groups.append(group)
+    return groups
