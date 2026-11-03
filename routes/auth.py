@@ -153,8 +153,8 @@ def update_profile():
 
 @auth_bp.route('/logout', methods=['POST'])
 def logout():
-    logout_user()
-    session.clear()
+    from services.impersonation import clear_identity
+    clear_identity()
     return jsonify({'success': True, 'message': 'Disconnessione effettuata con successo'})
 
 @auth_bp.route('/recupera-password/richiedi', methods=['POST'])
@@ -263,10 +263,31 @@ def conferma_recupero_password():
 
 @auth_bp.route('/me', methods=['GET'])
 def get_current_user():
+    from services.impersonation import preview_info
+    preview = preview_info()
     if not current_user.is_authenticated:
-        return jsonify({'authenticated': False, 'user': None})
+        return jsonify({'authenticated': False, 'user': None, 'impersonazione': preview})
     return jsonify({
         'authenticated': True,
-        'user': current_user.to_dict()
+        'user': current_user.to_dict(),
+        'impersonazione': preview
     })
+
+
+@auth_bp.route('/impersonazione/fine', methods=['POST'])
+def stop_impersonation():
+    from flask import current_app
+    from werkzeug.exceptions import Unauthorized, BadRequest
+    from services.impersonation import SESSION_KEY, original_admin, clear_identity
+    if not request.is_json:
+        raise BadRequest('È richiesta una richiesta JSON')
+    actor = original_admin()
+    if not actor:
+        raise Unauthorized('Nessuna sessione di impersonificazione amministrativa attiva')
+    target_id = session[SESSION_KEY]['target_id']
+    clear_identity()
+    login_user(actor, remember=False)
+    session['_remember'] = 'clear'
+    current_app.logger.info('Anteprima account terminata: admin_id=%s target_id=%s', actor.id, target_id)
+    return jsonify(success=True)
 

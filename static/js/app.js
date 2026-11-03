@@ -4,6 +4,7 @@
  */
 
 let currentUser = null;
+let impersonationState = null;
 let currentView = 'dashboard';
 let currentSegTab = 'iscrizioni';
 let cacheAttivita = [];
@@ -278,6 +279,7 @@ function showAuthModal(tab = 'login') {
 async function checkAuthStatus() {
   try {
     const data = await safeFetchJson('/api/auth/me', {}, { authenticated: false });
+    renderImpersonationBanner(data.impersonazione);
     if (data.authenticated && data.user) {
       currentUser = data.user;
       renderAppShell();
@@ -536,6 +538,7 @@ async function handleRegisterSubmit(e) {
 async function handleLogout() {
   await fetch('/api/auth/logout', { method: 'POST' });
   currentUser = null;
+  renderImpersonationBanner(null);
   currentFamilyData = null;
   enrollmentOptions = null;
   cacheMembriFamiglia = [];
@@ -543,6 +546,31 @@ async function handleLogout() {
   enrollmentExisting = [];
   showToast('Disconnesso con successo', 'info');
   goToPublicHome();
+}
+
+function renderImpersonationBanner(state) {
+  impersonationState = state || null;
+  const banner = document.getElementById('impersonationBanner');
+  if (!banner) return;
+  banner.hidden = !state?.attiva;
+  document.getElementById('impersonationName').textContent = state?.utente || '';
+}
+
+async function impersonateUser(id) {
+  try {
+    await apiJson(`/api/utenti/${id}/impersona`, {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    window.location.reload();
+  } catch (error) { showToast(error.message, 'error'); }
+}
+
+async function stopImpersonation() {
+  const button = document.getElementById('stopImpersonationButton');
+  button.disabled = true;
+  try {
+    await apiJson('/api/auth/impersonazione/fine', {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    window.location.reload();
+  } catch (error) { showToast(error.message, 'error'); }
+  finally { button.disabled = false; }
 }
 
 function showAuthTab(tab) {
@@ -4826,6 +4854,7 @@ function renderTableUtenti(items) {
         <td><span class="badge ${u.is_attivo ? 'badge-success' : 'badge-danger'}">${u.is_attivo ? 'Attivo' : 'Disattivato'}</span></td>
         <td>
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            ${currentUser?.is_admin && !impersonationState?.attiva && !isSelf && u.is_attivo ? `<button type="button" class="btn btn-sm btn-secondary" data-permission="utenti.gestione" onclick="impersonateUser(${u.id})" title="Visualizza il sito come questo utente, in sola lettura">Impersonifica</button>` : ''}
             <button class="btn btn-sm btn-secondary" onclick="openModalModificaRuoli(${u.id})" title="Modifica ruoli e privilegi">
               ⚙ Privilegi
             </button>

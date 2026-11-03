@@ -6,6 +6,31 @@ from services.access_control import validate_assignment,definitions,is_admin,ret
 
 utenti_bp = Blueprint('utenti_bp', __name__, url_prefix='/api/utenti')
 
+@utenti_bp.route('/<int:id>/impersona', methods=['POST'])
+def impersonate_user(id):
+    from flask import session, current_app
+    from flask_login import login_user
+    from services.impersonation import SESSION_KEY, clear_identity, preview_info
+    from werkzeug.exceptions import Forbidden, BadRequest, NotFound
+    if not is_admin():
+        raise Forbidden('Funzione riservata agli amministratori')
+    if SESSION_KEY in session:
+        raise BadRequest('Termina prima l’impersonificazione in corso')
+    if not request.is_json:
+        raise BadRequest('È richiesta una richiesta JSON')
+    target = db.session.get(Utente, id)
+    if not target:
+        raise NotFound('Utente non trovato')
+    if not target.is_attivo or target.id == current_user.id:
+        raise BadRequest('Seleziona un altro account attivo')
+    actor_id = current_user.id
+    clear_identity()
+    login_user(target, remember=False)
+    session['_remember'] = 'clear'
+    session[SESSION_KEY] = {'admin_id': actor_id, 'target_id': target.id}
+    current_app.logger.info('Anteprima account avviata: admin_id=%s target_id=%s', actor_id, target.id)
+    return jsonify(success=True, impersonazione=preview_info())
+
 @utenti_bp.route('/email-status', methods=['GET'])
 def email_status():
     from services.email_service import email_configuration_status

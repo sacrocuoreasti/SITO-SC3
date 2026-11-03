@@ -211,3 +211,9 @@ Le verifiche sono applicate anche alle API private, mantenendo i vincoli sui
 nuclei familiari e sui gruppi assegnati. Le definizioni iniziali sono nel codice;
 le personalizzazioni sono conservate nel database e incluse nei backup di rilascio.
 Gli account precedenti non vengono riscritti durante l’aggiornamento.
+
+Nell’elenco account, **Impersonifica** apre l’anteprima di un altro utente attivo.
+La sessione adotta i suoi permessi effettivi e blocca le scritture lato server.
+La barra di anteprima permette di tornare all’amministratore; uscire elimina
+anche il contesto di ritorno. Nessuna password, ruolo o data di accesso del
+destinatario viene modificata dall’anteprima.

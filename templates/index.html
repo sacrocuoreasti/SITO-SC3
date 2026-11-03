@@ -8,6 +8,10 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=asset_version) }}">
 </head>
 <body data-version="{{ app_version }}" data-quick-login="{{ 'true' if quick_login_enabled else 'false' }}">
+  <aside id="impersonationBanner" class="impersonation-banner" hidden aria-label="Anteprima utente">
+    <span>Stai visualizzando il sito come <strong id="impersonationName"></strong> · sola lettura</span>
+    <button type="button" class="btn btn-sm btn-secondary" id="stopImpersonationButton" onclick="stopImpersonation()">Torna al profilo amministratore</button>
+  </aside>
 
   <!-- ================= HOMEPAGE PUBBLICA (PRIMA DELL'ACCESSO) ================= -->
   <div class="public-homepage" id="publicHomepage">

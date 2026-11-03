@@ -3,7 +3,7 @@ import secrets
 import gzip
 from functools import lru_cache
 from pathlib import Path
-from flask import Flask, render_template, send_from_directory, jsonify, request, abort, g
+from flask import Flask, render_template, send_from_directory, jsonify, request, abort, g, session
 from flask_login import LoginManager, current_user
 from sqlalchemy import event, text
 from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
@@ -46,7 +46,7 @@ def create_app(config_class=Config):
     def release_admission():
         if not request.path.startswith('/api/'):
             return
-        if request.blueprint == 'backup_bp' or request.endpoint in {'auth_bp.login', 'auth_bp.logout', 'auth_bp.get_current_user'}:
+        if request.blueprint == 'backup_bp' or request.endpoint in {'auth_bp.login', 'auth_bp.logout', 'auth_bp.get_current_user', 'auth_bp.stop_impersonation'}:
             return
         if not gate.admit():
             response = jsonify(error='Aggiornamento in corso. Riprova tra poco.', success=False)
@@ -89,6 +89,11 @@ def create_app(config_class=Config):
 
     @login_manager.user_loader
     def load_user(user_id):
+        from services.impersonation import SESSION_KEY, original_admin
+        if SESSION_KEY in session and not original_admin():
+            session.clear()
+            session['_remember'] = 'clear'
+            return None
         try:
             user = db.session.get(Utente, int(user_id))
         except (TypeError, ValueError):
@@ -103,10 +108,13 @@ def create_app(config_class=Config):
     def protect_api():
         if not request.path.startswith('/api/') or request.endpoint is None:
             return
+        from services.impersonation import protect_preview
+        protect_preview()
         public_endpoints = {
             'auth_bp.login', 'auth_bp.register', 'auth_bp.get_current_user',
             'auth_bp.richiedi_recupero_password', 'auth_bp.conferma_recupero_password',
             'persone_bp.validate_cf_endpoint', 'auth_bp.registration_options',
+            'auth_bp.stop_impersonation',
         }
         public_get = (
             request.method in {'GET', 'HEAD', 'OPTIONS'} and (

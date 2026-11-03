@@ -108,7 +108,10 @@ const AccessUI=(()=>{
     window.addEventListener('focus',()=>refresh().catch(()=>{}));
   }
   async function refresh() {
-    const result=await apiJson('/api/auth/me');if(result.user){currentUser=result.user;applyRolePermissions();apply();}
+    const result=await apiJson('/api/auth/me');
+    if(currentUser && (!result.user || currentUser.id!==result.user.id)){window.location.reload();return;}
+    renderImpersonationBanner(result.impersonazione);
+    if(result.user){currentUser=result.user;applyRolePermissions();apply();}
   }
   async function load() {
     if(!currentUser.is_admin){document.getElementById('accessManager').style.display='none';return;}
