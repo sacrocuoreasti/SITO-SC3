@@ -1,8 +1,8 @@
 {
-  "target_version": "alpha 2.0.15",
-  "release_id": "0dae4bb6046e71cd5ff53ced4c58a396",
+  "target_version": "alpha 2.0.16",
+  "release_id": "2da852dc5a558b372bbe3487f352e1ff",
   "format": 1,
-  "source_version": "alpha 2.0.14",
-  "archive_sha256": "fc0b87fcd3d5decd03e586b3450e8c05e3c77431a7c8a1b8d63a2798123afc4a",
-  "encrypted_sha256": "416c1bedc52a50a9f3988954217f500b946840c4fc392a1eb8869ab93ed05464"
+  "source_version": "alpha 2.0.15",
+  "archive_sha256": "ca6c78dc5a225565cff8623fc59454407f3c905b920abdff8701a68a5d92063f",
+  "encrypted_sha256": "9493a2d51528f40593a167ae7ef4c4fa145b8890def363e558db986fd68d8c29"
 }
