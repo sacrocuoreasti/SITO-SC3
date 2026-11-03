@@ -150,3 +150,24 @@ const StaffGroupRegister=(()=>{
   async function removePerson(category,cf) {if(!confirm('Rimuovere questo partecipante dal gruppo?'))return;try{await changePerson(category,cf,'DELETE');}catch(error){showToast(error.message,'error');}}
   return {reset,openDates,back,manualDate,openAttendance,mark,markAll,save,removeMeeting,openRoster,addForm,addPerson,removePerson};
 })();
+
+function groupHealthButton(category,id) {
+  if(!hasPermission(category+'.salute') || !hasPermission(category+'.cucina'))return '';
+  return `<button type="button" class="btn btn-sm btn-secondary" data-permission="${category}.cucina" onclick="openGroupHealth('${category}',${id})">Quadro sanitario e cucina</button>`;
+}
+let groupHealthRequest=0;
+async function openGroupHealth(category,id) {
+  const sequence=++groupHealthRequest;
+  const modal=document.getElementById('modalGroupHealth');modal.dataset.category=category;
+  document.getElementById('groupHealthTitle').textContent='Caricamento…';
+  const content=document.getElementById('groupHealthContent');content.dataset.permission=category+'.salute';content.innerHTML='';
+  openModal('modalGroupHealth');
+  try {
+    const data=await apiJson(`/api/calendari-gruppi/${category}/${id}/sanita`);
+    if(sequence!==groupHealthRequest)return;
+    document.getElementById('groupHealthTitle').textContent=data.gruppo;
+    const counts=data.conteggi;
+    content.innerHTML=`<div class="health-summary-counts"><span><strong>${counts.iscritti}</strong> iscritti</span><span><strong>${counts.esigenze_alimentari}</strong> con allergie o intolleranze segnalate</span><span><strong>${counts.terapie}</strong> con terapie segnalate</span></div>`+
+      (data.persone.length?`<div class="table-responsive"><table class="custom-table"><thead><tr><th>Iscritto</th><th>Allergie</th><th>Intolleranze alimentari</th><th>Terapie / medicinali</th><th>Note</th><th>Contatti familiari</th></tr></thead><tbody>${data.persone.map(p=>`<tr><td><strong>${escapeHtml(p.nominativo)}</strong></td><td>${escapeHtml(p.allergie||'Non indicate')}</td><td>${escapeHtml(p.intolleranze_alimentari||'Non indicate')}</td><td>${escapeHtml(p.terapie_medicinali||'Non indicate')}</td><td>${escapeHtml(p.note_mediche||'—')}</td><td>${p.contatti.map(c=>`${escapeHtml(c.nominativo)}<br>${escapeHtml(c.telefono||'Numero non indicato')}`).join('<br>')||'Non indicati'}</td></tr>`).join('')}</tbody></table></div>`:'<p>Nessun iscritto in questo gruppo.</p>');
+  } catch(error){if(sequence===groupHealthRequest){document.getElementById('groupHealthTitle').textContent='';content.textContent=error.message;}}
+}

@@ -381,13 +381,13 @@ Domenica: dopo le Sante Messe</p>
         <!-- Sezione Pastorale & Servizi (Role-based) -->
         <div class="nav-section-label" id="sectionLabelPastorale">Attività & Pastorale</div>
         <a class="nav-item role-nav oratorio-nav" data-view="oratorio" onclick="navigateTo('oratorio')">
-          <i>🏓</i> Oratorio & Allergie
+          <i>🏓</i> Oratorio
         </a>
         <a class="nav-item role-nav catechismo-nav" data-view="catechismo" onclick="navigateTo('catechismo')">
-          <i>🕮</i> Gruppi Catechismo
+          <i>🕮</i> Catechismo
         </a>
         <a class="nav-item role-nav doposcuola-nav" data-view="doposcuola" onclick="navigateTo('doposcuola')">
-          <i>📚</i> Doposcuola & Studio
+          <i>📚</i> Doposcuola
         </a>
 
         <!-- Sezione Gestione & Segreteria -->
@@ -651,14 +651,15 @@ Domenica: dopo le Sante Messe</p>
               <h1 id="oratorioPageTitle">Oratorio Parrocchiale (Estivo & Invernale)</h1>
               <p id="oratorioPageDesc">Gestione gruppi Estate Ragazzi, Oratorio Invernale pomeridiano, animatori, registro presenze elettronico e quadro sanitario.</p>
             </div>
-            <div class="header-actions" id="oratorioStaffHeaderActions" style="display: flex; gap: 10px; flex-wrap: wrap;">
-              <button type="button" class="btn btn-secondary" id="btnMassaOratorio" onclick="openModalAssegnaPersoneMassa('oratorio_estivo')">👥 Assegna Persone di Massa</button>
-              <button class="btn btn-primary" onclick="openModalNuovoGruppoOratorio()"><i>+</i> Crea Nuovo Gruppo Oratorio</button>
-            </div>
+
           </div>
 
           <!-- SEZIONE STAFF / ANIMATORI / SEGRETERIA -->
-          <div id="oratorioStaffSection">
+          <section id="oratorioParentSection" class="pastoral-family-section" style="display:none"><h2>La mia famiglia</h2><div id="oratorioParentContainer" class="pastoral-family-content"></div></section>
+          <div id="oratorioStaffSection"><div class="pastoral-staff-heading"><div><h2>Il mio incarico · Oratorio</h2><p>Gruppi assegnati, incontri, appelli e informazioni sanitarie.</p></div>            <div class="header-actions" id="oratorioStaffHeaderActions" style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <button type="button" class="btn btn-secondary" id="btnMassaOratorio" onclick="openModalAssegnaPersoneMassa('oratorio_estivo')">👥 Assegna Persone di Massa</button>
+              <button class="btn btn-primary" onclick="openModalNuovoGruppoOratorio()"><i>+</i> Crea Nuovo Gruppo Oratorio</button>
+            </div></div>
             <div id="oratorioGroupsOverview">
             <!-- Navigazione Sotto-Sezioni Oratorio: Estivo vs Invernale vs Allergie -->
             <div style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border-light); padding-bottom: 12px; flex-wrap: wrap;">
@@ -733,9 +734,7 @@ Domenica: dopo le Sante Messe</p>
           </div>
 
           <!-- SEZIONE GENITORE / UTENTE (VEDE SOLO I PROPRI FIGLI) -->
-          <div id="oratorioParentSection" style="display: none;">
-            <div id="oratorioParentContainer" style="display: flex; flex-direction: column; gap: 20px;"></div>
-          </div>
+
         </section>
 
         <!-- ================= VIEW 5: CATECHISMO (GRUPPI MULTIPLI) ================= -->
@@ -745,14 +744,15 @@ Domenica: dopo le Sante Messe</p>
               <h1 id="catechismoPageTitle" data-permission="catechismo">Gruppi di Catechismo & Archivio</h1>
               <p id="catechismoPageDesc">Archivio per anni pastorali, appello presenze, storico incontri svolti, allergie e intolleranze dei ragazzi.</p>
             </div>
-            <div class="header-actions" id="catechismoStaffHeaderActions" style="display: flex; gap: 10px; flex-wrap: wrap;">
-              <button type="button" class="btn btn-secondary" id="btnMassaCatechismo" onclick="openModalAssegnaPersoneMassa('catechismo')">👥 Assegna Persone di Massa</button>
-              <button class="btn btn-primary" onclick="openModalNuovoGruppoCatechismo()"><i>+</i> Crea Nuovo Gruppo Catechismo</button>
-            </div>
+
           </div>
 
           <!-- SEZIONE STAFF / CATECHISTI / SEGRETERIA -->
-          <div id="catechismoStaffSection">
+          <section id="catechismoParentSection" class="pastoral-family-section" style="display:none"><h2>La mia famiglia</h2><div id="catechismoParentContainer" class="pastoral-family-content"></div></section>
+          <div id="catechismoStaffSection"><div class="pastoral-staff-heading"><div><h2>Il mio incarico · Catechismo</h2><p>Gruppi assegnati, incontri, appelli e informazioni sanitarie.</p></div>            <div class="header-actions" id="catechismoStaffHeaderActions" style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <button type="button" class="btn btn-secondary" id="btnMassaCatechismo" onclick="openModalAssegnaPersoneMassa('catechismo')">👥 Assegna Persone di Massa</button>
+              <button class="btn btn-primary" onclick="openModalNuovoGruppoCatechismo()"><i>+</i> Crea Nuovo Gruppo Catechismo</button>
+            </div></div>
             <div id="catechismoGroupOverview">
             <!-- Archivio per Anni Pastorali & Ricerca Gruppi -->
             <div class="card" style="margin-bottom: 20px; padding: 14px 20px;">
@@ -884,9 +884,7 @@ Domenica: dopo le Sante Messe</p>
           </div>
 
           <!-- SEZIONE GENITORE / UTENTE (VEDE SOLO I PROPRI FIGLI) -->
-          <div id="catechismoParentSection" style="display: none;">
-            <div id="catechismoParentContainer" style="display: flex; flex-direction: column; gap: 20px;"></div>
-          </div>
+
         </section>
 
         <!-- ================= VIEW: DOPOSCUOLA (GRUPPI & REGISTRO ELETTRONICO) ================= -->
@@ -896,14 +894,15 @@ Domenica: dopo le Sante Messe</p>
               <h1 id="doposcuolaPageTitle">Doposcuola & Supporto allo Studio</h1>
               <p id="doposcuolaPageDesc">Gruppi di studio pomeridiani, educatori e volontari, registro presenze elettronico e note sui ragazzi.</p>
             </div>
-            <div class="header-actions" id="doposcuolaStaffHeaderActions" style="display: flex; gap: 10px; flex-wrap: wrap;">
-              <button type="button" class="btn btn-secondary" id="btnMassaDoposcuola" onclick="openModalAssegnaPersoneMassa('doposcuola')">👥 Assegna Persone di Massa</button>
-              <button class="btn btn-primary" onclick="openModalNuovoGruppoDoposcuola()"><i>+</i> Crea Nuovo Gruppo Doposcuola</button>
-            </div>
+
           </div>
 
           <!-- SEZIONE STAFF / EDUCATORI / SEGRETERIA -->
-          <div id="doposcuolaStaffSection">
+          <section id="doposcuolaParentSection" class="pastoral-family-section" style="display:none"><h2>La mia famiglia</h2><div id="doposcuolaParentContainer" class="pastoral-family-content"></div></section>
+          <div id="doposcuolaStaffSection"><div class="pastoral-staff-heading"><div><h2>Il mio incarico · Doposcuola</h2><p>Gruppi assegnati, incontri, appelli e informazioni sanitarie.</p></div>            <div class="header-actions" id="doposcuolaStaffHeaderActions" style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <button type="button" class="btn btn-secondary" id="btnMassaDoposcuola" onclick="openModalAssegnaPersoneMassa('doposcuola')">👥 Assegna Persone di Massa</button>
+              <button class="btn btn-primary" onclick="openModalNuovoGruppoDoposcuola()"><i>+</i> Crea Nuovo Gruppo Doposcuola</button>
+            </div></div>
             <div id="doposcuolaGroupsOverview">
             <!-- Archivio Anno Scolastico (SOLO PULSANTI) & Ricerca Gruppi -->
             <div class="card" style="margin-bottom: 20px; padding: 14px 20px;">
@@ -928,9 +927,7 @@ Domenica: dopo le Sante Messe</p>
           </div>
 
           <!-- SEZIONE GENITORE / UTENTE (VEDE SOLO I PROPRI FIGLI) -->
-          <div id="doposcuolaParentSection" style="display: none;">
-            <div id="doposcuolaParentContainer" style="display: flex; flex-direction: column; gap: 20px;"></div>
-          </div>
+
         </section>
 
         <!-- ================= VIEW 6: SEGRETERIA & QUOTE & LISTE & HOMEPAGE ================= -->
@@ -1725,7 +1722,7 @@ Domenica: dopo le Sante Messe</p>
 
 <section class="card access-manager" id="accessManager" data-permission="utenti.permessi">
   <h2>Ruoli, privilegi e viste</h2><p>I permessi del ruolo e dei privilegi assegnati si sommano. Admin mantiene sempre l’accesso completo. Le limitazioni ai gruppi assegnati e al proprio nucleo restano attive.</p>
-  <form onsubmit="AccessUI.save(event)"><div class="staff-register-tools"><label for="accessProfile">Profilo da configurare<select class="form-control" id="accessProfile" onchange="AccessUI.showProfile()"></select></label><label for="accessProfileName">Nome del profilo<input class="form-control" id="accessProfileName" maxlength="100" required></label></div><div id="accessTree"></div><button class="btn btn-primary" type="submit" id="accessSave">Salva viste e permessi</button></form>
+  <form onsubmit="AccessUI.save(event)"><div class="staff-register-tools"><label for="accessProfile">Profilo da configurare<select class="form-control" id="accessProfile" onchange="AccessUI.showProfile()"></select></label><label for="accessProfileName">Nome del profilo<input class="form-control" id="accessProfileName" maxlength="100" required></label></div><div id="accessTree"></div><button class="btn btn-primary" type="submit" id="accessSave">Salva nome e permessi</button><button type="button" class="btn btn-danger" id="accessDelete" onclick="AccessUI.remove()">Elimina profilo</button><p id="accessDeleteHelp" class="access-delete-help"></p></form>
   <details class="catechismo-history"><summary>Crea un nuovo ruolo o privilegio</summary><form class="access-create" onsubmit="AccessUI.create(event)"><label for="accessNewName">Nome<input class="form-control" id="accessNewName" maxlength="100" required></label><label for="accessNewKey">Codice univoco<input class="form-control" id="accessNewKey" pattern="[a-z][a-z0-9_]{1,29}" maxlength="30" required placeholder="es. referente_eventi"></label><label for="accessNewType">Tipo<select class="form-control" id="accessNewType"><option value="ruolo">Ruolo base</option><option value="privilegio">Privilegio aggiuntivo</option></select></label><button type="submit" class="btn btn-secondary">Crea profilo</button></form></details>
 </section>
           <div class="card">
@@ -4206,5 +4203,6 @@ Domenica: dopo le Sante Messe</p>
 
 <div class="modal-overlay" id="modalPartecipantiEvento"><div class="modal-window"><div class="modal-header"><h3 id="partecipantiEventoTitle">Iscritti e disiscrizioni</h3><button type="button" class="btn-close-modal" onclick="closeModal('modalPartecipantiEvento')">×</button></div><div class="modal-body" id="partecipantiEventoElenco"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="closeModal('modalPartecipantiEvento')">Chiudi</button></div></div></div>
 
+<div class="modal-overlay" id="modalGroupHealth"><div class="modal-window" style="max-width:1100px"><div class="modal-header"><div><h3>Quadro sanitario e cucina</h3><p id="groupHealthTitle"></p></div><button type="button" class="btn-close-modal" onclick="closeModal('modalGroupHealth')">×</button></div><div class="modal-body" id="groupHealthContent"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="closeModal('modalGroupHealth')">Chiudi</button></div></div></div>
 </body>
 </html>

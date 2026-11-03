@@ -278,6 +278,35 @@ vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['
     assert.equal(JSON.parse(post.options.body).data,'2026-11-08');
     assert.equal(JSON.parse(post.options.body).presenze[0].presente,false);
   }
+  // Un incarico pastorale aggiunge la gestione senza nascondere la famiglia.
+  vm.runInContext("currentUser={id:1,codice_fiscale:'RSSMRA80A01H501U',ruolo:'utente',tutti_i_ruoli:['utente','catechista','oratorio','educatore'],permessi:['oratorio','catechismo','doposcuola',...['oratorio','catechismo','doposcuola'].flatMap(c=>['staff','salute','cucina','calendario','storico','elenco'].map(p=>c+'.'+p))]};",context);
+  fixtures['/api/oratorio/allergie']={conteggi:{},segnalazioni:[]};
+  fixtures['/api/famiglie/opportunita'].gruppi_iscritti={};
+  for(const [category,load] of [['catechismo','loadCatechismo'],['oratorio','loadOratorio'],['doposcuola','loadDoposcuola']]) {
+    fixtures['/api/'+category+'/gruppi']={gruppi:[],is_catechista_only:true};
+    fixtures['/api/famiglie/opportunita'].gruppi[category]=[{id:3,nome:'Disponibile '+category,partecipanti:[people[1]]}];
+    fixtures['/api/famiglie/opportunita'].gruppi_iscritti[category]=[{id:9}];
+    fixtures['/api/famiglie/registri-gruppi/'+category]={gruppi:[{id:9,nome:'Gruppo del figlio',componenti:[]}]};
+    vm.runInContext("currentView='"+category+"';",context);
+    await context[load]();
+    assert.equal(nodes(category+'ParentSection').style.display,'block');
+    assert.equal(nodes(category+'StaffSection').style.display,'block');
+    const content=nodes(category+'ParentContainer').innerHTML;
+    assert.ok(content.indexOf(category+'AssignedContainer')<content.indexOf('Gruppi disponibili'));
+    assert.ok(nodes(category+'AssignedContainer').innerHTML.includes('I tuoi gruppi e le presenze'));
+    assert.ok(template.indexOf('id="'+category+'ParentSection"')<template.indexOf('id="'+category+'StaffSection"'));
+    fixtures['/api/famiglie/opportunita'].gruppi[category]=[];
+    fixtures['/api/famiglie/opportunita'].gruppi_iscritti[category]=[];
+    await context[load]();
+    assert.equal(nodes(category+'ParentSection').style.display,'none');
+    assert.equal(nodes(category+'StaffSection').style.display,'block');
+    assert.equal(vm.runInContext('currentView',context),category);
+  }
+  fixtures['/api/calendari-gruppi/catechismo/9/sanita']={gruppo:'Gruppo di prova',conteggi:{iscritti:1,esigenze_alimentari:1,terapie:0},persone:[{nominativo:'Nome <prova>',allergie:'Arachidi',intolleranze_alimentari:'',terapie_medicinali:'',note_mediche:'',contatti:[]}]};
+  await context.openGroupHealth('catechismo',9);
+  assert.ok(nodes('groupHealthContent').innerHTML.includes('Arachidi'));
+  assert.ok(nodes('groupHealthContent').innerHTML.includes('Nome &lt;prova&gt;'));
+  assert.ok(!nodes('groupHealthContent').innerHTML.includes('Nome <prova>'));
   vm.runInContext("currentUser.permessi=['calendari','calendari.comunita'];",context);
   assert.equal(context.hasPermission('calendari.comunita'),true);
   assert.equal(context.hasPermission('utenti.permessi'),false);

@@ -217,3 +217,12 @@ La sessione adotta i suoi permessi effettivi e blocca le scritture lato server.
 La barra di anteprima permette di tornare all’amministratore; uscire elimina
 anche il contesto di ritorno. Nessuna password, ruolo o data di accesso del
 destinatario viene modificata dall’anteprima.
+
+Le sezioni Oratorio, Catechismo e Doposcuola mantengono distinta la parte
+**La mia famiglia** dall’area **Il mio incarico**, quando sono entrambe presenti.
+I gruppi del nucleo con le presenze precedono quelli disponibili per l’iscrizione.
+Ogni scheda staff offre il quadro sanitario e cucina del singolo gruppo,
+subordinato ai permessi sanitari/cucina e all’assegnazione al gruppo.
+I profili personalizzati si rinominano senza cambiare codice e assegnazioni;
+si possono eliminare dopo aver rimosso le assegnazioni, anche agli account
+inattivi. I profili di sistema restano disponibili.

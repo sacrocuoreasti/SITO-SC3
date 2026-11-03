@@ -10,6 +10,34 @@ from services.catechismo_parents import group_people
 calendari_gruppi_bp=Blueprint('calendari_gruppi_bp',__name__,url_prefix='/api/calendari-gruppi')
 
 
+@calendari_gruppi_bp.route('/<category>/<int:id>/sanita')
+def health_summary(category,id):
+    if category not in GROUP_MODELS:
+        raise NotFound()
+    model,collection=GROUP_MODELS[category]
+    group=db.session.get(model,id)
+    if not group:
+        raise NotFound()
+    if not can_record(category,group):
+        raise Forbidden('Quadro sanitario disponibile solo per i gruppi assegnati')
+    from services.catechismo_parents import parents_of
+    people={p.codice_fiscale:p for p in group_people(group,collection)}
+    rows=[]
+    for person in sorted(people.values(),key=lambda p:(p.cognome.casefold(),p.nome.casefold())):
+        parents=parents_of(person)
+        head=person.nucleo.capofamiglia if person.nucleo else None
+        contacts=parents or ([head] if head and head!=person else [])
+        rows.append({'nominativo':person.nominativo,'allergie':person.allergie or '',
+                     'intolleranze_alimentari':person.intolleranze_alimentari or '',
+                     'terapie_medicinali':person.terapie_medicinali or '',
+                     'note_mediche':person.note_generali or '',
+                     'contatti':[{'nominativo':p.nominativo,'telefono':p.telefono or ''} for p in contacts]})
+    return jsonify(gruppo=group.nome,categoria=category,persone=rows,
+                   conteggi={'iscritti':len(rows),
+                             'esigenze_alimentari':sum(bool(r['allergie'] or r['intolleranze_alimentari']) for r in rows),
+                             'terapie':sum(bool(r['terapie_medicinali']) for r in rows)})
+
+
 @calendari_gruppi_bp.route('/<category>/<int:id>')
 def get_month(category,id):
     if category not in GROUP_MODELS: raise NotFound()

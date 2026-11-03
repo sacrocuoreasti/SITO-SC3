@@ -9,8 +9,8 @@ SECTIONS={
  'attivita':('Attività e iscrizioni',{'catalogo':'Catalogo','passati':'Eventi passati','iscrizioni':'Iscrizione e disiscrizione','gestione':'Creazione, modifica e pubblicazione (staff)'}),
  'calendari':('Calendari e appuntamenti',{'comunita':'Calendari della comunità','gruppi':'Calendari dei propri gruppi'}),
  'oratorio':('Oratorio',{'estivo':'Oratorio estivo','invernale':'Oratorio invernale','staff':'Gestione pastorale (staff)','elenco':'Elenco iscritti','salute':'Fascicoli sanitari','appelli':'Incontri e appelli','calendario':'Calendario del gruppo','storico':'Storico e statistiche','gestione':'Crea e modifica gruppi','assegnazioni':'Assegna e rimuovi iscritti','tutti':'Accesso a tutti i gruppi','cucina':'Quadro sanitario e cucina'}),
- 'catechismo':('Catechismo',{'staff':'Gestione pastorale (staff)','elenco':'Elenco iscritti','salute':'Fascicoli sanitari','appelli':'Incontri e appelli','calendario':'Calendario del gruppo','storico':'Storico e statistiche','gestione':'Crea e modifica gruppi','assegnazioni':'Assegna e rimuovi iscritti','tutti':'Accesso a tutti i gruppi','genitori':'Gruppi genitori'}),
- 'doposcuola':('Doposcuola',{'staff':'Gestione pastorale (staff)','elenco':'Elenco iscritti','salute':'Fascicoli sanitari','appelli':'Incontri e appelli','calendario':'Calendario del gruppo','storico':'Storico e statistiche','gestione':'Crea e modifica gruppi','assegnazioni':'Assegna e rimuovi iscritti','tutti':'Accesso a tutti i gruppi'}),
+ 'catechismo':('Catechismo',{'cucina':'Quadro sanitario e cucina','staff':'Gestione pastorale (staff)','elenco':'Elenco iscritti','salute':'Fascicoli sanitari','appelli':'Incontri e appelli','calendario':'Calendario del gruppo','storico':'Storico e statistiche','gestione':'Crea e modifica gruppi','assegnazioni':'Assegna e rimuovi iscritti','tutti':'Accesso a tutti i gruppi','genitori':'Gruppi genitori'}),
+ 'doposcuola':('Doposcuola',{'cucina':'Quadro sanitario e cucina','staff':'Gestione pastorale (staff)','elenco':'Elenco iscritti','salute':'Fascicoli sanitari','appelli':'Incontri e appelli','calendario':'Calendario del gruppo','storico':'Storico e statistiche','gestione':'Crea e modifica gruppi','assegnazioni':'Assegna e rimuovi iscritti','tutti':'Accesso a tutti i gruppi'}),
  'segreteria':('Segreteria',{'iscrizioni':'Iscrizioni e cassa quote','pagamenti':'Pagamenti e ricevute','liste':'Liste parrocchiali','celebrazioni':'Messe e liturgia','homepage':'Homepage pubblica','calendari':'Calendari comunitari','avvisi':'Avvisi ed eventi','configurazioni':'Configurazioni e clausole','campi_account':'Campi personalizzati account'}),
  'anagrafica':('Anagrafica parrocchiale',{'elenco':'Consultazione','gestione':'Inserimento, modifica e cancellazione','contatti':'Contatti','nuclei':'Nuclei familiari','documenti':'Documenti e certificati','salute':'Fascicoli sanitari','liste':'Badge e liste'}),
  'excel':('Importa ed esporta Excel',{'template':'Scarica modello','import':'Importazione','export':'Esportazione'}),
@@ -27,7 +27,7 @@ DEFAULTS={
  'admin':('Admin','ruolo',KEYS),
  'segreteria':('Segreteria','ruolo',STAFF),
  'utente':('Utente','ruolo',USER),
- 'animatore':('Animatore','privilegio',{'dashboard','dashboard.attivita','dashboard.settimana'}|subtree('oratorio')-{'oratorio.gestione','oratorio.assegnazioni','oratorio.cucina'}),
+ 'animatore':('Animatore','privilegio',{'dashboard','dashboard.attivita','dashboard.settimana'}|subtree('oratorio')-{'oratorio.gestione','oratorio.assegnazioni'}),
  'responsabile_oratorio':('Responsabile oratorio','privilegio',{'dashboard','dashboard.attivita','dashboard.settimana'}|subtree('oratorio')),
  'catechista':('Catechista','privilegio',{'dashboard','dashboard.attivita','dashboard.settimana'}|subtree('catechismo')-{'catechismo.gestione','catechismo.assegnazioni','catechismo.tutti'}),
  'educatore':('Educatore (incarico precedente)','privilegio',{'dashboard','dashboard.attivita','dashboard.settimana'}|subtree('doposcuola')-{'doposcuola.gestione','doposcuola.assegnazioni','doposcuola.tutti'})}
@@ -84,7 +84,7 @@ def technical_roles(user):
 
 def identity(user):
     base,profiles=assigned(user);config=definitions()
-    return {'ruolo_base':base,'privilegi':[key for key in sorted(profiles) if config[key]['tipo']=='privilegio'],
+    return {'ruolo_base':base,'nome_ruolo':config[base]['nome'],'nomi_profili':{key:config[key]['nome'] for key in profiles},'privilegi':[key for key in sorted(profiles) if config[key]['tipo']=='privilegio'],
             'profili_accesso':sorted(profiles),'permessi':sorted(permissions(user)),'is_admin':is_admin(user)}
 
 def staff_scope(user=None):
@@ -125,6 +125,7 @@ def required_permissions():
     if bp=='calendari_gruppi_bp':
         category=(request.view_args or {}).get('category','')
         if category not in ('oratorio','catechismo','doposcuola'):return []
+        if path.endswith('/sanita'):return [category,category+'.salute',category+'.cucina']
         if path.endswith('/registro'):child='appelli'
         elif path.endswith('/elenco'):child='assegnazioni' if write else 'elenco'
         elif path.endswith('/assegnabili'):child='assegnazioni'

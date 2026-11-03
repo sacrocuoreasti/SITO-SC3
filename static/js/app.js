@@ -300,7 +300,7 @@ function renderAppShell() {
     if (backupButton) backupButton.style.display = currentUser.tutti_i_ruoli.includes('admin') ? 'block' : 'none';
     const nome = currentUser.nominativo || currentUser.email.split('@')[0];
     document.getElementById('topUserName').textContent = nome;
-    document.getElementById('topUserRole').textContent = currentUser.ruolo.toUpperCase();
+    document.getElementById('topUserRole').textContent = (currentUser.nome_ruolo || currentUser.ruolo).toUpperCase();
 
     const topAvatar = document.getElementById('topAvatar');
     const fotoUrl = (currentUser.persona && currentUser.persona.foto_profilo_url) ? currentUser.persona.foto_profilo_url : null;
@@ -341,20 +341,20 @@ function applyRolePermissions() {
   const excelNav = document.getElementById('navItemExcel');
   const gestioneLabel = document.getElementById('sectionLabelGestione');
 
-  const isGestionePura = currentUser.is_gestione_pura || ['segreteria', 'oratorio'].includes(currentUser.ruolo);
+  const isGestionePura = currentUser.is_gestione_pura || !currentUser.codice_fiscale;
   const puoIscrivereFigli = !isGestionePura;
 
   if (oratorioNav) {
     oratorioNav.style.display = (isOratorio || (puoIscrivereFigli && !!enrollmentOptions?.gruppi?.oratorio?.length)) ? 'flex' : 'none';
-    oratorioNav.innerHTML = !isOratorio && puoIscrivereFigli ? '<i>🏓</i> Oratorio Figli' : '<i>🏓</i> Oratorio & Allergie';
+    oratorioNav.innerHTML = '<i>🏓</i> Oratorio';
   }
   if (catechismoNav) {
     catechismoNav.style.display = (isCatechista || (puoIscrivereFigli && !!enrollmentOptions?.gruppi?.catechismo?.length)) ? 'flex' : 'none';
-    catechismoNav.innerHTML = !isCatechista && puoIscrivereFigli ? '<i>🕮</i> Catechismo Figli' : '<i>🕮</i> Gruppi Catechismo';
+    catechismoNav.innerHTML = '<i>🕮</i> Catechismo';
   }
   if (doposcuolaNav) {
     doposcuolaNav.style.display = (isStaff || isOratorio || isCatechista || (puoIscrivereFigli && !!enrollmentOptions?.gruppi?.doposcuola?.length)) ? 'flex' : 'none';
-    doposcuolaNav.innerHTML = (!isStaff && !isOratorio && !isCatechista && puoIscrivereFigli) ? '<i>📚</i> Doposcuola Figli' : '<i>📚</i> Doposcuola & Studio';
+    doposcuolaNav.innerHTML = '<i>📚</i> Doposcuola';
   }
   if (segreteriaNav) segreteriaNav.style.display = isSegreteria ? 'flex' : 'none';
   if (adminNav) adminNav.style.display = isAdminOrParroco ? 'flex' : 'none';
@@ -416,7 +416,7 @@ async function handleLoginSubmit(e) {
     currentUser = data.user;
     showToast(data.message, 'success');
     renderAppShell();
-    if (currentUser.is_gestione_pura || ['segreteria', 'oratorio'].includes(currentUser.ruolo)) {
+    if (currentUser.is_gestione_pura || !currentUser.codice_fiscale) {
       navigateTo('dashboard');
     } else {
       navigateTo('dashboard');
@@ -1180,7 +1180,8 @@ async function loadOratorio() {
   const parentSec = document.getElementById('oratorioParentSection');
   if (staffSec) staffSec.style.display = 'block';
   if (staffActions) staffActions.style.display = 'flex';
-  if (parentSec) parentSec.style.display = 'none';
+  if (parentSec) parentSec.style.display = 'block';
+  await loadOratorioParentView();
   StaffGroupRegister.reset('oratorio');
   const titleEl = document.getElementById('oratorioPageTitle');
   const descEl = document.getElementById('oratorioPageDesc');
@@ -1348,6 +1349,7 @@ function renderGruppiOratorioGrid() {
             <button type="button" class="btn btn-xs btn-secondary" onclick="StaffGroupRegister.openRoster('oratorio',${g.id})">
               Elenco
             </button>
+            ${groupHealthButton('oratorio',g.id)}
           </div>
           <button type="button" class="btn btn-xs btn-outline-primary" onclick="openModalModificaGruppoOratorio(${g.id})">
             ✏️ Modifica
@@ -1850,7 +1852,8 @@ async function loadCatechismo() {
   const parentSec = document.getElementById('catechismoParentSection');
   if (staffSec) staffSec.style.display = 'block';
   if (staffActions) staffActions.style.display = 'flex';
-  if (parentSec) parentSec.style.display = 'none';
+  if (parentSec) parentSec.style.display = 'block';
+  await loadCatechismoParentView();
   tornaGruppiCatechismo();
   const titleEl = document.getElementById('catechismoPageTitle');
   const descEl = document.getElementById('catechismoPageDesc');
@@ -1969,6 +1972,7 @@ function renderGruppiCatechismoGrid() {
         </button>
       </div>
 
+      ${groupHealthButton('catechismo',g.id)}
       ${!cacheIsCatechistaOnly ? `
         <div style="display: flex; gap: 6px; margin-top: 6px;">
           <button class="btn btn-sm btn-danger" onclick="eliminaGruppoCatechismo(${g.id})" title="Elimina gruppo">
@@ -2705,7 +2709,8 @@ async function loadDoposcuola() {
   const parentSec = document.getElementById('doposcuolaParentSection');
   if (staffSec) staffSec.style.display = 'block';
   if (staffActions) staffActions.style.display = 'flex';
-  if (parentSec) parentSec.style.display = 'none';
+  if (parentSec) parentSec.style.display = 'block';
+  await loadDoposcuolaParentView();
   StaffGroupRegister.reset('doposcuola');
   const titleEl = document.getElementById('doposcuolaPageTitle');
   const descEl = document.getElementById('doposcuolaPageDesc');
@@ -2809,6 +2814,7 @@ function renderGruppiDoposcuolaGrid() {
         <button class="btn btn-sm btn-secondary" onclick="StaffGroupRegister.openRoster('doposcuola',${g.id})" style="color: #b45309; border-color: #fde68a; background: #fffbeb;">
           Elenco
         </button>
+        ${groupHealthButton('doposcuola',g.id)}
         <button class="btn btn-sm btn-secondary" onclick="openModalModificaGruppoDoposcuola(${g.id})">
           ✏️ Modifica
         </button>
@@ -4847,7 +4853,7 @@ function renderTableUtenti(items) {
         <td><strong>${escapeHtml(u.email)}</strong> ${isSelf ? '<span class="badge badge-info" style="font-size:10px; margin-left:4px;">TU</span>' : ''}</td>
         <td>${escapeHtml(u.nominativo)}</td>
         <td style="font-family:monospace; font-size:12px;">${escapeHtml(u.codice_fiscale || '-')}</td>
-        <td><span class="badge badge-info">${escapeHtml(u.ruolo.toUpperCase())}</span></td>
+        <td><span class="badge badge-info">${escapeHtml(AccessUI.label(u.ruolo_base || u.ruolo,u.nome_ruolo))}</span></td>
         <td>
           ${(u.privilegi || []).map(r => `<span class="badge badge-neutral" style="margin:1px;">${escapeHtml(AccessUI.label(r))}</span>`).join('')}
         </td>
@@ -8236,7 +8242,7 @@ async function refreshEnrollmentOptions() {
   let visible=false;
   for(const category of ['oratorio','catechismo','doposcuola']) {
     const managed=managesGroupCategory(category);
-    const available=managed || (!(currentUser.is_gestione_pura || ['segreteria','oratorio'].includes(currentUser.ruolo)) && (!!data.gruppi?.[category]?.length || !!data.gruppi_iscritti?.[category]?.length));
+    const available=managed || (!(currentUser.is_gestione_pura || !currentUser.codice_fiscale) && (!!data.gruppi?.[category]?.length || !!data.gruppi_iscritti?.[category]?.length));
     const nav=document.querySelector('.'+category+'-nav');
     if(nav) nav.style.display=available ? 'flex' : 'none';
     visible=visible || available;
@@ -8305,8 +8311,10 @@ async function loadFamilyGroupView(category,loadAssigned) {
     const data=await refreshEnrollmentOptions();
     const groups=data?.gruppi?.[category] || [];
     const joined=data?.gruppi_iscritti?.[category] || [];
-    if(!groups.length && !joined.length) {if(currentView===category) navigateTo('dashboard');return;}
-    container.innerHTML=(groups.length ? `<div class="family-group-heading"><div><h2>Gruppi disponibili</h2><p>Consulta le informazioni e scegli chi iscrivere.</p></div><span class="badge badge-neutral">${groups.length} ${groups.length===1 ? 'gruppo':'gruppi'}</span></div><div class="family-group-grid">${availableGroupCards(category,groups)}</div>` : '')+`<div class="family-group-assigned" id="${category}AssignedContainer"></div>`;
+    const section=document.getElementById(category+'ParentSection');
+    if(section)section.style.display=(groups.length || joined.length)?'block':'none';
+    if(!groups.length && !joined.length) {if(currentView===category && !hasPermission(category+'.staff')) navigateTo('dashboard');return;}
+    container.innerHTML=`<div class="family-group-assigned" id="${category}AssignedContainer"></div>`+(groups.length ? `<div class="family-group-heading"><div><h2>Gruppi disponibili</h2><p>Consulta le informazioni e scegli chi iscrivere.</p></div><span class="badge badge-neutral">${groups.length} ${groups.length===1 ? 'gruppo':'gruppi'}</span></div><div class="family-group-grid">${availableGroupCards(category,groups)}</div>` : '');
     await loadAssigned();
   } catch(error) {showToast(error.message,'error');}
 }
@@ -8321,7 +8329,7 @@ async function enrollFamilyGroup(event,category,id) {
     const result=await apiJson('/api/famiglie/iscrizioni-gruppo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({categoria:category,gruppo_id:id,partecipanti:participants})});
     showToast(result.message,'success');
     await refreshEnrollmentOptions();
-    if(currentView===category) await ({oratorio:loadOratorioParentView,catechismo:loadCatechismoParentView,doposcuola:loadDoposcuolaParentView})[category]();
+    if(currentView===category) await (hasPermission(category+'.staff') ? {oratorio:loadOratorio,catechismo:loadCatechismo,doposcuola:loadDoposcuola} : {oratorio:loadOratorioParentView,catechismo:loadCatechismoParentView,doposcuola:loadDoposcuolaParentView})[category]();
   } catch(error) {showToast(error.message,'error');}
   finally {button.disabled=false;}
 }

@@ -341,7 +341,7 @@ class Utente(UserMixin, db.Model):
             'gestito_da_id': self.gestito_da_id,
             'is_capofamiglia': bool(self.persona and self.persona.nucleo and self.persona.nucleo.codice_fiscale_capofamiglia == self.codice_fiscale),
             'campi_extra': campi_extra_dict,
-            'is_gestione_pura': self.ruolo in ['segreteria', 'oratorio'] or not self.codice_fiscale,
+            'is_gestione_pura': not self.codice_fiscale,
             'nominativo': self.persona.nominativo if self.persona else self.email.split('@')[0],
             'telefono': self.persona.telefono if self.persona else '',
             'nucleo_id': self.persona.nucleo_id if self.persona else None,

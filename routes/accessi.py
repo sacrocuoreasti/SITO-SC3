@@ -49,3 +49,20 @@ def update_definition(key):
     row.nome=name;row.tipo=kind;row.permessi=json.dumps(grants)
     db.session.commit();g.pop('access_definitions',None)
     return jsonify(success=True,profilo=definitions()[key])
+
+
+@accessi_bp.route('/<key>',methods=['DELETE'])
+def delete_definition(key):
+    from models import Utente
+    from services.access_control import raw_roles
+    if key in DEFAULTS:
+        raise BadRequest('I profili di sistema non possono essere eliminati; puoi configurarne nome e viste.')
+    row=db.session.get(DefinizioneAccesso,key)
+    if not row:
+        return jsonify(error='Profilo non trovato'),404
+    count=sum(key in raw_roles(user) for user in Utente.query.all())
+    if count:
+        return jsonify(error=f'Profilo assegnato a {count} account: rimuovi prima le assegnazioni per eliminarlo.',assegnazioni=count),409
+    db.session.delete(row)
+    db.session.commit();g.pop('access_definitions',None)
+    return jsonify(success=True)
