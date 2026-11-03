@@ -164,6 +164,10 @@ def create_app(config_class=Config):
     app.register_blueprint(persone_bp)
     app.register_blueprint(famiglie_bp)
     app.register_blueprint(calendari_gruppi_bp)
+    from routes.giovani import giovani_bp
+    from routes.bacheche import bacheche_bp
+    app.register_blueprint(giovani_bp)
+    app.register_blueprint(bacheche_bp)
     app.register_blueprint(attivita_bp)
     app.register_blueprint(iscrizioni_bp)
     app.register_blueprint(oratorio_bp)
@@ -179,7 +183,7 @@ def create_app(config_class=Config):
 
     @app.route('/')
     def index():
-        version = os.environ.get('RENDER_GIT_COMMIT') or str(max(os.stat(app.static_folder + '/' + name).st_mtime_ns for name in ['css/style.css', 'js/app.js','js/group-calendar.js','js/portal-views.js','js/access-control.js']))
+        version = os.environ.get('RENDER_GIT_COMMIT') or str(max(os.stat(app.static_folder + '/' + name).st_mtime_ns for name in ['css/style.css', 'js/app.js','js/group-calendar.js','js/portal-views.js','js/access-control.js','js/pastoral.js']))
         return render_template('index.html', asset_version=version, quick_login_enabled=quick_login_enabled())
 
     @app.route('/health')

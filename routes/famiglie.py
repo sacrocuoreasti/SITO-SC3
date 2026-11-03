@@ -343,9 +343,10 @@ def enroll_family_group():
         return jsonify(error='Gruppo non disponibile'),400
     supplied = data.get('partecipanti')
     if not isinstance(supplied,list) or not supplied or any(not isinstance(cf,str) for cf in supplied):
-        return jsonify(error='Seleziona almeno un figlio'),400
+        return jsonify(error='Seleziona almeno una persona' if category=='giovani' else 'Seleziona almeno un figlio'),400
     cfs = list(dict.fromkeys(normalizza_cf(cf) for cf in supplied))
-    allowed = {p.codice_fiscale:p for p in group_candidates()}
+    from services.enrollment_options import manageable_people
+    allowed = {p.codice_fiscale:p for p in (manageable_people() if category=='giovani' else group_candidates())}
     for cf in cfs:
         if cf not in allowed:
             return jsonify(error='Non sei autorizzato a iscrivere uno dei partecipanti'),403
@@ -370,7 +371,7 @@ def get_family_group_calendars():
     from services.catechismo_parents import is_parent_group
     calendars={}
     for person in manageable_people():
-        for category in ('oratorio','catechismo','doposcuola'):
+        for category in ('oratorio','catechismo','doposcuola','giovani'):
             for group in person_groups(person,category):
                 url=calendar_info(group)
                 if url or is_parent_group(group):

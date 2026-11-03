@@ -16,7 +16,7 @@ def can_record(category,group):
     if is_admin(): return True
     if not can(category+'.staff'): return False
     if can(category+'.tutti'): return True
-    if category=='catechismo':
+    if category in ('catechismo','giovani'):
         return current_user.id==group.catechista_utente_id or current_user.codice_fiscale==group.catechista_cf and bool(group.catechista_cf) or any(u.id==current_user.id for u in group.catechisti)
     if category=='oratorio':
         return current_user.id==group.animatore_utente_id or current_user.codice_fiscale==group.animatore_cf and bool(group.animatore_cf) or any(u.id==current_user.id for u in group.animatori)

@@ -16,6 +16,7 @@ def backup_sqlite(engine):
     missing = missing or ('persona' in tables and 'documento_persona' not in tables)
     missing = missing or ('utente' in tables and 'definizione_accesso' not in tables)
     missing = missing or ('gruppo_doposcuola' in tables and 'gruppo_doposcuola_educatori' not in tables)
+    missing = missing or ('persona' in tables and not {'gruppo_giovani','gruppo_giovani_persona','gruppo_giovani_responsabili','avviso_gruppo'}.issubset(tables))
     if not missing or not engine.url.database or engine.url.database == ':memory:':
         return None
     directory = os.path.join(os.path.dirname(os.path.abspath(engine.url.database)), 'backups')

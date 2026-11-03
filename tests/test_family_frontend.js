@@ -16,6 +16,7 @@ const nodes = id => {
 };
 const people = [{codice_fiscale:'RSSMRA80A01H501U',nominativo:'Genitore di prova',eta:46}, {codice_fiscale:'RSSLGI14A01H501A',nominativo:'Figlio di prova',eta:12}];
 const fixtures = {
+  '/api/bacheche':{avvisi:[],gruppi:[]},
   '/api/attivita':{attivita:[{id:7,titolo:'Attività selezionata',eta_min:0,eta_max:99,quota_iscrizione:10,campi_personalizzati:[{nome:'Taglia',chiave:'taglia',obbligatorio:true}]}]},
   '/api/famiglie/calendari-gruppi':{calendari:[]},
   '/api/famiglie/opportunita':{attivita:{7:{partecipanti:people.map(p=>p.codice_fiscale),gia_iscritto:false}},gruppi:{oratorio:[],catechismo:[],doposcuola:[]}},
@@ -40,6 +41,7 @@ const context = vm.createContext({
 vm.runInContext(fs.readFileSync('static/js/group-calendar.js','utf8'),context);
 vm.runInContext(fs.readFileSync('static/js/portal-views.js','utf8'),context);
 vm.runInContext(fs.readFileSync('static/js/access-control.js','utf8'),context);
+vm.runInContext(fs.readFileSync('static/js/pastoral.js','utf8'),context);
 vm.runInContext(fs.readFileSync('static/js/app.js','utf8'),context);
 const loadDashboardOriginal=context.loadDashboard;
 vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['utente'],is_capofamiglia:true}; showToast=()=>{}; loadDashboard=async()=>{};",context);
@@ -124,7 +126,7 @@ vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['
     assert.equal(nodes(category+'ParentContainer').innerHTML,'');
     assert.equal(nodes('.'+category+'-nav').style.display,'none');
   }
-  assert.equal(nodes('sectionLabelPastorale').style.display,'none');
+  assert.equal(nodes('sectionLabelPastorale').style.display,'block');
   const dashboard=template.slice(template.indexOf('id="viewDashboard"'),template.indexOf('<!-- KPI Grid -->'));
   assert.ok(!dashboard.includes('openModalNuovaIscrizione'));
   assert.ok(!dashboard.includes('openModalOfferteDonazioni'));
@@ -261,6 +263,32 @@ vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['
   assert.equal((nodes('dashWeeklyCalendar').innerHTML.match(/class="weekly-day /g)||[]).length,7);
   assert.equal((nodes('dashWeeklyCalendar').innerHTML.match(/Messa feriale/g)||[]).length,5);
   assert.ok(nodes('dashWeeklyCalendar').innerHTML.includes('Avviso datato'));
+  // Calendari suddivisi per tipologia e bacheche separate per famiglia, staff e argomento.
+  const calendarGroups=context.groupedCalendarCards([{titolo:'Calendario oratorio',categoria:'oratorio'},{titolo:'Calendario catechismo',categoria:'catechismo'}]);
+  assert.ok(calendarGroups.includes('<h2>Oratorio</h2>'));assert.ok(calendarGroups.includes('<h2>Catechismo</h2>'));
+  assert.equal((calendarGroups.match(/class="calendar-type-section"/g)||[]).length,2);
+  const beforeBoards=vm.runInContext('currentUser',context),beforeBoardView=vm.runInContext('currentView',context);
+  vm.runInContext("currentUser={id:1,codice_fiscale:'RSSMRA80A01H501U',permessi:['dashboard','dashboard.bacheche','catechismo','catechismo.bacheca','catechismo.staff','catechismo.avvisi','giovani','giovani.staff','giovani.bacheca','giovani.appelli','giovani.elenco','giovani.calendario']};currentView='dashboard';",context);
+  const boardRows=[{id:31,categoria:'catechismo',gruppo_id:11,gruppo:'Gruppo del figlio',argomento:'Incontri',titolo:'Avviso famiglia',contenuto:'Testo <riservato>',is_pubblicato:true,created_at:'2026-11-04T10:00:00Z',ambiti:['famiglia']},{id:32,categoria:'catechismo',gruppo_id:12,gruppo:'Gruppo seguito',argomento:'Materiali',titolo:'Avviso staff',contenuto:'Materiali da portare',is_pubblicato:true,created_at:'2026-11-04T10:00:00Z',ambiti:['staff']}];
+  fixtures['/api/bacheche']={avvisi:boardRows,gruppi:[{categoria:'catechismo',id:11,nome:'Gruppo del figlio',ambiti:['famiglia'],puo_gestire:false},{categoria:'catechismo',id:12,nome:'Gruppo seguito',ambiti:['staff'],puo_gestire:true}]};
+  const boards=vm.runInContext('PastoralBoards',context);
+  await boards.load('catechismo','catechismoBoardFamily','famiglia');
+  assert.ok(nodes('catechismoBoardFamily').innerHTML.includes('Avviso famiglia'));assert.ok(!nodes('catechismoBoardFamily').innerHTML.includes('Avviso staff'));
+  assert.ok(nodes('catechismoBoardFamily').innerHTML.includes('Testo &lt;riservato&gt;'));
+  await boards.load('catechismo','catechismoBoardStaff','staff');assert.ok(nodes('catechismoBoardStaff').innerHTML.includes('Avviso staff'));
+  await boards.load(null,'dashboardGroupBoards');
+  assert.ok(nodes('dashboardGroupBoards').innerHTML.includes('<h4>Incontri</h4>'));assert.ok(nodes('dashboardGroupBoards').innerHTML.includes('<h4>Materiali</h4>'));
+  assert.equal((nodes('dashboardGroupBoards').innerHTML.match(/Avviso famiglia/g)||[]).length,1);
+  fixtures['/api/bacheche/catechismo/12']={gruppo:'Gruppo seguito',puo_gestire:true,avvisi:[boardRows[1]]};
+  await boards.open('catechismo',12);nodes('boardTopic').value='Organizzazione';nodes('boardTitle').value='Nuovo avviso';nodes('boardBody').value='Messaggio del gruppo';nodes('boardPublished').checked=true;
+  await boards.save({preventDefault(){}});
+  assert.ok(requests.some(r=>r.url==='/api/bacheche/catechismo/12' && r.options.method==='POST' && JSON.parse(r.options.body).argomento==='Organizzazione'));
+  fixtures['/api/giovani/gruppi']={anno_pastorale_corrente:'2026/2027',gruppi:[{id:22,nome:'Gruppo giovani uno',anno_pastorale:'2026/2027',stato:'pubblico',catechista_nome:'Responsabile',totale_ragazzi:2}]};
+  vm.runInContext("currentView='giovani_staff';",context);await context.navigateTo('giovani_staff');
+  assert.ok(nodes('youthGroupsGrid').innerHTML.includes('Gruppo giovani uno'));assert.ok(nodes('youthGroupsGrid').innerHTML.includes("openDates('giovani',22)"));
+  assert.ok(template.includes('data-view="giovani"'));assert.ok(template.includes('data-view="giovani_staff"'));
+  context.restoreBoardUser=beforeBoards;context.restoreBoardView=beforeBoardView;vm.runInContext('currentUser=restoreBoardUser;currentView=restoreBoardView;',context);
+  fixtures['/api/bacheche']={avvisi:[],gruppi:[]};
   // Messe, liturgia e avvenimenti datati condividono la settimana senza ripetere le date specifiche.
   const dated=[{sezione:'messe',giorno:'Lunedì',titolo:'Messa settimanale'}, {sezione:'liturgia',giorno:'Martedì',titolo:'Liturgia settimanale'}, {sezione:'avvenimenti',data_specifica:days[2],titolo:'Avvenimento unico'}];
   const italian=days[3].split('-').reverse().join('/');

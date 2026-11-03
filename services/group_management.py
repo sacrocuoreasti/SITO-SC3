@@ -12,7 +12,7 @@ from services.cf_validator import normalizza_cf
 
 
 def managed_group(category,id):
-    if category not in ('oratorio','doposcuola'): raise NotFound()
+    if category not in ('oratorio','doposcuola','giovani'): raise NotFound()
     model,collection=GROUP_MODELS[category]
     group=db.session.get(model,id)
     if not group: raise NotFound()

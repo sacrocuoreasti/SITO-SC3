@@ -29,8 +29,8 @@ def calendar_catalog(include_private=False):
     query=CalendarioComunita.query
     if not include_private:query=query.filter_by(is_pubblico=True)
     result=[dict(c.to_dict(),automatico=False) for c in query.order_by(CalendarioComunita.ordine,CalendarioComunita.id).all()]
-    colors={'catechismo':'#8B1E1E','oratorio':'#2563eb','doposcuola':'#d97706'}
-    icons={'catechismo':'📖','oratorio':'🏓','doposcuola':'📚'}
+    colors={'catechismo':'#8B1E1E','oratorio':'#2563eb','doposcuola':'#d97706','giovani':'#7c3aed'}
+    icons={'catechismo':'📖','oratorio':'🏓','doposcuola':'📚','giovani':'🌱'}
     for category,(model,_) in GROUP_MODELS.items():
         for group in model.query.order_by(model.nome,model.id).all():
             group_year=getattr(group,'anno_pastorale',None) or getattr(group,'anno_scolastico',None)

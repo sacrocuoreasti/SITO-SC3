@@ -1,7 +1,7 @@
 /* Calendario mensile dei gruppi. Date da Google, appelli salvati soltanto nel portale. */
 const GroupCalendar = (() => {
   const views = new WeakMap();
-  const apiPattern = /^\/api\/(?:calendari-gruppi|impostazioni\/calendari-gruppi)\/(catechismo|doposcuola|oratorio)\/\d+$/;
+  const apiPattern = /^\/api\/(?:calendari-gruppi|impostazioni\/calendari-gruppi)\/(catechismo|doposcuola|oratorio|giovani)\/\d+$/;
   const localDate = () => {const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Rome',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());return ['year','month','day'].map(type=>parts.find(part=>part.type===type).value).join('-');};
   const iso = date => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
   function days(month) {

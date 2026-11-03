@@ -682,7 +682,7 @@ function navigateTo(viewName) {
   const isStaff = roles.some(r => ['admin', 'segreteria', 'parroco'].includes(r));
 
   if(Array.isArray(currentUser?.permessi) && !hasPermission(viewName)) {
-    viewName=['dashboard','famiglia','attivita','calendari','oratorio','catechismo','doposcuola','oratorio_staff','catechismo_staff','doposcuola_staff','segreteria','anagrafica','excel','utenti'].find(key=>hasPermission(key));
+    viewName=['dashboard','famiglia','attivita','calendari','oratorio','catechismo','doposcuola','oratorio_staff','catechismo_staff','doposcuola_staff','giovani','giovani_staff','segreteria','anagrafica','excel','utenti'].find(key=>hasPermission(key));
     if(!viewName){document.querySelectorAll('.view-panel').forEach(el=>el.style.display='none');document.getElementById('viewNoAccess').style.display='block';return;}
   }
   currentView = viewName;
@@ -710,6 +710,8 @@ function navigateTo(viewName) {
     'catechismo_staff': { id: 'viewCatechismoStaff', fn: loadCatechismo },
     'doposcuola': { id: 'viewDoposcuola', fn: loadDoposcuola },
     'doposcuola_staff': { id: 'viewDoposcuolaStaff', fn: loadDoposcuola },
+    'giovani': {id:'viewGiovani',fn:()=>YouthGroups.load()},
+    'giovani_staff': {id:'viewGiovaniStaff',fn:()=>YouthGroups.load()},
     'segreteria': { id: 'viewSegreteria', fn: loadSegreteria },
     'anagrafica': { id: 'viewAnagrafica', fn: () => loadAnagrafica() },
     'excel': { id: 'viewExcel', fn: () => {} },
@@ -746,6 +748,7 @@ function toggleSidebar() {
 
 // ================= VIEW 1: DASHBOARD =================
 async function loadDashboard() {
+  await PastoralBoards.load(null,'dashboardGroupBoards');
   try {
     const roles = currentUser ? (currentUser.tutti_i_ruoli || [currentUser.ruolo]) : [];
     const isStaff = hasPermission('dashboard.cassa');
@@ -1153,6 +1156,7 @@ async function loadOratorio() {
   const roles = (currentUser && currentUser.tutti_i_ruoli) || [currentUser ? currentUser.ruolo : 'utente'];
   const isSupervisor = roles.some(r => ['admin', 'parroco', 'segreteria'].includes(r));
   const isAnimatore = currentView==='oratorio_staff' && hasPermission('oratorio.staff');
+  await PastoralBoards.load('oratorio','oratorio'+(isAnimatore?'BoardStaff':'BoardFamily'),isAnimatore?'staff':'famiglia');
 
   if (!isAnimatore) {
     // Genitore / Fedele: visualizza iscrizioni e presenze dei propri figli
@@ -1824,6 +1828,7 @@ async function loadCatechismo() {
   const roles = (currentUser && currentUser.tutti_i_ruoli) || [currentUser ? currentUser.ruolo : 'utente'];
   const isSupervisor = roles.some(r => ['admin', 'parroco', 'segreteria'].includes(r));
   const isCatechista = currentView==='catechismo_staff' && hasPermission('catechismo.staff');
+  await PastoralBoards.load('catechismo','catechismo'+(isCatechista?'BoardStaff':'BoardFamily'),isCatechista?'staff':'famiglia');
 
   if (!isCatechista) {
     // Profilo Utente / Genitore: carica SOLO la vista per i propri figli
@@ -2647,6 +2652,7 @@ async function loadDoposcuola() {
   const roles = (currentUser && currentUser.tutti_i_ruoli) || [currentUser ? currentUser.ruolo : 'utente'];
   const isSupervisor = roles.some(r => ['admin', 'parroco', 'segreteria'].includes(r));
   const isStaffOrEducatore = currentView==='doposcuola_staff' && hasPermission('doposcuola.staff');
+  await PastoralBoards.load('doposcuola','doposcuola'+(isStaffOrEducatore?'BoardStaff':'BoardFamily'),isStaffOrEducatore?'staff':'famiglia');
 
   if (!isStaffOrEducatore) {
     const staffSec = document.getElementById('doposcuolaStaffSection');
@@ -7805,7 +7811,7 @@ async function loadPublicCalendari(preloaded) {
       `;
       return;
     }
-    grid.innerHTML=calendari.map(c=>communityCalendarCard(c)).join('');
+    grid.innerHTML=groupedCalendarCards(calendari);
   } catch (err) {
     console.error('Errore caricamento calendari pubblici:', err);
   }
@@ -7828,9 +7834,9 @@ async function loadUserCalendari() {
       matches.forEach(g=>used.add(g.id));
       const related=matches[0];
       const api=related && hasPermission(related.categoria+'.calendario')?related.calendar_api_url:c.calendar_api_url;
-      return communityCalendarCard({...c,calendar_api_url:api});
+      return {...c,calendar_api_url:api};
     });
-    container.innerHTML=cards.join('')+owned.filter(g=>!used.has(g.id)).map(group=>`<div class="card" style="padding:14px"><strong>${escapeHtml(group.titolo)}</strong><p>${escapeHtml(group.categoria)}</p>${groupCalendarMarkup(group)}</div>`).join('');
+    container.innerHTML=groupedCalendarCards([...cards,...owned.filter(g=>!used.has(g.id))]);
   } catch (err) {
     console.error('Errore calendari dashboard:', err);
   }
@@ -7847,7 +7853,7 @@ async function loadSegreteriaCalendari() {
       tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--ink-500); padding: 18px;">Nessun calendario Google configurato. Clicca "+ Nuovo Calendario".</td></tr>';
       return;
     }
-    tbody.innerHTML = cacheSegreteriaCalendari.map(c => `
+    tbody.innerHTML = calendarBuckets(cacheSegreteriaCalendari).map(([type,rows])=>`<tr class="calendar-type-row"><th colspan="6">${escapeHtml(calendarTypeLabel(type))}</th></tr>`+rows.map(c => `
       <tr>
         <td>
           <span style="font-size: 18px; margin-right: 6px;">${escapeHtml(c.icona || '📅')}</span>
@@ -7875,7 +7881,7 @@ async function loadSegreteriaCalendari() {
           </div>
         </td>
       </tr>
-    `).join('');
+    `).join('')).join('');
   } catch (err) {
     console.error('Errore calendari segreteria:', err);
   }
@@ -8151,8 +8157,8 @@ async function refreshEnrollmentOptions() {
   if(currentUser!==actor) return null;
   enrollmentOptions=data;
   let visible=false;
-  for(const category of ['oratorio','catechismo','doposcuola']) {
-    const available=(!(currentUser.is_gestione_pura || !currentUser.codice_fiscale) && (!!data.gruppi?.[category]?.length || !!data.gruppi_iscritti?.[category]?.length));
+  for(const category of ['oratorio','catechismo','doposcuola','giovani']) {
+    const available=category==='giovani' || (!(currentUser.is_gestione_pura || !currentUser.codice_fiscale) && (!!data.gruppi?.[category]?.length || !!data.gruppi_iscritti?.[category]?.length));
     const nav=document.querySelector('.'+category+'-nav');
     if(nav) nav.style.display=available ? 'flex' : 'none';
     visible=visible || available;
@@ -8170,6 +8176,7 @@ function activityEnrollmentAction(activity,staff=false) {
 }
 function availableGroupCards(category, groups) {
   const labels = {
+    giovani: {icon:'🌱',name:'Gruppi giovani',reference:'Responsabili'},
     catechismo: {icon:'📖', name:'Catechismo', reference:'Catechisti'},
     doposcuola: {icon:'📚', name:'Doposcuola', reference:'Educatore'},
     oratorio: {icon:'☀️', name:'Oratorio', reference:'Animatori'}
@@ -8179,11 +8186,11 @@ function availableGroupCards(category, groups) {
   return groups.map(g => {
     const winter = category === 'oratorio' && g.tipo_oratorio === 'invernale';
     const year = g.anno_scolastico || g.anno_pastorale || 'Da definire';
-    const course = category === 'catechismo' ? g.anno_catechismo : category === 'doposcuola' ? g.fascia_eta : winter ? 'Oratorio invernale' : 'Oratorio estivo';
-    const staff = category === 'catechismo' ? g.catechisti : category === 'oratorio' ? g.animatori : g.educatori;
+    const course = category==='giovani'?'Gruppo giovani':category === 'catechismo' ? g.anno_catechismo : category === 'doposcuola' ? g.fascia_eta : winter ? 'Oratorio invernale' : 'Oratorio estivo';
+    const staff = (category === 'catechismo'||category==='giovani') ? g.catechisti : category === 'oratorio' ? g.animatori : g.educatori;
     const reference = staff?.length ? staff.map(person=>person.nominativo).filter(Boolean).join(', ') : (g.catechista_nome || g.educatore_nome || g.animatori_nomi || g.animatore_referente_nome || 'Da assegnare');
     const members = g.totale_studenti ?? g.totale_ragazzi ?? 0;
-    return `<form class="catechismo-card family-enrollment-card family-enrollment-card--${category}${winter ? ' family-enrollment-card--invernale' : ''}" onsubmit="enrollFamilyGroup(event,'${category}',${g.id})">
+    return `<form data-group-category="${category}" class="catechismo-card family-enrollment-card family-enrollment-card--${category}${winter ? ' family-enrollment-card--invernale' : ''}" onsubmit="enrollFamilyGroup(event,'${category}',${g.id})">
       <header class="family-enrollment-header">
         <div class="family-enrollment-title"><span class="family-enrollment-icon" aria-hidden="true">${winter ? '❄️' : type.icon}</span><div><span class="family-enrollment-category">${type.name}</span><h3>${escapeHtml(g.nome)}</h3></div></div>
         <span class="badge badge-success family-enrollment-status">Iscrizioni aperte</span>
@@ -8198,10 +8205,10 @@ function availableGroupCards(category, groups) {
       ${g.attivita_titolo ? `<p class="family-enrollment-activity">Attività collegata: <strong>${escapeHtml(g.attivita_titolo)}</strong></p>` : ''}
       ${g.note ? `<div class="family-enrollment-notes"><strong>Informazioni sul gruppo</strong><p>${escapeHtml(g.note)}</p></div>` : ''}
       ${groupCalendarMarkup(g)}
-      <fieldset class="family-enrollment-people"><legend>Chi vuoi iscrivere?</legend><p>Seleziona i figli da iscrivere a questo gruppo.</p>
+      <fieldset class="family-enrollment-people"><legend>Chi vuoi iscrivere?</legend><p>${category==='giovani'?'Seleziona le persone da iscrivere a questo gruppo.':'Seleziona i figli da iscrivere a questo gruppo.'}</p>
         ${g.partecipanti.map(person => `<label class="family-enrollment-person"><input class="group-participant" type="checkbox" value="${escapeHtml(person.codice_fiscale)}" onchange="updateGroupEnrollmentSelection(this)"><span class="family-enrollment-person-avatar" aria-hidden="true">${escapeHtml((person.nominativo || '').trim().charAt(0))}</span><span class="family-enrollment-person-name"><strong>${escapeHtml(person.nominativo)}</strong><small>${person.eta == null ? 'Età non indicata' : person.eta+' anni'}</small></span></label>`).join('')}
       </fieldset>
-      <footer class="family-enrollment-footer"><span class="family-enrollment-selection" aria-live="polite">Nessun figlio selezionato</span><button type="submit" class="btn btn-primary" disabled>Iscrivi al gruppo</button></footer>
+      <footer class="family-enrollment-footer"><span class="family-enrollment-selection" aria-live="polite">${category==='giovani'?'Nessuna persona selezionata':'Nessun figlio selezionato'}</span><button type="submit" class="btn btn-primary" disabled>Iscrivi al gruppo</button></footer>
     </form>`;
   }).join('');
 }
@@ -8209,7 +8216,7 @@ function availableGroupCards(category, groups) {
 function updateGroupEnrollmentSelection(input) {
   const form = input.closest('form');
   const count = form.querySelectorAll('.group-participant:checked').length;
-  form.querySelector('.family-enrollment-selection').textContent = count === 1 ? '1 figlio selezionato' : count+' figli selezionati';
+  form.querySelector('.family-enrollment-selection').textContent = form.dataset?.groupCategory==='giovani'?(count===1?'1 persona selezionata':count+' persone selezionate'):(count===1?'1 figlio selezionato':count+' figli selezionati');
   form.querySelector('button[type="submit"]').disabled = count === 0;
 }
 async function loadFamilyGroupView(category,loadAssigned) {
@@ -8222,7 +8229,7 @@ async function loadFamilyGroupView(category,loadAssigned) {
     const joined=data?.gruppi_iscritti?.[category] || [];
     const section=document.getElementById(category+'ParentSection');
     if(section)section.style.display=(groups.length || joined.length)?'block':'none';
-    if(!groups.length && !joined.length) {if(currentView===category && hasPermission('dashboard'))navigateTo('dashboard');return;}
+    if(!groups.length && !joined.length) {if(category==='giovani'){if(section)section.style.display='block';container.innerHTML='<p>Nessun gruppo giovani disponibile al momento.</p>';return;}if(currentView===category && hasPermission('dashboard'))navigateTo('dashboard');return;}
     container.innerHTML=`<div class="family-group-assigned" id="${category}AssignedContainer"></div>`+(groups.length ? `<div class="family-group-heading"><div><h2>Gruppi disponibili</h2><p>Consulta le informazioni e scegli chi iscrivere.</p></div><span class="badge badge-neutral">${groups.length} ${groups.length===1 ? 'gruppo':'gruppi'}</span></div><div class="family-group-grid">${availableGroupCards(category,groups)}</div>` : '');
     await loadAssigned();
   } catch(error) {showToast(error.message,'error');}
@@ -8231,7 +8238,7 @@ async function enrollFamilyGroup(event,category,id) {
   event.preventDefault();
   const form=event.currentTarget;
   const participants=[...form.querySelectorAll('.group-participant:checked')].map(input=>input.value);
-  if(!participants.length) return showToast('Seleziona almeno un figlio','warning');
+  if(!participants.length) return showToast(category==='giovani'?'Seleziona almeno una persona':'Seleziona almeno un figlio','warning');
   const button=form.querySelector('button[type="submit"]');
   button.disabled=true;
   try {
@@ -8305,6 +8312,7 @@ async function loadAssignedGroupRegisters(category) {
   container.innerHTML=(data.gruppi || []).length ? '<h2>I tuoi gruppi e le presenze</h2>'+data.gruppi.map(group=>`<section class="catechismo-card family-enrollment-card family-enrollment-card--${category} assigned-register-card"><header><span class="badge badge-success">Iscrizione effettuata</span><h3>${escapeHtml(group.nome)}</h3><p>${escapeHtml(group.anno_scolastico || group.anno_pastorale || '')} · ${escapeHtml(group.orario_incontri || group.giorni_orari || 'Orario da definire')}</p><p>${escapeHtml(group.catechista_nome || group.educatore_nome || group.animatori_nomi || group.animatore_referente_nome || '')}${group.aula ? ' · '+escapeHtml(group.aula):''}</p></header>${groupCalendarMarkup(group)}${group.componenti.map(person=>`<div class="family-person-register" data-permission="${category}.storico"><h4>${escapeHtml(person.nominativo)}</h4><div class="family-register-summary"><span><strong>${person.presenti}</strong> presenze</span><span><strong>${person.assenti}</strong> assenze</span><span><strong>${person.percentuale == null ? '—':person.percentuale+'%'}</strong> frequenza</span></div>${person.presenze.length ? `<div class="table-responsive"><table class="custom-table"><thead><tr><th>Data</th><th>Incontro</th><th>Presenza</th><th>Note</th></tr></thead><tbody>${person.presenze.map(record=>`<tr><td>${record.data.split('-').reverse().join('/')}</td><td>${escapeHtml(record.titolo_incontro || 'Incontro')}${record.concorre_percentuale===false ? '<br><small>Non concorre alla percentuale</small>':''}</td><td><span class="badge ${record.presente ? 'badge-success':'badge-danger'}">${record.presente ? 'Presente':'Assente'}</span></td><td>${escapeHtml(record.note || '—')}</td></tr>`).join('')}</tbody></table></div>`:'<p>Nessun appello ancora salvato per questo gruppo.</p>'}</div>`).join('')}</section>`).join('') : '';
 }
 async function openCalendarGroupAttendance(category,id,day) {
+  if(category==='giovani'){if(currentView!=='giovani_staff')await navigateTo('giovani_staff');return StaffGroupRegister.openAttendance('giovani',day,id);}
   if(category==='catechismo') {
     if(currentView!=='catechismo_staff') await navigateTo('catechismo_staff');
     if(!cacheGruppiCatechismo.some(group=>group.id===id)) cacheGruppiCatechismo=(await apiJson('/api/catechismo/gruppi')).gruppi || [];

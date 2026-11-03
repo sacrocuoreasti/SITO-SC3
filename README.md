@@ -252,3 +252,20 @@ I calendari manuali sono conservati; i collegamenti identici vengono accorpati
 nella vista, senza creare nuove righe. I calendari in bozza restano riservati
 allo staff autorizzato. Le viste mensili pubbliche mostrano soltanto gli
 appuntamenti e caricano Google su richiesta, senza esporre presenze o anagrafiche.
+
+I calendari vengono raggruppati per tipologia nelle viste pubbliche, personali
+e di segreteria; i collegamenti condivisi fra attività diverse hanno un gruppo
+dedicato. La nuova sezione **Gruppi giovani** mantiene viste famiglia/staff
+separate e riutilizza iscrizioni, calendario, elenco, quadro sanitario e appelli.
+Sono consentiti al massimo due gruppi giovani per anno pastorale, con controllo
+anche sulle richieste concorrenti. Non vengono creati gruppi o iscritti dimostrativi.
+
+Ogni gruppo pastorale ha una bacheca privata, con argomento, titolo, testo e
+bozze. La lettura è consentita agli iscritti/nuclei autorizzati e allo staff
+assegnato; la gestione richiede anche il permesso **Pubblica e gestisci avvisi**.
+La panoramica riunisce gli avvisi pubblicati dei gruppi accessibili, per attività
+e argomento, senza duplicare i gruppi presenti sia nell’ambito familiare sia
+nell’incarico staff. Le anteprime sono limitate e il testo completo è conservato.
+Il privilegio Responsabile gruppi giovani e i nuovi permessi delle bacheche sono
+configurabili in Utenti e privilegi. Gli avvisi di gruppo non sono avvisi pubblici
+della comunità e non compaiono negli endpoint pubblici.

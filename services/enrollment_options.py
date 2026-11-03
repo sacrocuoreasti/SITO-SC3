@@ -1,9 +1,9 @@
 """Opportunità di iscrizione calcolate per la famiglia e i permessi correnti."""
 from flask_login import current_user
-from models import Attivita, Iscrizione, GruppoCatechismo, GruppoDoposcuola, GruppoOratorio
+from models import Attivita, Iscrizione, GruppoCatechismo, GruppoDoposcuola, GruppoOratorio, GruppoGiovani
 from services.family_service import can_manage_family
 
-GROUP_MODELS = {'oratorio': (GruppoOratorio, 'ragazzi'), 'catechismo': (GruppoCatechismo, 'ragazzi'), 'doposcuola': (GruppoDoposcuola, 'studenti')}
+GROUP_MODELS = {'oratorio': (GruppoOratorio, 'ragazzi'), 'catechismo': (GruppoCatechismo, 'ragazzi'), 'doposcuola': (GruppoDoposcuola, 'studenti'), 'giovani': (GruppoGiovani, 'ragazzi')}
 
 
 def age_eligible(person, item):
@@ -32,7 +32,7 @@ def group_candidates():
 
 def available_groups(category):
     model, collection = GROUP_MODELS[category]
-    people = group_candidates()
+    people = manageable_people() if category=='giovani' else group_candidates()
     results = []
     for group in model.query.filter_by(stato='pubblico').order_by(model.nome).all():
         from services.catechismo_membership import conflicting_group

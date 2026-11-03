@@ -44,6 +44,13 @@ gruppo_catechismo_catechisti = db.Table(
     db.Column('utente_id', db.Integer, db.ForeignKey('utente.id', ondelete='CASCADE'), primary_key=True)
 )
 
+gruppo_giovani_persona = db.Table('gruppo_giovani_persona',
+    db.Column('gruppo_id',db.Integer,db.ForeignKey('gruppo_giovani.id',ondelete='CASCADE'),primary_key=True),
+    db.Column('codice_fiscale',db.String(16),db.ForeignKey('persona.codice_fiscale',ondelete='CASCADE'),primary_key=True))
+gruppo_giovani_responsabili = db.Table('gruppo_giovani_responsabili',
+    db.Column('gruppo_id',db.Integer,db.ForeignKey('gruppo_giovani.id',ondelete='CASCADE'),primary_key=True),
+    db.Column('utente_id',db.Integer,db.ForeignKey('utente.id',ondelete='CASCADE'),primary_key=True))
+
 # Tabella di associazione molti-a-molti: Persona <-> GruppoOratorio
 gruppo_oratorio_persona = db.Table(
     'gruppo_oratorio_persona',
@@ -652,6 +659,98 @@ class GruppoCatechismo(db.Model):
         if include_ragazzi:
             d['ragazzi'] = [r.to_dict(include_family=True) for r in participants]
         return d
+
+
+class GruppoGiovani(db.Model):
+    __tablename__ = 'gruppo_giovani'
+    eta_min = db.Column(db.Integer, nullable=True)
+    eta_max = db.Column(db.Integer, nullable=True)
+
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(120), nullable=False)  # es. "3ª Elementare - Gruppo A"
+    anno_pastorale = db.Column(db.String(20), default='2026/2027')
+    anno_catechismo = db.Column(db.String(50), nullable=True)  # es. "1° Anno Comunione", "2° Anno Comunione", "Cresima"
+    catechista_nome = db.Column(db.String(120), nullable=True)
+    catechista_cf = db.Column(db.String(16), db.ForeignKey('persona.codice_fiscale', ondelete='SET NULL'), nullable=True)
+    catechista_utente_id = db.Column(db.Integer, db.ForeignKey('utente.id', ondelete='SET NULL'), nullable=True)
+    orario_incontri = db.Column(db.String(100), nullable=True)
+    aula = db.Column(db.String(50), nullable=True)
+    google_calendar_url = db.Column(db.String(500), nullable=True)
+    note = db.Column(db.Text, nullable=True)
+    stato = db.Column(db.String(20), default='pubblico')  # 'pubblico', 'bozza', 'chiuso'
+    attivita_id = db.Column(db.Integer, db.ForeignKey('attivita.id', ondelete='SET NULL'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relazioni
+    ragazzi = db.relationship('Persona', secondary=gruppo_giovani_persona, backref='gruppi_giovani')
+    catechisti = db.relationship('Utente', secondary=gruppo_giovani_responsabili, backref='gruppi_giovani_assegnati')
+    catechista = db.relationship('Persona', foreign_keys=[catechista_cf])
+    catechista_utente = db.relationship('Utente', foreign_keys=[catechista_utente_id])
+    attivita = db.relationship('Attivita')
+
+    def to_dict(self, include_ragazzi=True):
+        from services.catechismo_parents import members,is_parent_group
+        participants=list(self.ragazzi)
+        catechisti_list = []
+        if self.catechisti:
+            for u in self.catechisti:
+                catechisti_list.append({
+                    'id': u.id,
+                    'nominativo': u.persona.nominativo if u.persona else u.email.split('@')[0],
+                    'email': u.email,
+                    'telefono': u.persona.telefono if u.persona else ''
+                })
+        elif self.catechista_utente:
+            u = self.catechista_utente
+            catechisti_list.append({
+                'id': u.id,
+                'nominativo': u.persona.nominativo if u.persona else u.email.split('@')[0],
+                'email': u.email,
+                'telefono': u.persona.telefono if u.persona else ''
+            })
+
+        nomi_catechisti = ", ".join([c['nominativo'] for c in catechisti_list]) if catechisti_list else (self.catechista_nome or (self.catechista.nominativo if self.catechista else 'Da assegnare'))
+
+        d = {
+            'id': self.id,
+            'eta_min': self.eta_min,
+            'eta_max': self.eta_max,
+            'nome': self.nome,
+            'anno_pastorale': self.anno_pastorale or '2026/2027',
+            'anno_catechismo': self.anno_catechismo or '',
+            'catechista_nome': nomi_catechisti,
+            'catechista_cf': self.catechista_cf or '',
+            'catechista_utente_id': self.catechista_utente_id,
+            'catechisti': catechisti_list,
+            'catechisti_ids': [c['id'] for c in catechisti_list],
+            'orario_incontri': self.orario_incontri or '',
+            'aula': self.aula or '',
+            'google_calendar_url': self.google_calendar_url or '',
+            'calendar_embed_url': calendar_info(self),
+            'calendar_api_url': f'/api/calendari-gruppi/giovani/{self.id}' if calendar_info(self) else '',
+            'gruppo_genitori': False,
+            'note': self.note or '',
+            'stato': self.stato or 'pubblico',
+            'attivita_id': self.attivita_id,
+            'attivita_titolo': self.attivita.titolo if self.attivita else '',
+            'totale_ragazzi': len(participants)
+        }
+        if include_ragazzi:
+            d['ragazzi'] = [r.to_dict(include_family=True) for r in participants]
+        return d
+
+
+class AvvisoGruppo(db.Model):
+    __tablename__='avviso_gruppo'
+    id=db.Column(db.Integer,primary_key=True)
+    categoria=db.Column(db.String(30),nullable=False,index=True)
+    gruppo_id=db.Column(db.Integer,nullable=False,index=True)
+    argomento=db.Column(db.String(80),nullable=False,default='Comunicazioni')
+    titolo=db.Column(db.String(150),nullable=False)
+    contenuto=db.Column(db.Text,nullable=False)
+    is_pubblicato=db.Column(db.Boolean,nullable=False,default=True)
+    autore_id=db.Column(db.Integer,db.ForeignKey('utente.id',ondelete='SET NULL'),nullable=True)
+    created_at=db.Column(db.DateTime,nullable=False,default=datetime.utcnow)
 
 
 # ================= GRUPPI DOPOSCUOLA =================

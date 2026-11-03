@@ -46,7 +46,7 @@ def get_month(category,id):
     if not group: raise NotFound()
     manages=can_record(category,group)
     enrolled=[p for p in manageable_people() if p in group_people(group,collection)]
-    eligible=group.stato=='pubblico' and any(age_eligible(p,group) for p in group_candidates())
+    eligible=group.stato=='pubblico' and any(age_eligible(p,group) for p in (manageable_people() if category=='giovani' else group_candidates()))
     if not manages and not enrolled and not eligible: raise Forbidden('Calendario non disponibile per questo profilo')
     try: data=group_events(group,request.args.get('mese'))
     except CalendarUnavailable as error:

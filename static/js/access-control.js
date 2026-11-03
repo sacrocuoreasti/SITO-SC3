@@ -6,6 +6,7 @@ function hasPermission(key) {
   const roles=currentUser.tutti_i_ruoli||[currentUser.ruolo];
   if(roles.some(r=>['admin','segreteria','parroco'].includes(r)))return true;
   const module=key.split('.')[0];
+  if(key==='giovani.staff')return roles.includes('responsabile_giovani');
   if(key.endsWith('.staff'))return roles.some(r=>(module==='oratorio'?['oratorio','animatore']:module==='catechismo'?['catechista']:['educatore','doposcuola']).includes(r));
   if(/\.(gestione|assegnazioni|tutti|cassa)$/.test(key))return module==='oratorio' && roles.includes('oratorio');
   return !['utenti','segreteria','anagrafica','excel'].includes(module);
@@ -22,7 +23,7 @@ const AccessUI=(()=>{
     if(match)return 'segreteria.'+match[1];
     match=code.match(/switchOratorioTab\('([^']+)'/);
     if(match)return 'oratorio.'+(match[1]==='allergie'?'cucina':match[1]);
-    match=code.match(/StaffGroupRegister\.(\w+)\('(oratorio|doposcuola)'/);
+    match=code.match(/StaffGroupRegister\.(\w+)\('(oratorio|doposcuola|giovani)'/);
     if(match)return ['reset','back'].includes(match[1])?null:match[2]+'.'+(['openRoster'].includes(match[1])?'elenco':['addForm','addPerson','removePerson'].includes(match[1])?'assegnazioni':'appelli');
     for(const [pattern,key] of [
       [/openCatechismoDates|openModalAppelloCatechismo|handleSalvaAppelloCatechismo/,'catechismo.appelli'],
@@ -78,13 +79,13 @@ const AccessUI=(()=>{
       tabContentOraAllergie:'oratorio.cucina',tbodySegreteriaCalendari:'segreteria.calendari',tableSegreteriaEventi:'segreteria.avvisi'};
     for(const [id,key] of Object.entries(mappings)){const el=document.getElementById(id);if(el)gate(el,hasPermission(key));}
     for(const label of ['sectionLabelGestione','sectionLabelPastorale']){
-      const modules=label==='sectionLabelGestione'?['segreteria','anagrafica','excel','utenti']:['oratorio','catechismo','doposcuola','oratorio_staff','catechismo_staff','doposcuola_staff'];
+      const modules=label==='sectionLabelGestione'?['segreteria','anagrafica','excel','utenti']:['oratorio','catechismo','doposcuola','oratorio_staff','catechismo_staff','doposcuola_staff','giovani','giovani_staff'];
       const el=document.getElementById(label);if(el)el.style.display=modules.some(module=>document.querySelector(`.nav-item[data-view="${module}"]`)?.style.display!=='none' && hasPermission(module))?'block':'none';
     }
     document.querySelectorAll('h4,fieldset.family-section legend').forEach(heading=>{
       if(!/fascicolo sanitario|scheda sanitaria|allergie|intolleranze|terapie/i.test(heading.textContent||''))return;
-      const module=heading.closest('#viewOratorio,#viewCatechismo,#viewDoposcuola,#viewOratorioStaff,#viewCatechismoStaff,#viewDoposcuolaStaff,#modalAllergieGruppoCatechismo');
-      const key=module ? (module.id.includes('Oratorio')?'oratorio':module.id.includes('Doposcuola')?'doposcuola':'catechismo')+'.salute' : (currentView==='anagrafica'?'anagrafica':'famiglia')+'.salute';
+      const module=heading.closest('#viewOratorio,#viewCatechismo,#viewDoposcuola,#viewOratorioStaff,#viewCatechismoStaff,#viewDoposcuolaStaff,#viewGiovani,#viewGiovaniStaff,#modalAllergieGruppoCatechismo');
+      const key=module ? (module.id.includes('Giovani')?'giovani':module.id.includes('Oratorio')?'oratorio':module.id.includes('Doposcuola')?'doposcuola':'catechismo')+'.salute' : (currentView==='anagrafica'?'anagrafica':'famiglia')+'.salute';
       if(!hasPermission(key)) {
         if(heading.tagName==='LEGEND')heading.parentElement.style.display='none';
         else{heading.style.display='none';const next=heading.nextElementSibling;if(next && next.tagName==='DL')next.style.display='none';}
@@ -97,8 +98,8 @@ const AccessUI=(()=>{
       if(key){const allowed=hasPermission(key);gate(el,allowed);el.querySelectorAll('input,select,textarea').forEach(input=>{if(!allowed && !input.disabled){input.disabled=true;input.dataset.aclDisabled='1';}else if(allowed && input.dataset.aclDisabled){input.disabled=false;delete input.dataset.aclDisabled;}});}
     });
     document.querySelectorAll('.catechismo-history').forEach(el=>{
-      const parent=el.closest('#catechismoDatesSection,#oratorioRegisterSection,#doposcuolaRegisterSection');
-      if(parent){const category=parent.id.startsWith('catechismo')?'catechismo':parent.id.startsWith('oratorio')?'oratorio':'doposcuola';if(!hasPermission(category+'.storico'))el.style.display='none';}
+      const parent=el.closest('#catechismoDatesSection,#oratorioRegisterSection,#doposcuolaRegisterSection,#giovaniRegisterSection');
+      if(parent){const category=parent.id.startsWith('catechismo')?'catechismo':parent.id.startsWith('oratorio')?'oratorio':parent.id.startsWith('giovani')?'giovani':'doposcuola';if(!hasPermission(category+'.storico'))el.style.display='none';}
     });
     const healthModal=document.getElementById('modalGroupHealth');
     if(healthModal?.dataset.category && (!hasPermission(healthModal.dataset.category+'.salute') || !hasPermission(healthModal.dataset.category+'.cucina'))){const content=document.getElementById('groupHealthContent');if(content.innerHTML)content.innerHTML='';}
@@ -147,7 +148,7 @@ const AccessUI=(()=>{
     document.getElementById('accessTree').innerHTML=config.viste.map(section=>`<fieldset class="access-section"><legend><label><input class="access-check" type="checkbox" value="${section.chiave}" ${grants.has(section.chiave)?'checked':''} ${locked?'disabled':''} onchange="AccessUI.toggleSection(this)"> ${escapeHtml(section.nome)}</label></legend><div class="access-children">${section.figli.map(child=>`<label><input class="access-check" type="checkbox" value="${child.chiave}" ${grants.has(child.chiave)?'checked':''} ${locked||child.solo_admin?'disabled':''} onchange="AccessUI.toggleChild(this)"> ${escapeHtml(child.nome)}</label>`).join('')}</div></fieldset>`).join('');
   }
   function toggleSection(box){document.querySelectorAll('#accessTree .access-check').forEach(child=>{if(child.value.startsWith(box.value+'.') && !child.disabled)child.checked=box.checked;});}
-  function toggleChild(box){if(box.checked){const module=box.value.split('.')[0];const parent=document.querySelector(`#accessTree input[value="${module}"]`);if(parent)parent.checked=true;if(['appelli','elenco','salute','gestione','assegnazioni','tutti','cucina'].includes(box.value.split('.')[1])){const staff=document.querySelector(`#accessTree input[value="${module}.staff"]`);if(staff)staff.checked=true;}}}
+  function toggleChild(box){if(box.checked){const module=box.value.split('.')[0];const parent=document.querySelector(`#accessTree input[value="${module}"]`);if(parent)parent.checked=true;if(['appelli','elenco','salute','gestione','assegnazioni','tutti','cucina','avvisi'].includes(box.value.split('.')[1])){const staff=document.querySelector(`#accessTree input[value="${module}.staff"]`);if(staff)staff.checked=true;}}}
   async function save(event){event.preventDefault();const key=document.getElementById('accessProfile').value;const button=document.getElementById('accessSave');button.disabled=true;
     try{const data=await apiJson('/api/accessi/'+key,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome:document.getElementById('accessProfileName').value,permessi:[...document.querySelectorAll('#accessTree .access-check:checked')].filter(x=>!x.disabled).map(x=>x.value)})});config.profili=config.profili.map(p=>p.chiave===key?data.profilo:p);profileOptions(key);populate();filtraUtenti();await refresh();showToast('Nome e permessi salvati','success');}
     catch(error){showToast(error.message,'error');}finally{button.disabled=key==='admin';}}

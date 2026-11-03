@@ -15,13 +15,17 @@ SECTIONS={
  'anagrafica':('Anagrafica parrocchiale',{'elenco':'Consultazione','gestione':'Inserimento, modifica e cancellazione','contatti':'Contatti','nuclei':'Nuclei familiari','documenti':'Documenti e certificati','salute':'Fascicoli sanitari','liste':'Badge e liste'}),
  'excel':('Importa ed esporta Excel',{'template':'Scarica modello','import':'Importazione','export':'Esportazione'}),
  'utenti':('Utenti e privilegi',{'elenco':'Consultazione account','gestione':'Gestione account (solo admin)','permessi':'Ruoli, privilegi e permessi (solo admin)'})}
+SECTIONS['giovani']=('Gruppi giovani',{key:value for key,value in SECTIONS['catechismo'][1].items() if key!='genitori'})
+SECTIONS['dashboard'][1]['bacheche']='Bacheche dei propri gruppi'
+for section in ('oratorio','catechismo','doposcuola','giovani'):
+    SECTIONS[section][1].update(bacheca='Bacheca del gruppo',avvisi='Pubblica e gestisci avvisi del gruppo')
 KEYS={key for section,(_,children) in SECTIONS.items() for key in [section,*[section+'.'+child for child in children]]}
 ADMIN_ONLY={'utenti.gestione','utenti.permessi'}
 
 def subtree(section): return {key for key in KEYS if key==section or key.startswith(section+'.')}
-USER=set().union(*(subtree(s) for s in ('dashboard','famiglia','attivita','calendari','oratorio','catechismo','doposcuola')))-{'dashboard.cassa','attivita.gestione'}
-for section in ('oratorio','catechismo','doposcuola'):
-    USER-={section+'.'+child for child in ('staff','gestione','assegnazioni','tutti','cucina','appelli','elenco','salute')}
+USER=set().union(*(subtree(s) for s in ('dashboard','famiglia','attivita','calendari','oratorio','catechismo','doposcuola','giovani')))-{'dashboard.cassa','attivita.gestione'}
+for section in ('oratorio','catechismo','doposcuola','giovani'):
+    USER-={section+'.'+child for child in ('staff','gestione','assegnazioni','tutti','cucina','appelli','elenco','salute','avvisi')}
 STAFF=KEYS-ADMIN_ONLY
 DEFAULTS={
  'admin':('Admin','ruolo',KEYS),
@@ -31,6 +35,7 @@ DEFAULTS={
  'responsabile_oratorio':('Responsabile oratorio','privilegio',{'dashboard','dashboard.attivita','dashboard.settimana'}|subtree('oratorio')),
  'catechista':('Catechista','privilegio',{'dashboard','dashboard.attivita','dashboard.settimana'}|subtree('catechismo')-{'catechismo.gestione','catechismo.assegnazioni','catechismo.tutti'}),
  'educatore':('Educatore (incarico precedente)','privilegio',{'dashboard','dashboard.attivita','dashboard.settimana'}|subtree('doposcuola')-{'doposcuola.gestione','doposcuola.assegnazioni','doposcuola.tutti'})}
+DEFAULTS['responsabile_giovani']=('Responsabile gruppi giovani','privilegio',{'dashboard','dashboard.attivita','dashboard.settimana','dashboard.bacheche'}|subtree('giovani')-{'giovani.gestione','giovani.assegnazioni','giovani.tutti'})
 ALIASES={'genitore':'utente','parroco':'segreteria','oratorio':'responsabile_oratorio','doposcuola':'educatore'}
 
 def raw_roles(user):
@@ -103,7 +108,8 @@ def staff_scope(user=None):
 def required_permissions():
     """Ogni API privata viene associata a un menu o a una sua funzione."""
     bp=request.blueprint or '';path=request.path;write=request.method not in ('GET','HEAD','OPTIONS');end=request.endpoint or ''
-    if bp=='accessi_bp':return []
+    if bp in ('accessi_bp','bacheche_bp'):return []
+    if bp=='giovani_bp':return ['giovani.gestione'] if write else ['giovani.staff']
     if bp=='backup_bp':return ['__admin__']
     if bp=='auth_bp':return [] # accesso e profilo personale non dipendono dai menu
     if bp=='utenti_bp':return ['utenti', 'utenti.elenco'] if not write else ['__admin__']
@@ -124,14 +130,14 @@ def required_permissions():
     if bp=='attivita_bp':return ['attivita.gestione'] if write else []
     if bp=='calendari_gruppi_bp':
         category=(request.view_args or {}).get('category','')
-        if category not in ('oratorio','catechismo','doposcuola'):return []
+        if category not in ('oratorio','catechismo','doposcuola','giovani'):return []
         if path.endswith('/sanita'):return [category,category+'.salute',category+'.cucina']
         if path.endswith('/registro'):child='appelli'
         elif path.endswith('/elenco'):child='assegnazioni' if write else 'elenco'
         elif path.endswith('/assegnabili'):child='assegnazioni'
         else:return [category,category+'.calendario']
         return [category,category+'.'+child]
-    if bp in ('oratorio_bp','catechismo_bp','doposcuola_bp'):
+    if bp in ('oratorio_bp','catechismo_bp','doposcuola_bp','giovani_bp'):
         category=bp[:-3];caps=[category]
         if path.rsplit('/',1)[-1] in ('animatori','catechisti','educatori'):child='gestione'
         elif 'allergie' in path:child='salute'
@@ -168,7 +174,7 @@ def authorize_request():
     if is_admin():return
     for key in required_permissions():
         if key=='__admin__' or not can(key):raise Forbidden('Questa funzione è disattivata per i tuoi ruoli e privilegi')
-    if request.blueprint in ('oratorio_bp','catechismo_bp','doposcuola_bp'):
+    if request.blueprint in ('oratorio_bp','catechismo_bp','doposcuola_bp','giovani_bp'):
         category=request.blueprint[:-3]
         private=any(word in request.path for word in ('allergie','registro','storico','presenze')) or request.method not in ('GET','HEAD','OPTIONS')
         if private and not request.path.endswith('/iscrivi-figlio'):
@@ -201,7 +207,7 @@ def filter_response(response):
     if not current_user.is_authenticated or is_admin() or not response.is_json:return response
     bp=request.blueprint or ''
     if bp in ('accessi_bp','configurazioni_bp'):return response
-    if bp in ('oratorio_bp','catechismo_bp','doposcuola_bp'):prefix=bp[:-3]
+    if bp in ('oratorio_bp','catechismo_bp','doposcuola_bp','giovani_bp'):prefix=bp[:-3]
     elif bp=='calendari_gruppi_bp':prefix=(request.view_args or {}).get('category','famiglia')
     elif bp=='persone_bp':prefix=profile_prefix()
     elif bp=='utenti_bp':prefix='anagrafica'

@@ -86,7 +86,7 @@ def run_release(client, version=None):
     if not re.fullmatch(r'alpha \d+\.\d+\.\d+', target):
         raise ValueError('Formato versione non valido')
     # Controlli prima di mettere online la manutenzione.
-    for command in [[sys.executable, '-m', 'unittest', 'discover', '-s', 'tests'], ['node', '--check', 'static/js/app.js'], ['node','--check','static/js/group-calendar.js'], ['node','--check','static/js/portal-views.js'], ['node','--check','static/js/access-control.js'],
+    for command in [[sys.executable, '-m', 'unittest', 'discover', '-s', 'tests'], ['node', '--check', 'static/js/app.js'], ['node','--check','static/js/group-calendar.js'], ['node','--check','static/js/portal-views.js'], ['node','--check','static/js/access-control.js'], ['node','--check','static/js/pastoral.js'],
                     ['node', 'tests/test_frontend.js'], ['node', 'tests/test_google_script.js'], ['node', 'tests/test_family_frontend.js']]:
         subprocess.run(command, cwd=ROOT, check=True)
     pushed = False
