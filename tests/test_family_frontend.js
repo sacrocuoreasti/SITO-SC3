@@ -261,6 +261,31 @@ vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['
   assert.equal((nodes('dashWeeklyCalendar').innerHTML.match(/class="weekly-day /g)||[]).length,7);
   assert.equal((nodes('dashWeeklyCalendar').innerHTML.match(/Messa feriale/g)||[]).length,5);
   assert.ok(nodes('dashWeeklyCalendar').innerHTML.includes('Avviso datato'));
+  // Messe, liturgia e avvenimenti datati condividono la settimana senza ripetere le date specifiche.
+  const dated=[{sezione:'messe',giorno:'Lunedì',titolo:'Messa settimanale'}, {sezione:'liturgia',giorno:'Martedì',titolo:'Liturgia settimanale'}, {sezione:'avvenimenti',data_specifica:days[2],titolo:'Avvenimento unico'}];
+  const italian=days[3].split('-').reverse().join('/');
+  context.renderDashboardWeek(dated,[{titolo:'Avviso italiano',data_evento:italian,contenuto:'Testo'}],{});
+  for(const title of ['Messa settimanale','Liturgia settimanale','Avvenimento unico','Avviso italiano'])assert.ok(nodes('dashWeeklyCalendar').innerHTML.includes(title));
+  assert.equal((nodes('dashWeeklyCalendar').innerHTML.match(/Avvenimento unico/g)||[]).length,1);
+  assert.ok(!nodes('dashAvvisiContainer').innerHTML.includes('Avvenimento unico'));
+  context.moveDashboardWeek(1);
+  assert.ok(!nodes('dashWeeklyCalendar').innerHTML.includes('Avvenimento unico'));
+  assert.ok(nodes('dashWeeklyCalendar').innerHTML.includes('Messa settimanale'));
+  context.moveDashboardWeek(0);
+  assert.ok(context.groupCalendarMarkup({calendar_api_url:'/api/impostazioni/calendari-gruppi/catechismo/1'}).includes('Calendario mensile'));
+  context.openModalNuovaCelebrazione();nodes('celSezione').value='avvenimenti';context.updateCelebrationDateMode();
+  assert.equal(nodes('celWeekdaysGroup').hidden,true);assert.equal(nodes('celDataSpecifica').required,true);
+  nodes('celDataSpecifica').value=days[2];nodes('celTitolo').value='Avvenimento datato';
+  fixtures['/api/celebrazioni']={success:true,celebrazioni:[],avvisi:[]};
+  await context.handleSalvaCelebrazione({preventDefault(){}});
+  const occurrencePost=requests.find(r=>r.url==='/api/celebrazioni' && r.options.method==='POST');
+  assert.equal(JSON.parse(occurrencePost.options.body).data_specifica,days[2]);
+  assert.equal(JSON.parse(occurrencePost.options.body).giorno,'');
+  context.openModalNuovoEvento('celebrazioni');nodes('eventoTitolo').value='Avviso dalla liturgia';nodes('eventoContenuto').value='Testo avviso';nodes('eventoData').value=days[3];
+  fixtures['/api/celebrazioni/avvisi']={success:true};
+  await context.handleSalvaNuovoEvento({preventDefault(){}});
+  assert.ok(requests.some(r=>r.url==='/api/celebrazioni/avvisi' && r.options.method==='POST'));
+  context.openModalNuovoEvento();assert.equal(nodes('eventoCategoria').disabled,false);
   assert.ok(template.indexOf('id="dashUserCalendariGrid"')>template.indexOf('id="viewCalendari"'));
   // Stesso percorso date → appello per oratorio e doposcuola, con salvataggio sulla data scelta.
   const staffRegister=vm.runInContext('StaffGroupRegister',context);

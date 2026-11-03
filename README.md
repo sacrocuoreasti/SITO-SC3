@@ -239,3 +239,16 @@ pastorale, anche tramite API, assegnazioni di massa e richieste simultanee.
 I gruppi genitori sono distinti e le eventuali iscrizioni precedenti non vengono
 cancellate automaticamente. Per il doposcuola, la tabella di associazione degli
 educatori permette più incaricati, conservando anche gli assegnatari precedenti.
+
+Il calendario settimanale della panoramica include Messe, Liturgia e Avvenimenti.
+I nuovi avvenimenti usano una data specifica, mentre le ricorrenze e gli
+avvenimenti precedenti conservano i giorni già registrati. Da Messe e liturgia
+si possono creare avvisi pubblicati o in bozza: quelli pubblicati confluiscono
+in Avvisi & Orari Messe, con gestione compatibile delle date italiane precedenti.
+
+Il catalogo dei calendari comunitari include automaticamente i calendari dei
+gruppi dell’anno pastorale corrente (1 settembre–31 agosto, Europe/Rome).
+I calendari manuali sono conservati; i collegamenti identici vengono accorpati
+nella vista, senza creare nuove righe. I calendari in bozza restano riservati
+allo staff autorizzato. Le viste mensili pubbliche mostrano soltanto gli
+appuntamenti e caricano Google su richiesta, senza esporre presenze o anagrafiche.

@@ -1,12 +1,33 @@
 from flask import Blueprint, request, jsonify
 from flask_login import current_user
-from models import db, Celebrazione
+from models import db, Celebrazione, NotiziaEvento
 from services.access_control import can
+from datetime import date
+import re
+from werkzeug.exceptions import BadRequest
 
 celebrazioni_bp = Blueprint('celebrazioni_bp', __name__, url_prefix='/api/celebrazioni')
 
 def check_staff():
     return can('segreteria.celebrazioni')
+
+
+def parse_date(value):
+    if not isinstance(value,str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}',value):
+        raise BadRequest('Indica una data valida nel formato AAAA-MM-GG')
+    try:return date.fromisoformat(value)
+    except ValueError:raise BadRequest('La data indicata non è valida')
+
+
+def apply_specific_date(celebration,data,creating=False):
+    if celebration.sezione=='avvenimenti':
+        if 'data_specifica' in data:
+            celebration.data_specifica=parse_date(data['data_specifica'])
+            celebration.giorno=''
+        elif creating or ('sezione' in data and not celebration.data_specifica):
+            raise BadRequest('Per un avvenimento seleziona una data specifica')
+    elif 'data_specifica' in data or 'sezione' in data:
+        celebration.data_specifica=None
 
 @celebrazioni_bp.route('', methods=['GET'])
 def get_celebrazioni():
@@ -29,7 +50,8 @@ def get_celebrazioni():
         'celebrazioni': [c.to_dict() for c in tutte],
         'messe': messe,
         'liturgia': liturgia,
-        'avvenimenti': avvenimenti
+        'avvenimenti': avvenimenti,
+        'avvisi':[n.to_dict() for n in NotiziaEvento.query.filter_by(categoria='avviso').order_by(NotiziaEvento.id.desc()).all() if include_inattivi or n.is_pubblicato]
     })
 
 @celebrazioni_bp.route('', methods=['POST'])
@@ -57,6 +79,7 @@ def create_celebrazione():
         ordine=int(data.get('ordine', 0)),
         is_attivo=bool(data.get('is_attivo', True))
     )
+    apply_specific_date(c,data,creating=True)
     db.session.add(c)
     db.session.commit()
     
@@ -87,6 +110,7 @@ def update_celebrazione(id):
     if 'luogo' in data: c.luogo = data['luogo'].strip() or 'Chiesa Parrocchiale'
     if 'ordine' in data: c.ordine = int(data['ordine'])
     if 'is_attivo' in data: c.is_attivo = bool(data['is_attivo'])
+    apply_specific_date(c,data)
     
     db.session.commit()
     return jsonify({
@@ -107,3 +131,16 @@ def delete_celebrazione(id):
     db.session.delete(c)
     db.session.commit()
     return jsonify({'success': True, 'message': 'Celebrazione eliminata con successo'})
+
+
+@celebrazioni_bp.route('/avvisi',methods=['POST'])
+def create_notice():
+    data=request.get_json() or {}
+    title=data.get('titolo','');body=data.get('contenuto','')
+    if not isinstance(title,str) or not title.strip() or len(title)>150 or not isinstance(body,str) or not body.strip():
+        raise BadRequest('Indica titolo e contenuto dell’avviso (titolo: massimo 150 caratteri)')
+    notice=NotiziaEvento(titolo=title.strip(),contenuto=body.strip(),categoria='avviso',
+                        data_evento=parse_date(data['data_evento']) if data.get('data_evento') else None,
+                        is_pubblicato=bool(data.get('is_pubblicato',True)),in_evidenza=True)
+    db.session.add(notice);db.session.commit()
+    return jsonify(success=True,message='Avviso salvato',avviso=notice.to_dict()),201

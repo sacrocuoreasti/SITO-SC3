@@ -850,6 +850,7 @@ class NotiziaEvento(db.Model):
             'categoria': self.categoria,
             'contenuto': self.contenuto,
             'data_evento': self.data_evento.strftime('%d/%m/%Y') if self.data_evento else None,
+            'data_evento_iso': self.data_evento.isoformat() if self.data_evento else None,
             'in_evidenza': self.in_evidenza,
             'is_pubblicato': self.is_pubblicato
         }
@@ -1015,6 +1016,7 @@ class Celebrazione(db.Model):
     titolo = db.Column(db.String(150), nullable=False)
     descrizione = db.Column(db.Text, nullable=True)
     giorno = db.Column(db.String(100), nullable=True)    # es. "Lunedì - Venerdì", "Domenica e Festivi"
+    data_specifica = db.Column(db.Date, nullable=True)
     orario = db.Column(db.String(100), nullable=True)    # es. "ore 18:00", "ore 09:00 e 11:00"
     luogo = db.Column(db.String(120), default='Chiesa Parrocchiale')
     ordine = db.Column(db.Integer, default=0)
@@ -1028,6 +1030,7 @@ class Celebrazione(db.Model):
             'titolo': self.titolo,
             'descrizione': self.descrizione or '',
             'giorno': self.giorno or '',
+            'data_specifica': self.data_specifica.isoformat() if self.data_specifica else None,
             'orario': self.orario or '',
             'luogo': self.luogo or 'Chiesa Parrocchiale',
             'ordine': self.ordine,
@@ -1079,6 +1082,7 @@ def init_default_configurazioni():
             ('presenza','gruppo_categoria','VARCHAR(20)'),
             ('presenza','gruppo_id','INTEGER'),
             ('persona','civico_residenza','VARCHAR(30)'),
+            ('celebrazione','data_specifica','DATE'),
             ('persona','consensi_aggiunta','TEXT'),
             ('gruppo_oratorio','google_calendar_url','VARCHAR(500)'),
             ('gruppo_doposcuola','google_calendar_url','VARCHAR(500)'),

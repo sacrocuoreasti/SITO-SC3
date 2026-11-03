@@ -22,7 +22,10 @@ function celebrationWeekdays(text) {
   if(!found.length && value.includes('ferial'))return [0,1,2,3,4,5];
   return found;
 }
+function celebrationWhen(celebration) {return celebration.data_specifica?new Date(celebration.data_specifica+'T12:00:00').toLocaleDateString('it-IT'):celebration.giorno||'';}
+function noticeDate(notice) {const value=notice.data_evento_iso||notice.data_evento||'';if(/^\d{4}-\d{2}-\d{2}/.test(value))return value.slice(0,10);const match=value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);return match?`${match[3]}-${match[2]}-${match[1]}`:null;}
 function celebrationApplies(celebration,day,index) {
+  if(celebration.data_specifica)return celebration.data_specifica===day;
   if(!celebrationWeekdays(celebration.giorno).includes(index)) return false;
   const value=(celebration.giorno||'').toLowerCase();
   const date=new Date(day+'T12:00:00');
@@ -40,12 +43,12 @@ function renderDashboardWeek(celebrations,notices,settings={}) {
   dashboardWeekData=[celebrations,notices,settings];
   const days=weeklyDays(dashboardWeekOffset);
   const masses=settings.mostra_orari_messe===false?[]:celebrations.filter(m=>m.is_attivo!==false);
-  const news=settings.mostra_avvisi===false?[]:notices;
+  const news=settings.mostra_avvisi===false?[]:notices.filter(n=>n.is_pubblicato!==false);
   const format=day=>new Date(day+'T12:00:00').toLocaleDateString('it-IT',{day:'numeric',month:'short'});
   document.getElementById('dashWeeklyCalendar').innerHTML=`<div class="weekly-toolbar"><strong>${format(days[0])} – ${format(days[6])}</strong><div><button class="btn btn-sm btn-secondary" type="button" aria-label="Settimana precedente" onclick="moveDashboardWeek(-1)">←</button><button class="btn btn-sm btn-secondary" type="button" onclick="moveDashboardWeek(0)">Questa settimana</button><button class="btn btn-sm btn-secondary" type="button" aria-label="Settimana successiva" onclick="moveDashboardWeek(1)">→</button></div></div>
-    <div class="weekly-calendar">${days.map((day,index)=>`<section class="weekly-day ${day===GroupCalendar.localDate()?'is-today':''}"><h4>${escapeHtml(new Date(day+'T12:00:00').toLocaleDateString('it-IT',{weekday:'short',day:'numeric'}))}</h4>${masses.filter(m=>celebrationApplies(m,day,index)).map(m=>`<article class="weekly-mass"><strong>${escapeHtml((m.orario||'').replace(/^ore\s*/i,''))}</strong><span>${escapeHtml(m.titolo||'Santa Messa')}</span><small>${escapeHtml(m.luogo||'')}</small></article>`).join('')}${news.filter(n=>(n.data_evento||'').slice(0,10)===day).map(n=>`<article class="weekly-notice"><strong>${escapeHtml(n.titolo)}</strong><p>${escapeHtml(n.contenuto||'')}</p></article>`).join('')}${!masses.some(m=>celebrationApplies(m,day,index)) && !news.some(n=>(n.data_evento||'').slice(0,10)===day)?'<small class="weekly-empty">Nessun appuntamento</small>':''}</section>`).join('')}</div>`;
-  const extra=masses.filter(m=>!celebrationWeekdays(m.giorno).length).map(m=>`<article class="weekly-extra"><strong>${escapeHtml(m.titolo)}</strong><p>${escapeHtml(m.giorno||'Data da definire')} · ${escapeHtml(m.orario||'')}</p></article>`).join('');
-  document.getElementById('dashAvvisiContainer').innerHTML=extra+news.filter(n=>!n.data_evento).map(n=>`<article class="weekly-extra"><strong>${escapeHtml(n.titolo)}</strong><p>${escapeHtml(n.contenuto||'')}</p></article>`).join('');
+    <div class="weekly-calendar">${days.map((day,index)=>`<section class="weekly-day ${day===GroupCalendar.localDate()?'is-today':''}"><h4>${escapeHtml(new Date(day+'T12:00:00').toLocaleDateString('it-IT',{weekday:'short',day:'numeric'}))}</h4>${masses.filter(m=>celebrationApplies(m,day,index)).map(m=>`<article class="weekly-mass" data-section="${escapeHtml(m.sezione||'messe')}"><strong>${escapeHtml((m.orario||'').replace(/^ore\s*/i,''))}</strong><span>${escapeHtml(m.titolo||'Santa Messa')}</span><small>${escapeHtml(m.luogo||'')}</small>${m.descrizione?`<small>${escapeHtml(m.descrizione)}</small>`:''}</article>`).join('')}${news.filter(n=>noticeDate(n)===day).map(n=>`<article class="weekly-notice"><strong>${escapeHtml(n.titolo)}</strong><p>${escapeHtml(n.contenuto||'')}</p></article>`).join('')}${!masses.some(m=>celebrationApplies(m,day,index)) && !news.some(n=>noticeDate(n)===day)?'<small class="weekly-empty">Nessun appuntamento</small>':''}</section>`).join('')}</div>`;
+  const extra=masses.filter(m=>!m.data_specifica && !celebrationWeekdays(m.giorno).length).map(m=>`<article class="weekly-extra"><strong>${escapeHtml(m.titolo)}</strong><p>${escapeHtml(m.giorno||'Data da definire')} · ${escapeHtml(m.orario||'')}</p></article>`).join('');
+  document.getElementById('dashAvvisiContainer').innerHTML=extra+news.filter(n=>!noticeDate(n)).map(n=>`<article class="weekly-extra"><strong>${escapeHtml(n.titolo)}</strong><p>${escapeHtml(n.contenuto||'')}</p></article>`).join('');
 }
 async function openUserEnrollmentManagement(id) {
   try {

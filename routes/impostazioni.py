@@ -2,6 +2,7 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify
 from flask_login import current_user
 from models import db, ImpostazioniSito, Attivita, NotiziaEvento, CalendarioComunita, Celebrazione
+from services.community_calendars import calendar_catalog,current_pastoral_year,public_group,has_calendar
 
 impostazioni_bp = Blueprint('impostazioni_bp', __name__, url_prefix='/api/impostazioni')
 
@@ -57,13 +58,12 @@ def get_dati_pubblici():
 
     attivita = Attivita.query.filter_by(is_attiva=True, is_pubblicato=True).order_by(Attivita.id.desc()).all()
     avvisi = NotiziaEvento.query.filter_by(is_pubblicato=True).order_by(NotiziaEvento.id.desc()).all()
-    calendari = CalendarioComunita.query.filter_by(is_pubblico=True).order_by(CalendarioComunita.ordine.asc(), CalendarioComunita.id.asc()).all()
 
     return jsonify({
         'impostazioni': imp.to_dict(),
         'attivita': [a.to_dict() for a in attivita],
         'avvisi': [av.to_dict() for av in avvisi],
-        'calendari': [c.to_dict() for c in calendari],
+        'calendari': calendar_catalog(),
         'celebrazioni': [c.to_dict() for c in Celebrazione.query.filter_by(is_attivo=True).order_by(Celebrazione.ordine.asc(), Celebrazione.id.asc()).all()]
     })
 
@@ -172,14 +172,32 @@ def delete_evento(id):
 def get_calendari():
     """Ritorna i calendari google parrocchiali configurati."""
     solo_pubblici = request.args.get('solo_pubblici', 'false').lower() in ['true', '1']
-    query = CalendarioComunita.query
-    if solo_pubblici:
-        query = query.filter_by(is_pubblico=True)
-    calendari = query.order_by(CalendarioComunita.ordine.asc(), CalendarioComunita.id.asc()).all()
+    from services.access_control import can
+    calendari=calendar_catalog(include_private=not solo_pubblici and can('segreteria.calendari'))
     return jsonify({
         'total': len(calendari),
-        'calendari': [c.to_dict() for c in calendari]
+        'calendari': calendari,
+        'anno_pastorale':current_pastoral_year()
     })
+
+
+@impostazioni_bp.route('/calendari-gruppi/<category>/<int:id>',methods=['GET'])
+def community_group_month(category,id):
+    from werkzeug.exceptions import NotFound
+    from services.enrollment_options import GROUP_MODELS
+    from services.catechismo_membership import year_key
+    from services.access_control import can
+    from services.group_attendance import can_record
+    from services.calendar_events import group_events,CalendarUnavailable
+    if category not in GROUP_MODELS:raise NotFound()
+    group=db.session.get(GROUP_MODELS[category][0],id)
+    if not group or not has_calendar(group):raise NotFound()
+    year=getattr(group,'anno_pastorale',None) or getattr(group,'anno_scolastico',None)
+    if year_key(year)!=current_pastoral_year() or (not public_group(group) and not (can('segreteria.calendari') and can_record(category,group))):raise NotFound()
+    try:result=group_events(group,request.args.get('mese'))
+    except CalendarUnavailable as error:return jsonify(error=str(error)),502
+    result.update(nome_gruppo=group.nome,categoria=category,presenze=[],iscritto=False,puo_registrare_presenze=False)
+    return jsonify(result)
 
 @impostazioni_bp.route('/calendari', methods=['POST'])
 def create_calendario():

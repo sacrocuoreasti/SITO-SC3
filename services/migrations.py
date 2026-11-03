@@ -6,7 +6,7 @@ from sqlalchemy import inspect
 
 
 def backup_sqlite(engine):
-    expected = {'presenza': {'gruppo_categoria','gruppo_id'}, 'persona': {'terapie_medicinali','civico_residenza','consensi_aggiunta'}, 'nucleo_familiare': {'codice_invito'},
+    expected = {'celebrazione': {'data_specifica'}, 'presenza': {'gruppo_categoria','gruppo_id'}, 'persona': {'terapie_medicinali','civico_residenza','consensi_aggiunta'}, 'nucleo_familiare': {'codice_invito'},
                 'utente': {'consensi_registrazione', 'gestito_da_id'},
                 'gruppo_oratorio': {'eta_min','eta_max','google_calendar_url'}, 'gruppo_catechismo': {'eta_min','eta_max'},
                 'gruppo_doposcuola': {'eta_min','eta_max','google_calendar_url'}}

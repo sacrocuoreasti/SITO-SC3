@@ -1545,7 +1545,7 @@ Domenica: dopo le Sante Messe</p>
                     <option value="liturgia">🕊️ Liturgia & Preghiera</option>
                     <option value="avvenimenti">🔔 Avvenimenti & Feste</option>
                   </select>
-                  <button class="btn btn-primary btn-sm" onclick="openModalNuovaCelebrazione()">+ Aggiungi Celebrazione</button>
+                  <button class="btn btn-secondary btn-sm" data-permission="segreteria.celebrazioni" onclick="openModalNuovoEvento('celebrazioni')">+ Crea avviso</button><button class="btn btn-primary btn-sm" onclick="openModalNuovaCelebrazione()">+ Aggiungi Celebrazione</button>
                 </div>
               </div>
               <div class="card-body">
@@ -1568,6 +1568,7 @@ Domenica: dopo le Sante Messe</p>
                 </div>
               </div>
             </div>
+<div class="card" style="margin-top:20px"><div class="card-header"><h3>Avvisi alla comunità</h3></div><div class="card-body" id="celebrationNotices"></div></div>
           </div>
         </section>
 
@@ -2669,7 +2670,7 @@ Domenica: dopo le Sante Messe</p>
   <div class="modal-overlay" id="modalNuovoEvento">
     <div class="modal-window" style="max-width: 580px;">
       <div class="modal-header">
-        <h3>Nuovo Evento o Avviso Parrocchiale</h3>
+        <h3 id="eventoFormTitle">Nuovo Evento o Avviso Parrocchiale</h3>
         <button class="btn-close-modal" onclick="closeModal('modalNuovoEvento')">×</button>
       </div>
       <form onsubmit="handleSalvaNuovoEvento(event)">
@@ -2947,7 +2948,7 @@ Domenica: dopo le Sante Messe</p>
           <div class="form-row">
             <div class="form-group">
               <label>Sezione *</label>
-              <select id="celSezione" class="form-control" required>
+              <select id="celSezione" class="form-control" required onchange="updateCelebrationDateMode()">
                 <option value="messe">⛪ Sante Messe</option>
                 <option value="liturgia">🕊️ Liturgia & Preghiera</option>
                 <option value="avvenimenti">🔔 Avvenimenti & Feste</option>
@@ -2963,8 +2964,9 @@ Domenica: dopo le Sante Messe</p>
             <input type="text" id="celTitolo" class="form-control" placeholder="es. Santa Messa Festiva" required>
           </div>
 
+<div class="form-group" id="celSpecificDateGroup" hidden><label for="celDataSpecifica">Data dell’avvenimento *</label><input type="date" id="celDataSpecifica" class="form-control"></div>
           <!-- Selezione Giorni con Checkbox (NO TESTO LIBERO) -->
-          <div class="form-group" style="background: var(--bg-subtle); padding: 12px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-light);">
+          <div id="celWeekdaysGroup" class="form-group" style="background: var(--bg-subtle); padding: 12px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-light);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
               <label style="margin: 0; font-weight: 700; font-size: 13px; color: var(--ink-800);">Giorni di Celebrazione * (Spunta i giorni)</label>
               <div style="display: flex; gap: 4px; flex-wrap: wrap;">

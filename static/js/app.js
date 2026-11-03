@@ -833,15 +833,8 @@ async function loadDashboard() {
 
     // Carica orari messe e avvisi parrocchiali aggiornati con le impostazioni
     try {
-      const [evRes, celRes] = await Promise.all([
-        fetch('/api/impostazioni/dati-pubblici'),
-        fetch('/api/celebrazioni?sezione=messe')
-      ]);
-      const evData = await evRes.json();
-      const celData = await celRes.json();
-      const imp = evData.impostazioni || {};
-
-      renderDashboardWeek(celData.messe || [],evData.avvisi || [],imp);
+      const evData=await apiJson('/api/impostazioni/dati-pubblici');
+      renderDashboardWeek(evData.celebrazioni||[],evData.avvisi||[],evData.impostazioni||{});
     } catch (e) {
       console.warn('Errore caricamento messe e avvisi dashboard:', e);
     }
@@ -3980,9 +3973,12 @@ async function loadSegreteriaEventi() {
   }
 }
 
-function openModalNuovoEvento() {
+function openModalNuovoEvento(origin='homepage') {
+  document.getElementById('modalNuovoEvento').dataset.origin=origin;
+  document.getElementById('eventoFormTitle').textContent=origin==='celebrazioni'?'Nuovo avviso alla comunità':'Nuovo Evento o Avviso Parrocchiale';
   document.getElementById('eventoTitolo').value = '';
-  document.getElementById('eventoCategoria').value = 'evento';
+  document.getElementById('eventoCategoria').value = origin==='celebrazioni'?'avviso':'evento';
+  document.getElementById('eventoCategoria').disabled=origin==='celebrazioni';
   document.getElementById('eventoData').value = '';
   document.getElementById('eventoContenuto').value = '';
   document.getElementById('eventoIsPubblicato').checked = true;
@@ -3998,7 +3994,8 @@ async function handleSalvaNuovoEvento(e) {
   const is_pubblicato = document.getElementById('eventoIsPubblicato').checked;
 
   try {
-    const res = await fetch('/api/impostazioni/eventi', {
+    const fromCelebrations=document.getElementById('modalNuovoEvento').dataset.origin==='celebrazioni';
+    const res = await fetch(fromCelebrations?'/api/celebrazioni/avvisi':'/api/impostazioni/eventi', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ titolo, categoria, data_evento, contenuto, is_pubblicato })
@@ -4008,7 +4005,7 @@ async function handleSalvaNuovoEvento(e) {
 
     showToast(d.message, 'success');
     closeModal('modalNuovoEvento');
-    await loadSegreteriaEventi();
+    if(fromCelebrations)await loadSegreteriaCelebrazioni();else await loadSegreteriaEventi();
     await loadPublicHomepage();
   } catch (err) {
     showToast(err.message, 'error');
@@ -6646,7 +6643,7 @@ function cambiaTabCelebrazioniPubbliche(sezione) {
       <div class="mass-time-badge">${escapeHtml(c.orario)}</div>
       <div class="mass-details">
         <strong>${escapeHtml(c.titolo)}</strong>
-        <span>📅 ${escapeHtml(c.giorno)} · 📍 ${escapeHtml(c.luogo || 'Chiesa Parrocchiale')}</span>
+        <span>📅 ${escapeHtml(celebrationWhen(c))} · 📍 ${escapeHtml(c.luogo || 'Chiesa Parrocchiale')}</span>
         ${c.descrizione ? `<p style="margin: 4px 0 0 0; font-size: 12px; color: var(--ink-700);">${escapeHtml(c.descrizione)}</p>` : ''}
       </div>
     </div>
@@ -6658,6 +6655,7 @@ async function loadSegreteriaCelebrazioni() {
     const res = await fetch('/api/celebrazioni');
     const data = await res.json();
     cacheCelebrazioni = data.celebrazioni || [];
+    document.getElementById('celebrationNotices').innerHTML=(data.avvisi||[]).map(n=>`<article class="weekly-extra"><strong>${escapeHtml(n.titolo)}</strong><span class="badge badge-neutral">${n.is_pubblicato?'Pubblicato':'Bozza'}</span><p>${escapeHtml(n.contenuto)}</p>${n.data_evento?`<small>${escapeHtml(n.data_evento)}</small>`:''}</article>`).join('')||'<p>Nessun avviso presente.</p>';
     const filterSelect = document.getElementById('filterSegCelebrazioneSezione');
     const sezione = filterSelect ? filterSelect.value : '';
     filtraTabellaCelebrazioni(sezione);
@@ -6695,7 +6693,7 @@ function filtraTabellaCelebrazioni(sezione) {
           <strong style="color:var(--ink-900); font-size:13.5px;">${escapeHtml(c.titolo)}</strong>
           ${c.descrizione ? `<small style="display:block; color:var(--ink-500);">${escapeHtml(c.descrizione)}</small>` : ''}
         </td>
-        <td>${escapeHtml(c.giorno)}</td>
+        <td>${escapeHtml(celebrationWhen(c))}</td>
         <td><strong style="color:var(--primary);">${escapeHtml(c.orario)}</strong></td>
         <td>${escapeHtml(c.luogo || 'Chiesa')}</td>
         <td>${c.ordine}</td>
@@ -6739,6 +6737,7 @@ function openModalNuovaCelebrazione() {
   document.getElementById('modalCelebrazioneTitle').textContent = 'Nuova Celebrazione / Orario';
   document.getElementById('celId').value = '';
   document.getElementById('celSezione').value = 'messe';
+  document.getElementById('celDataSpecifica').value='';
   document.getElementById('celOrdine').value = '1';
   document.getElementById('celTitolo').value = '';
 
@@ -6753,6 +6752,7 @@ function openModalNuovaCelebrazione() {
   document.getElementById('celLuogo').value = 'Chiesa Parrocchiale';
   document.getElementById('celDescrizione').value = '';
   document.getElementById('celAttivo').checked = true;
+  updateCelebrationDateMode();
   openModal('modalCelebrazione');
 }
 
@@ -6763,6 +6763,7 @@ function openModalModificaCelebrazione(id) {
   document.getElementById('modalCelebrazioneTitle').textContent = 'Modifica Celebrazione';
   document.getElementById('celId').value = c.id;
   document.getElementById('celSezione').value = c.sezione;
+  document.getElementById('celDataSpecifica').value=c.data_specifica||'';
   document.getElementById('celOrdine').value = c.ordine || 1;
   document.getElementById('celTitolo').value = c.titolo || '';
 
@@ -6799,6 +6800,7 @@ function openModalModificaCelebrazione(id) {
   document.getElementById('celLuogo').value = c.luogo || 'Chiesa Parrocchiale';
   document.getElementById('celDescrizione').value = c.descrizione || '';
   document.getElementById('celAttivo').checked = !!c.is_attivo;
+  updateCelebrationDateMode();
   openModal('modalCelebrazione');
 }
 
@@ -6812,13 +6814,15 @@ async function handleSalvaCelebrazione(e) {
   // Raccogli giorni selezionati dalle checkbox
   const chks = Array.from(document.querySelectorAll('input[name="celGiornoCheckbox"]:checked')).map(cb => cb.value);
   const warn = document.getElementById('celGiorniWarning');
-  if (!chks.length) {
+  const specificDate=sezione==='avvenimenti'?document.getElementById('celDataSpecifica').value:null;
+  if(sezione==='avvenimenti' && !specificDate){showToast('Seleziona la data dell’avvenimento','error');return;}
+  if (sezione!=='avvenimenti' && !chks.length) {
     if (warn) warn.style.display = 'block';
     showToast('Seleziona almeno un giorno di celebrazione', 'error');
     return;
   }
   if (warn) warn.style.display = 'none';
-  const giorno = chks.join(', ');
+  const giorno = sezione==='avvenimenti'?'':chks.join(', ');
 
   // Formatta orario dal time picker
   const orarioInizio = document.getElementById('celOrarioInizio').value;
@@ -6841,7 +6845,7 @@ async function handleSalvaCelebrazione(e) {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        sezione, ordine, titolo, giorno, orario, luogo, descrizione, is_attivo: isAttivo
+        sezione, ordine, titolo, giorno, data_specifica:specificDate, orario, luogo, descrizione, is_attivo: isAttivo
       })
     });
     const data = await res.json();
@@ -7801,25 +7805,7 @@ async function loadPublicCalendari(preloaded) {
       `;
       return;
     }
-    grid.innerHTML = calendari.map(c => `
-      <div class="public-card" style="border-top: 4px solid ${escapeHtml(c.colore)}; display: flex; flex-direction: column; justify-content: space-between;">
-        <div>
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-size: 24px;">${escapeHtml(c.icona || '📅')}</span>
-              <h3 style="font-size: 17px; font-weight: 700; color: var(--ink-900); margin: 0;">${escapeHtml(c.titolo)}</h3>
-            </div>
-            <span class="badge" style="background: ${escapeHtml(c.colore)}; color: #fff; font-size: 10.5px;">${escapeHtml((c.categoria || 'parrocchia').toUpperCase())}</span>
-          </div>
-          ${c.descrizione ? `<p style="font-size: 13px; color: var(--ink-700); line-height: 1.5; margin-bottom: 14px;">${escapeHtml(c.descrizione)}</p>` : ''}
-        </div>
-        <div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border-light); display: flex; gap: 8px;">
-          <a href="${escapeHtml(c.google_calendar_url)}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary" style="width: 100%; text-align: center; justify-content: center; background: ${escapeHtml(c.colore)}; border-color: ${escapeHtml(c.colore)}; font-weight: 600;">
-            📅 Apri / Aggiungi a Google Calendar ↗
-          </a>
-        </div>
-      </div>
-    `).join('');
+    grid.innerHTML=calendari.map(c=>communityCalendarCard(c)).join('');
   } catch (err) {
     console.error('Errore caricamento calendari pubblici:', err);
   }
@@ -7835,25 +7821,16 @@ async function loadUserCalendari() {
       container.innerHTML = `<div style="grid-column: 1/-1; padding: 16px; color: var(--ink-500); text-align: center;">Nessun calendario parrocchiale attivo al momento.</div>`;
       return;
     }
-    container.innerHTML = calendari.map(c => `
-      <div style="background: #fff; border: 1.5px solid var(--border-light); border-left: 5px solid ${escapeHtml(c.colore)}; border-radius: var(--radius-md); padding: 14px 16px; display: flex; flex-direction: column; justify-content: space-between;">
-        <div>
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <span style="font-size: 20px;">${escapeHtml(c.icona || '📅')}</span>
-              <strong style="font-size: 14.5px; color: var(--ink-900);">${escapeHtml(c.titolo)}</strong>
-            </div>
-            <span class="badge" style="background: ${escapeHtml(c.colore)}; color: #fff; font-size: 10px;">${escapeHtml((c.categoria || 'parrocchia').toUpperCase())}</span>
-          </div>
-          ${c.descrizione ? `<p style="font-size: 12px; color: var(--ink-600); margin: 0 0 10px 0; line-height: 1.4;">${escapeHtml(c.descrizione)}</p>` : ''}
-        </div>
-        <div style="margin-top: 10px; display: flex; gap: 8px;">
-          <a href="${escapeHtml(c.google_calendar_url)}" target="_blank" rel="noopener noreferrer" class="btn btn-xs btn-outline-primary" style="width: 100%; text-align: center; justify-content: center; font-weight: 600;">
-            📅 Sincronizza con Google Calendar ↗
-          </a>
-        </div>
-      </div>
-    `).join('') + (groups.calendari || []).map(group=>`<div class="card" style="padding:14px"><strong>${escapeHtml(group.titolo)}</strong><p>${escapeHtml(group.categoria)}</p>${groupCalendarMarkup(group)}</div>`).join('');
+    const owned=groups.calendari||[];
+    const used=new Set();
+    const cards=calendari.map(c=>{
+      const matches=owned.filter(g=>(c.gruppi_origine||[]).some(origin=>g.id===origin.categoria+':'+origin.id) || (g.google_calendar_url && g.google_calendar_url===c.google_calendar_url));
+      matches.forEach(g=>used.add(g.id));
+      const related=matches[0];
+      const api=related && hasPermission(related.categoria+'.calendario')?related.calendar_api_url:c.calendar_api_url;
+      return communityCalendarCard({...c,calendar_api_url:api});
+    });
+    container.innerHTML=cards.join('')+owned.filter(g=>!used.has(g.id)).map(group=>`<div class="card" style="padding:14px"><strong>${escapeHtml(group.titolo)}</strong><p>${escapeHtml(group.categoria)}</p>${groupCalendarMarkup(group)}</div>`).join('');
   } catch (err) {
     console.error('Errore calendari dashboard:', err);
   }
@@ -7894,8 +7871,7 @@ async function loadSegreteriaCalendari() {
         </td>
         <td>
           <div style="display: flex; gap: 6px;">
-            <button class="btn btn-xs btn-secondary" onclick="openModalModificaCalendario(${c.id})">✏️ Modifica</button>
-            <button class="btn btn-xs btn-danger" onclick="eliminaCalendario(${c.id})">🗑 Elimina</button>
+            ${c.automatico?`<span class="badge badge-info">Automatico · ${escapeHtml(c.anno_pastorale)}</span>${hasPermission(c.categoria+'.staff')?`<button class="btn btn-xs btn-secondary" onclick="navigateTo('${c.categoria}_staff')">Vai al gruppo</button>`:''}`:`<button class="btn btn-xs btn-secondary" onclick="openModalModificaCalendario(${c.id})">✏️ Modifica</button><button class="btn btn-xs btn-danger" onclick="eliminaCalendario(${c.id})">🗑 Elimina</button>`}
           </div>
         </td>
       </tr>
@@ -8305,7 +8281,7 @@ function updateDocumentAge(id,age) {
     group.style.display=visible ? 'block':'none';input.disabled=!visible;
   });
 }
-function groupCalendarMarkup(group) {const category=(group.calendar_api_url||'').split('/')[3];return category && !hasPermission(category+'.calendario')?'':GroupCalendar.markup(group);}
+function groupCalendarMarkup(group) {if((group.calendar_api_url||'').startsWith('/api/impostazioni/calendari-gruppi/'))return GroupCalendar.markup(group);const category=(group.calendar_api_url||'').split('/')[3];return category && !hasPermission(category+'.calendario')?'':GroupCalendar.markup(group);}
 
 function loadGroupCalendar(button) {return GroupCalendar.load(button);}
 
@@ -8359,4 +8335,10 @@ function chooseCalendarMeeting(select,prefix) {
   if(prefix==='appello') onDataIncontroCatechismoChanged();
   else if(prefix==='appelloDop') onDataIncontroDoposcuolaChanged();
   else caricaPresenzeOratorioData();
+}
+
+function updateCelebrationDateMode() {const specific=document.getElementById('celSezione').value==='avvenimenti';document.getElementById('celWeekdaysGroup').hidden=specific;document.getElementById('celSpecificDateGroup').hidden=!specific;document.getElementById('celDataSpecifica').required=specific;}
+
+function communityCalendarCard(calendar) {
+  return `<div class="card" style="padding:18px;border-top:4px solid ${escapeHtml(calendar.colore||'#8B1E1E')}"><h3>${escapeHtml(calendar.icona||'📅')} ${escapeHtml(calendar.titolo)}</h3><p>${escapeHtml(calendar.descrizione||'')}</p>${groupCalendarMarkup(calendar)}${calendar.google_calendar_url?`<a href="${escapeHtml(calendar.google_calendar_url)}" class="btn btn-sm btn-secondary" target="_blank" rel="noopener noreferrer">Apri / Aggiungi a Google Calendar ↗</a>`:''}</div>`;
 }
