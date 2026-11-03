@@ -166,7 +166,7 @@ def merge_calendar_dates(group,dates,month=None):
 
 def group_year_dates(group,dates):
     """Tutti gli incontri dell'anno pastorale, oltre all'intero storico salvato."""
-    match=re.match(r'^(\d{4})[/-](\d{4})$',getattr(group,'anno_pastorale','') or '')
+    match=re.match(r'^(\d{4})[/-](\d{4})$',getattr(group,'anno_pastorale','') or getattr(group,'anno_scolastico','') or '')
     today=datetime.now(ROME)
     year=int(match[1]) if match else today.year-(today.month<9)
     if not 1900<=year<2100: raise BadRequest('Anno pastorale non valido')

@@ -674,6 +674,7 @@ function navigateTo(viewName) {
 
   const viewMap = {
     'dashboard': { id: 'viewDashboard', fn: loadDashboard },
+    'calendari': { id: 'viewCalendari', fn: loadUserCalendari },
     'famiglia': { id: 'viewFamiglia', fn: loadFamiglia },
     'attivita': { id: 'viewAttivita', fn: loadAttivita },
     'oratorio': { id: 'viewOratorio', fn: loadOratorio },
@@ -757,43 +758,11 @@ async function loadDashboard() {
       if (document.getElementById('kpiCardCassaQuote')) document.getElementById('kpiCardCassaQuote').style.display = 'flex';
       if (document.getElementById('kpiCardOfferteUtente')) document.getElementById('kpiCardOfferteUtente').style.display = 'none';
     } else {
-      // Profilo Utente: non vede anagrafica totale parrocchiale ma solo i dati della sua famiglia
-      const [famRes, iscRes, attRes] = await Promise.all([
-        fetch('/api/famiglie/mia'),
-        fetch('/api/iscrizioni?solo_mie=true'),
-        fetch('/api/attivita')
-      ]);
-      const famData = await famRes.json();
-      const iscData = await iscRes.json();
-      const attData = await attRes.json();
-
-      cacheAttivita = attData.attivita || [];
-      const membriCount = famData.nucleo ? (famData.nucleo.componenti || []).length : 1;
-      const mieIscrizioni = iscData.iscrizioni || [];
-
-      // Aggiorna KPI personalizzati per la famiglia (senza mostrare quote/cassa)
-      const kpiCard1 = document.querySelector('#dashKpiGrid .kpi-card:nth-child(1)');
-      if (kpiCard1) {
-        kpiCard1.querySelector('span').textContent = 'La Mia Famiglia';
-        kpiCard1.querySelector('strong').textContent = `${membriCount}`;
-        kpiCard1.querySelector('small').textContent = 'Componenti registrati';
-      }
-      const kpiCard2 = document.querySelector('#dashKpiGrid .kpi-card:nth-child(2)');
-      if (kpiCard2) {
-        kpiCard2.querySelector('span').textContent = 'Stato Iscrizioni';
-        kpiCard2.querySelector('strong').textContent = `${mieIscrizioni.length}`;
-        kpiCard2.querySelector('small').textContent = 'Attività attive nel nucleo';
-      }
-      const kpiCard3 = document.querySelector('#dashKpiGrid .kpi-card:nth-child(3)');
-      if (kpiCard3) {
-        kpiCard3.querySelector('span').textContent = 'Comunità Parrocchiale';
-        kpiCard3.querySelector('strong').textContent = 'Sacro Cuore';
-        kpiCard3.querySelector('small').textContent = 'Anno Pastorale 2025/2026';
-      }
-
-      if (document.getElementById('kpiCardCassaQuote')) document.getElementById('kpiCardCassaQuote').style.display = 'none';
-      if (document.getElementById('kpiCardOfferteUtente')) document.getElementById('kpiCardOfferteUtente').style.display = 'flex';
+      cacheAttivita=(await apiJson('/api/attivita')).attivita || [];
     }
+    document.getElementById('dashKpiGrid').style.display=isStaff?'grid':'none';
+    document.getElementById('dashColumns').classList.toggle('dashboard-user-columns',!isStaff);
+    document.getElementById('dashActivitiesTitle').textContent=isStaff?'Attività Parrocchiali Pubblicate':'Le prossime attività della tua famiglia';
 
     const container = document.getElementById('dashAttivitaList');
     let dashAttivita = cacheAttivita || [];
@@ -802,16 +771,16 @@ async function loadDashboard() {
       await refreshEnrollmentOptions();
       dashAttivita = dashAttivita.filter(a=>{
         const state = enrollmentOptions?.attivita?.[a.id];
-        return !!state && (state.gia_iscritto || state.partecipanti.length > 0);
+        return !!state?.gia_iscritto && !activityIsPast(a) && a.is_attiva!==false;
       });
     }
 
     if (!dashAttivita.length) {
       container.innerHTML = `<div style="padding: 16px; color: var(--ink-500); text-align: center;">
-        ${!isStaff ? 'Nessuna attività attualmente aperta per la fascia d\'età del tuo nucleo familiare.' : 'Nessuna attività registrata. Crea una nuova attività!'}
+        ${!isStaff ? 'Non ci sono attività future a cui la tua famiglia è iscritta.' : 'Nessuna attività registrata. Crea una nuova attività!'}
       </div>`;
     } else {
-    container.innerHTML = dashAttivita.slice(0, 4).map(a => `
+    container.innerHTML = (isStaff ? dashAttivita.slice(0,4):dashAttivita).map(a => `
       <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-light);">
         <div>
           <strong style="font-size: 14px; color: var(--ink-900); display: block;">${escapeHtml(a.titolo)}</strong>
@@ -842,53 +811,12 @@ async function loadDashboard() {
       const celData = await celRes.json();
       const imp = evData.impostazioni || {};
 
-      // Gestione dinamica blocco Orari Messe
-      const messeBlock = document.getElementById('dashOrariMesseBlock');
-      const messeCont = document.getElementById('dashOrariMesseContainer');
-      if (messeBlock && messeCont) {
-        if (imp.mostra_orari_messe === false) {
-          messeBlock.style.display = 'none';
-        } else {
-          messeBlock.style.display = 'block';
-          const messeList = (celData.messe || []).filter(c => c.is_attivo !== false);
-          if (messeList.length > 0) {
-            messeCont.innerHTML = `
-              <ul style="padding-left: 18px; font-size: 13px; color: var(--ink-800); line-height: 1.6; margin: 0;">
-                ${messeList.map(m => `
-                  <li><strong>${escapeHtml(m.giorno || m.titolo)}:</strong> ore ${escapeHtml(m.orario)} ${m.luogo ? `<span style="color:var(--ink-500);">(${escapeHtml(m.luogo)})</span>` : ''}</li>
-                `).join('')}
-              </ul>
-            `;
-          } else {
-            messeCont.innerHTML = '<p style="font-size: 13px; color: var(--ink-600); margin: 0;">Nessun orario messe configurato nelle celebrazioni parrocchiali.</p>';
-          }
-        }
-      }
-
-      // Gestione dinamica Avvisi
-      const avvisiCont = document.getElementById('dashAvvisiContainer');
-      if (avvisiCont) {
-        if (imp.mostra_avvisi === false) {
-          avvisiCont.innerHTML = '<p style="font-size: 13px; color: var(--ink-500);">La bacheca avvisi è momentaneamente disattivata.</p>';
-        } else if (evData.avvisi && evData.avvisi.length) {
-          avvisiCont.innerHTML = evData.avvisi.map(ev => `
-            <div style="border-left: 3px solid var(--primary); padding-left: 10px; margin-bottom: 12px;">
-              <span class="badge badge-success" style="font-size:10px; margin-bottom:4px;">${escapeHtml(ev.categoria.toUpperCase())}</span>
-              <strong style="display:block; font-size:13.5px; color:var(--ink-900);">${escapeHtml(ev.titolo)}</strong>
-              <p style="font-size:12.5px; color:var(--ink-700); margin:4px 0;">${escapeHtml(ev.contenuto)}</p>
-              ${ev.data_evento ? `<small style="color:var(--ink-500);">📅 ${ev.data_evento}</small>` : ''}
-            </div>
-          `).join('');
-        } else {
-          avvisiCont.innerHTML = '<p style="font-size: 13px; color: var(--ink-500);">Nessun avviso straordinario al momento.</p>';
-        }
-      }
+      renderDashboardWeek(celData.messe || [],evData.avvisi || [],imp);
     } catch (e) {
       console.warn('Errore caricamento messe e avvisi dashboard:', e);
     }
 
-    // Carica calendari parrocchiali per la dashboard personale
-    await loadUserCalendari();
+
   } catch (err) {
     console.error('Errore caricamento dashboard:', err);
   }
@@ -953,7 +881,7 @@ async function loadFamiglia() {
                   <span class="member-cf">${escapeHtml(m.codice_fiscale)}</span>
                 </div>
               </div>
-              <span class="badge ${isCapo ? 'badge-info' : 'badge-neutral'}">${escapeHtml(m.ruolo_famiglia === 'Capofamiglia' ? 'Ruolo da specificare' : (m.ruolo_famiglia || 'Figlio/a'))}</span>${isCapo ? '<span class="badge badge-info">Capofamiglia</span>' : ''}
+              <div class="member-badges"><span class="badge ${isCapo ? 'badge-info' : 'badge-neutral'}">${escapeHtml(m.ruolo_famiglia === 'Capofamiglia' ? 'Ruolo da specificare' : (m.ruolo_famiglia || 'Figlio/a'))}</span>${isCapo ? '<span class="badge badge-info">Capofamiglia</span>' : ''}</div>
             </div>
 
             <div class="member-details">
@@ -1047,12 +975,12 @@ async function loadFamilyIscrizioni() {
 async function loadAttivita() {
   try {
     const isStaff = currentUser && (currentUser.tutti_i_ruoli || []).some(r => ['admin', 'segreteria', 'parroco'].includes(r));
-    const url = isStaff ? '/api/attivita?include_bozze=true' : '/api/attivita';
+    const url = isStaff ? '/api/attivita?include_bozze=true&solo_attive=false' : '/api/attivita?solo_attive=false';
     const res = await fetch(url);
     const data = await res.json();
     cacheAttivita = data.attivita || [];
     if (!isStaff) await refreshEnrollmentOptions();
-    renderAttivitaCatalog(cacheAttivita);
+    applyAttivitaFilters();
   } catch (err) {
     console.error('Errore catalogo attività:', err);
   }
@@ -1062,9 +990,10 @@ function renderAttivitaCatalog(items) {
   const container = document.getElementById('activitiesCatalogGrid');
   const isStaff = currentUser && (currentUser.tutti_i_ruoli || []).some(r => ['admin', 'segreteria', 'parroco'].includes(r));
 
+  items=items.filter(a=>currentTimeFilter==='all' || activityIsPast(a)===(currentTimeFilter==='past'));
   if (!isStaff) items = items.filter(a => {
     const state = enrollmentOptions?.attivita?.[a.id];
-    return !!state && (state.gia_iscritto || state.partecipanti.length > 0);
+    return activityIsPast(a) || !!state && (state.gia_iscritto || state.ha_iscrizioni || state.partecipanti.length > 0);
   });
 
   if (!items.length) {
@@ -1155,6 +1084,8 @@ async function togglePubblicazioneAttivita(id) {
 
 let currentCatFilter = '';
 let currentStatusFilter = 'all';
+let currentTimeFilter = 'upcoming';
+function filterAttivitaByTime(value) {currentTimeFilter=value;applyAttivitaFilters();}
 
 function applyAttivitaFilters() {
   let list = cacheAttivita;
@@ -1198,7 +1129,7 @@ let currentEditingOratorioId = null;
 async function loadOratorio() {
   const roles = (currentUser && currentUser.tutti_i_ruoli) || [currentUser ? currentUser.ruolo : 'utente'];
   const isSupervisor = roles.some(r => ['admin', 'parroco', 'segreteria'].includes(r));
-  const isAnimatore = isSupervisor || roles.includes('oratorio');
+  const isAnimatore = isSupervisor || roles.some(r=>['oratorio','animatore'].includes(r));
 
   if (!isAnimatore) {
     // Genitore / Fedele: visualizza iscrizioni e presenze dei propri figli
@@ -1223,6 +1154,7 @@ async function loadOratorio() {
   if (staffSec) staffSec.style.display = 'block';
   if (staffActions) staffActions.style.display = 'flex';
   if (parentSec) parentSec.style.display = 'none';
+  StaffGroupRegister.reset('oratorio');
   const titleEl = document.getElementById('oratorioPageTitle');
   const descEl = document.getElementById('oratorioPageDesc');
   if (titleEl) titleEl.textContent = 'Oratorio & Estate Ragazzi (Sacro Cuore)';
@@ -1390,16 +1322,17 @@ function renderGruppiOratorioGrid() {
 
         <div class="card-footer" style="background: #f8fafc; border-top: 1px solid var(--border-light); display: flex; gap: 6px; flex-wrap: wrap; justify-content: space-between; align-items: center; padding: 10px 14px;">
           <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-            <button type="button" class="btn btn-xs btn-primary" onclick="openModalRegistroPresenzeOratorio(${g.id})">
-              📋 Registro Presenze
+            <button type="button" class="btn btn-xs btn-primary" onclick="StaffGroupRegister.openDates('oratorio',${g.id})">
+              📅 Incontri e appelli
             </button>
-            <button type="button" class="btn btn-xs btn-secondary" onclick="openModalAllergieGruppoOratorio(${g.id}, '${escapeHtml(g.nome)}')">
-              ⚠️ Allergie
+            <button type="button" class="btn btn-xs btn-secondary" onclick="StaffGroupRegister.openRoster('oratorio',${g.id})">
+              Elenco
             </button>
           </div>
           <button type="button" class="btn btn-xs btn-outline-primary" onclick="openModalModificaGruppoOratorio(${g.id})">
             ✏️ Modifica
           </button>
+          ${(currentUser?.tutti_i_ruoli||[]).some(r=>['admin','parroco','segreteria'].includes(r)) ? `<button type="button" class="btn btn-xs btn-danger" onclick="eliminaGruppoOratorio(${g.id})" title="Elimina gruppo">🗑️</button>`:''}
         </div>
       </div>
     `;
@@ -1407,6 +1340,12 @@ function renderGruppiOratorioGrid() {
 }
 
 async function loadOratorioAssignedView() {return loadAssignedGroupRegisters('oratorio');}
+
+async function eliminaGruppoOratorio(id) {
+  if(!confirm('Eliminare questo gruppo di oratorio?')) return;
+  try {await apiJson('/api/oratorio/gruppi/'+id,{method:'DELETE'});await loadOratorio();showToast('Gruppo eliminato','success');}
+  catch(error){showToast(error.message,'error');}
+}
 
 
 async function openModalNuovoGruppoOratorio(tipoPredefinito = 'estivo') {
@@ -2788,6 +2727,7 @@ async function loadDoposcuola() {
   if (staffSec) staffSec.style.display = 'block';
   if (staffActions) staffActions.style.display = 'flex';
   if (parentSec) parentSec.style.display = 'none';
+  StaffGroupRegister.reset('doposcuola');
   const titleEl = document.getElementById('doposcuolaPageTitle');
   const descEl = document.getElementById('doposcuolaPageDesc');
   if (titleEl) titleEl.textContent = 'Doposcuola & Supporto allo Studio';
@@ -2883,29 +2823,12 @@ function renderGruppiDoposcuolaGrid() {
         ${g.note ? `<div style="margin-top: 4px; font-style: italic; color: var(--ink-500);">📝 ${escapeHtml(g.note)}</div>` : ''}
       </div>
 
-      <div style="flex: 1;">
-        <strong style="font-size: 12px; text-transform: uppercase; color: var(--ink-500); display: block; margin-bottom: 6px;">Studenti nel Gruppo:</strong>
-        ${g.studenti && g.studenti.length ? `
-          <div style="display: flex; flex-direction: column; gap: 4px; max-height: 140px; overflow-y: auto;">
-            ${g.studenti.map(r => `
-              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 4px 6px; background: #fff; border: 1px solid var(--border-light); border-radius: var(--radius-sm);">
-                <span><strong>${escapeHtml(r.nominativo)}</strong> <small style="color:var(--ink-500);">(${r.eta !== null ? `${r.eta} anni` : r.codice_fiscale})</small></span>
-                <button onclick="rimuoviStudenteDoposcuola(${g.id}, '${r.codice_fiscale}')" style="background:none; border:none; color:#dc2626; cursor:pointer; font-weight:bold; font-size:14px;" title="Rimuovi dal gruppo">×</button>
-              </div>
-            `).join('')}
-          </div>
-        ` : `<small style="color:var(--ink-500);">Nessuno studente iscritto a questo gruppo.</small>`}
-      </div>
-
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; border-top: 1px solid var(--border-light); padding-top: 10px;">
-        <button class="btn btn-sm btn-primary" onclick="openModalAppelloDoposcuola(${g.id})" style="background: #d97706; border-color: #d97706;">
-          📖 Appello & Registro
+        <button class="btn btn-sm btn-primary" onclick="StaffGroupRegister.openDates('doposcuola',${g.id})" style="background: #d97706; border-color: #d97706;">
+          📅 Incontri e appelli
         </button>
-        <button class="btn btn-sm btn-secondary" onclick="openModalStoricoIncontriDoposcuola(${g.id})">
-          📅 Storico Pomeriggi
-        </button>
-        <button class="btn btn-sm btn-secondary" onclick="openModalAllergieGruppoDoposcuola(${g.id})" style="color: #b45309; border-color: #fde68a; background: #fffbeb;">
-          ⚠️ Allergie & Note
+        <button class="btn btn-sm btn-secondary" onclick="StaffGroupRegister.openRoster('doposcuola',${g.id})" style="color: #b45309; border-color: #fde68a; background: #fffbeb;">
+          Elenco
         </button>
         <button class="btn btn-sm btn-secondary" onclick="openModalModificaGruppoDoposcuola(${g.id})">
           ✏️ Modifica
@@ -2913,9 +2836,6 @@ function renderGruppiDoposcuolaGrid() {
       </div>
 
       <div style="display: flex; gap: 6px; margin-top: 6px;">
-        <button class="btn btn-sm btn-secondary" style="flex: 1;" onclick="openModalAssegnaStudenteDoposcuola(${g.id})">
-          + Iscrivi Studente
-        </button>
         <button class="btn btn-sm btn-danger" onclick="eliminaGruppoDoposcuola(${g.id})" title="Elimina gruppo doposcuola">
           🗑️
         </button>
@@ -7132,7 +7052,7 @@ async function annullaMiaIscrizione(id) {
     if(currentView==='attivita') await loadAttivita();
     if(currentView==='dashboard') await loadDashboard();
     const modal=document.getElementById('modalPartecipantiEvento');
-    if(modal?.classList.contains('active')) await openEventEnrollments(Number(modal.dataset.eventId));
+    if(modal?.classList.contains('active')) await (modal.dataset.management==='family' ? openUserEnrollmentManagement(Number(modal.dataset.eventId)):openEventEnrollments(Number(modal.dataset.eventId)));
   } catch(error) {showToast(error.message,'error');}
 }
 
@@ -7218,7 +7138,7 @@ async function openModalAssegnaPersoneMassa(tipo = 'catechismo') {
 
     const [resG, resP] = await Promise.all([
       fetch(gruppiUrl),
-      tipo==='catechismo' ? Promise.resolve({json:async()=>({persone:[]})}) : fetch('/api/persone')
+      Promise.resolve({json:async()=>({persone:[]})})
     ]);
 
     const dataG = await resG.json();
@@ -7253,7 +7173,8 @@ async function openModalAssegnaPersoneMassa(tipo = 'catechismo') {
         });
       }
     } else {
-      let gruppiOratorio = dataG.gruppi || [];
+      cacheGruppiOratorio=dataG.gruppi || [];
+      let gruppiOratorio = cacheGruppiOratorio;
       if (tipo === 'oratorio_estivo') {
         const estivi = gruppiOratorio.filter(g => (g.tipo_oratorio || 'estivo').toLowerCase() === 'estivo');
         if (estivi.length > 0) gruppiOratorio = estivi;
@@ -7287,12 +7208,13 @@ let massaAssignableRequest=0;
 async function aggiornaAssegnabiliMassa() {
   const request=++massaAssignableRequest;
   const id=document.getElementById('massaSelectGruppoDestinazione').value;
-  if(currentMassaTipo!=='catechismo') {filtraPersoneMassa();return;}
   cacheMassaPersone=[];
   filtraPersoneMassa();
   if(!id) return;
   try {
-    const data=await apiJson(`/api/catechismo/gruppi/${id}/assegnabili`);
+    const category=currentMassaTipo.startsWith('oratorio')?'oratorio':currentMassaTipo;
+    const path=category==='catechismo'?`/api/catechismo/gruppi/${id}/assegnabili`:`/api/calendari-gruppi/${category}/${id}/assegnabili`;
+    const data=await apiJson(path);
     if(request!==massaAssignableRequest) return;
     cacheMassaPersone=data.persone||[];
     filtraPersoneMassa();
@@ -8378,14 +8300,9 @@ async function refreshEnrollmentOptions() {
 }
 function activityEnrollmentAction(activity,staff=false) {
   const state=enrollmentOptions?.attivita?.[activity.id];
-  let markup='';
-  if(staff || state?.partecipanti?.length) {
-    const label=!staff && state?.gia_iscritto ? 'Iscrivi altri familiari' : 'Iscriviti';
-    markup=`<button class="btn btn-sm btn-primary" onclick="openModalNuovaIscrizione(${activity.id})">${label}</button>`;
-  } else if(state?.gia_iscritto) markup='<span class="badge badge-success">Iscrizione effettuata</span>';
-  if(staff) markup+=`<button class="btn btn-sm btn-secondary" onclick="openEventEnrollments(${activity.id})">Iscritti e disiscrizioni</button>`;
-  else markup+=(state?.iscrizioni || []).map(i=>withdrawButton({...i,stato:'confermata'},true)).join('');
-  return markup;
+  if(staff) return `${!activityIsPast(activity) && activity.is_attiva!==false ? `<button class="btn btn-sm btn-primary" onclick="openModalNuovaIscrizione(${activity.id})">Iscriviti</button>`:''}<button class="btn btn-sm btn-secondary" onclick="openEventEnrollments(${activity.id})">Iscritti e disiscrizioni</button>`;
+  if(state?.gia_iscritto || state?.ha_iscrizioni) return `<button class="btn btn-sm btn-primary" onclick="openUserEnrollmentManagement(${activity.id})">Gestisci iscrizione</button>`;
+  return state?.partecipanti?.length && !activityIsPast(activity) && activity.is_attiva!==false ? `<button class="btn btn-sm btn-primary" onclick="openModalNuovaIscrizione(${activity.id})">Iscriviti</button>`:'';
 }
 function availableGroupCards(category, groups) {
   const labels = {
@@ -8507,6 +8424,8 @@ function withdrawButton(enrollment,showName=false) {
   return `<button type="button" class="btn btn-sm btn-danger" onclick="annullaMiaIscrizione(${enrollment.id})">Disiscrivi${showName ? ' · '+escapeHtml(enrollment.nominativo || ''):''}</button>`;
 }
 async function openEventEnrollments(id) {
+  document.getElementById('partecipantiEventoTitle').textContent='Iscritti e disiscrizioni';
+  document.getElementById('modalPartecipantiEvento').dataset.management='staff';
   const modal=document.getElementById('modalPartecipantiEvento');modal.dataset.eventId=id;
   const data=await apiJson('/api/iscrizioni?attivita_id='+id);
   document.getElementById('partecipantiEventoElenco').innerHTML=(data.iscrizioni || []).map(i=>`<div class="choice-row"><span>${escapeHtml(i.partecipante_nome)} · ${escapeHtml(i.stato)}</span>${withdrawButton(i)}</div>`).join('') || '<p>Nessuna iscrizione presente.</p>';
@@ -8526,10 +8445,12 @@ async function openCalendarGroupAttendance(category,id,day) {
     await openModalAppelloCatechismo(id,day);
   } else if(category==='doposcuola') {
     if(!cacheGruppiDoposcuola.some(group=>group.id===id)) cacheGruppiDoposcuola=(await apiJson('/api/doposcuola/gruppi')).gruppi || [];
-    await openModalAppelloDoposcuola(id,day);
+    if(currentView!=='doposcuola') await navigateTo('doposcuola');
+    await StaffGroupRegister.openAttendance('doposcuola',day,id);
   } else if(category==='oratorio') {
     if(!cacheGruppiOratorio.some(group=>group.id===id)) cacheGruppiOratorio=(await apiJson('/api/oratorio/gruppi')).gruppi || [];
-    await openModalRegistroPresenzeOratorio(id,day);
+    if(currentView!=='oratorio') await navigateTo('oratorio');
+    await StaffGroupRegister.openAttendance('oratorio',day,id);
   }
 }
 

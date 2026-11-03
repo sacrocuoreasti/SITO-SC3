@@ -27,3 +27,61 @@ def get_month(category,id):
     data.update(categoria=category,gruppo_id=group.id,nome_gruppo=group.nome,puo_registrare_presenze=bool(manages),iscritto=bool(enrolled))
     data['presenze']=[{'data':record.data.isoformat(),'nominativo':record.persona.nominativo,'presente':record.presente} for record in records if record.data.isoformat()[:7]==data['mese']]
     return jsonify(data)
+
+
+@calendari_gruppi_bp.route('/<category>/<int:id>/registro',methods=['GET','POST','DELETE'])
+def manage_register(category,id):
+    from services.group_management import managed_group,day_value
+    from services.group_attendance import registry_data,save_group_records
+    group,collection=managed_group(category,id)
+    if request.method=='GET':
+        result=registry_data(category,group,request.args.get('mese'),whole_year=request.args.get('periodo')=='anno')
+        from services.family_service import staff_user
+        result['puo_cancellare']=bool(staff_user())
+        return jsonify(result)
+    data=request.get_json() or {}
+    if request.method=='POST':
+        save_group_records(category,group,data)
+        return jsonify(success=True,message='Presenze salvate')
+    from services.family_service import staff_user
+    if not staff_user(): raise Forbidden('Cancellazione riservata alla segreteria')
+    day=day_value(data.get('data'))
+    for record in group_records(category,group):
+        if record.data==day: db.session.delete(record)
+    db.session.commit()
+    return jsonify(success=True,message='Appello rimosso dal registro; appuntamento in calendario conservato')
+
+
+@calendari_gruppi_bp.route('/<category>/<int:id>/elenco',methods=['GET','POST','DELETE'])
+def manage_roster(category,id):
+    from services.group_management import managed_group,roster_data,can_manage_members
+    from services.cf_validator import normalizza_cf
+    from services.group_age_service import validate_member_age
+    from models import Persona
+    from werkzeug.exceptions import BadRequest
+    group,collection=managed_group(category,id)
+    if request.method=='GET': return jsonify(roster_data(category,group,collection))
+    if not can_manage_members(category): raise Forbidden('Assegnazione non autorizzata')
+    data=request.get_json() or {}
+    cf=data.get('codice_fiscale','')
+    if not isinstance(cf,str): raise BadRequest('Codice fiscale non valido')
+    person=db.session.get(Persona,normalizza_cf(cf))
+    if not person: raise BadRequest('Partecipante non trovato')
+    members=getattr(group,collection)
+    if request.method=='POST' and person not in members:
+        validate_member_age(group,person)
+        members.append(person)
+    if request.method=='DELETE' and person in members: members.remove(person)
+    db.session.commit()
+    return jsonify(success=True)
+
+
+@calendari_gruppi_bp.route('/<category>/<int:id>/assegnabili')
+def assignable_roster(category,id):
+    from services.group_management import managed_group,can_manage_members
+    from models import Persona
+    group,collection=managed_group(category,id)
+    if not can_manage_members(category): raise Forbidden('Assegnazione non autorizzata')
+    existing={p.codice_fiscale for p in getattr(group,collection)}
+    return jsonify(persone=[{'codice_fiscale':p.codice_fiscale,'nominativo':p.nominativo,'eta':p.eta}
+        for p in Persona.query.order_by(Persona.cognome,Persona.nome).all() if p.codice_fiscale not in existing and age_eligible(p,group)])

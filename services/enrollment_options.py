@@ -49,13 +49,18 @@ def enrollment_options():
     family_cfs = [p.codice_fiscale for p in (current_user.persona.nucleo.componenti if current_user.persona and current_user.persona.nucleo else people)]
     records = Iscrizione.query.filter(Iscrizione.codice_fiscale_partecipante.in_(family_cfs)).all() if family_cfs else []
     activities = {}
-    for activity in Attivita.query.filter_by(is_attiva=True, is_pubblicato=True).all():
-        enrolled = {r.codice_fiscale_partecipante for r in records if r.attivita_id == activity.id and r.stato != 'annullata'}
+    from datetime import datetime
+    from dateutil.tz import gettz
+    today=datetime.now(gettz('Europe/Rome')).date()
+    for activity in Attivita.query.filter_by(is_pubblicato=True).all():
+        enrolled = {r.codice_fiscale_partecipante for r in records if r.attivita_id == activity.id and r.stato not in ('annullata','rifiutata')}
         free = activity.posti_disponibili
-        candidates = [p.codice_fiscale for p in people if p.codice_fiscale not in enrolled and age_eligible(p,activity)] if free is None or free > 0 else []
+        ends=activity.data_fine or activity.data_inizio
+        open_event=activity.is_attiva and (not ends or ends>=today)
+        candidates = [p.codice_fiscale for p in people if p.codice_fiscale not in enrolled and age_eligible(p,activity)] if open_event and (free is None or free > 0) else []
         from routes.iscrizioni import can_withdraw
         withdrawals=[{'id':r.id,'nominativo':r.partecipante.nominativo,'puo_disiscriversi':can_withdraw(r)} for r in records if r.attivita_id==activity.id and r.stato != 'annullata']
-        activities[activity.id] = {'partecipanti':candidates, 'gia_iscritto':bool(enrolled), 'iscrizioni':withdrawals}
+        activities[activity.id] = {'partecipanti':candidates, 'gia_iscritto':bool(enrolled), 'ha_iscrizioni':any(r.attivita_id==activity.id for r in records), 'iscrizioni':withdrawals}
     return {'attivita':activities, 'gruppi':{category:available_groups(category) for category in GROUP_MODELS}, 'gruppi_iscritti':{category:assigned_groups(category) for category in GROUP_MODELS}}
 
 

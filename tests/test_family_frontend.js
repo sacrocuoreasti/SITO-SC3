@@ -8,7 +8,7 @@ const elements = new Map();
 const selected = [];
 const requests = [];
 const nodes = id => {
-  if (!elements.has(id)) elements.set(id, { value:'', style:{}, hidden:false, disabled:false, classList:{add(){},remove(){},contains(){return false;}}, textContent:'', _html:'',
+  if (!elements.has(id)) elements.set(id, { value:'', style:{}, dataset:{}, hidden:false, disabled:false, classList:{add(){},remove(){},toggle(){},contains(){return false;}}, textContent:'', _html:'',
     set innerHTML(value) { this._html=value; if (id==='iscrizioneAttivitaSelect') this.value='7'; },
     get innerHTML() { return this._html; },
   });
@@ -34,10 +34,11 @@ const context = vm.createContext({
   }},
   fetch:async(url,options={})=>{
     requests.push({url,options});
-    return {ok:true,headers:{get:()=> 'application/json'},json:async()=>url==='/api/iscrizioni'?{success:true,message:'Registrato'}:fixtures[url]};
+    return {ok:true,headers:{get:()=> 'application/json'},json:async()=>url==='/api/iscrizioni'?{success:true,message:'Registrato'}:fixtures[url] || (url==='/api/attivita?solo_attive=false' ? fixtures['/api/attivita']:undefined)};
   },
 });
 vm.runInContext(fs.readFileSync('static/js/group-calendar.js','utf8'),context);
+vm.runInContext(fs.readFileSync('static/js/portal-views.js','utf8'),context);
 vm.runInContext(fs.readFileSync('static/js/app.js','utf8'),context);
 const loadDashboardOriginal=context.loadDashboard;
 vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['utente'],is_capofamiglia:true}; showToast=()=>{}; loadDashboard=async()=>{};",context);
@@ -83,6 +84,7 @@ vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['
   fixtures['/api/celebrazioni?sezione=messe']={messe:[]};
   fixtures['/api/impostazioni/calendari?solo_pubblici=true']={calendari:[]};
   await loadDashboardOriginal();
+  await context.loadUserCalendari();
   assert.ok(requests.some(r=>r.url==='/api/impostazioni/calendari?solo_pubblici=true'));
   assert.ok(nodes('dashUserCalendariGrid').innerHTML.includes('Nessun calendario'));
   // Fresh eligibility controls buttons, even without opening the family screen.
@@ -94,11 +96,11 @@ vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['
   assert.ok(nodes('activitiesCatalogGrid').innerHTML.includes('Iscriviti</button>'));
   option.partecipanti=[people[1].codice_fiscale]; option.gia_iscritto=true;
   await context.loadAttivita();
-  assert.ok(nodes('activitiesCatalogGrid').innerHTML.includes('Iscrivi altri familiari'));
+  assert.ok(nodes('activitiesCatalogGrid').innerHTML.includes('Gestisci iscrizione'));
   assert.ok(!nodes('activitiesCatalogGrid').innerHTML.includes('Iscriviti</button>'));
   option.partecipanti=[];
   await context.loadAttivita();
-  assert.ok(nodes('activitiesCatalogGrid').innerHTML.includes('Iscrizione effettuata'));
+  assert.ok(nodes('activitiesCatalogGrid').innerHTML.includes('Gestisci iscrizione'));
   assert.ok(!nodes('activitiesCatalogGrid').innerHTML.includes('openModalNuovaIscrizione'));
   assert.equal(context.ageEligible({eta:null},{eta_min:null,eta_max:null}),true);
   assert.equal(context.ageEligible({eta:100},{eta_min:18,eta_max:null}),true);
@@ -234,5 +236,46 @@ vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['
   nodes('massaSelectGruppoDestinazione').value='';context.filtraPersoneMassa();
   assert.ok(!nodes('massaTablePersoneBody').innerHTML.includes('type="checkbox"'));
   for(const id of ['catAnnoPercorso','modCatAnnoCatechismo','modCatAttivitaSelect']) assert.ok(!template.includes('id="'+id+'"'));
+  // Panoramica: solo iscritti non conclusi, calendario settimanale e calendari nel menu.
+  const future={...activity,id:31,titolo:'Evento futuro iscritto',data_inizio:'2099-01-01'};
+  const past={...activity,id:32,titolo:'Evento passato iscritto',data_fine:'2000-01-01'};
+  const available={...activity,id:33,titolo:'Evento futuro disponibile',data_inizio:'2099-01-01'};
+  fixtures['/api/attivita']={attivita:[future,past,available]};
+  fixtures['/api/famiglie/opportunita'].attivita={31:{gia_iscritto:true,partecipanti:[]},32:{gia_iscritto:true,partecipanti:[]},33:{gia_iscritto:false,partecipanti:[people[1].codice_fiscale]}};
+  vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['utente']};",context);
+  await loadDashboardOriginal();
+  assert.equal(nodes('dashKpiGrid').style.display,'none');
+  assert.ok(nodes('dashAttivitaList').innerHTML.includes(future.titolo));
+  assert.ok(!nodes('dashAttivitaList').innerHTML.includes(past.titolo));
+  assert.ok(!nodes('dashAttivitaList').innerHTML.includes(available.titolo));
+  await context.loadAttivita();context.filterAttivitaByTime('past');
+  assert.ok(nodes('activitiesCatalogGrid').innerHTML.includes(past.titolo));
+  assert.ok(!nodes('activitiesCatalogGrid').innerHTML.includes(future.titolo));
+  assert.equal((context.activityEnrollmentAction(future).match(/<button/g)||[]).length,1);
+  assert.ok(context.activityEnrollmentAction(future).includes('Gestisci iscrizione'));
+  const days=context.weeklyDays();assert.equal(days.length,7);assert.equal(new Date(days[0]+'T12:00:00').getDay(),1);
+  assert.deepEqual(Array.from(context.celebrationWeekdays('Lunedì - Venerdì')),[0,1,2,3,4]);
+  assert.deepEqual(Array.from(context.celebrationWeekdays('Venerdì - Lunedì')),[4,5,6,0]);
+  context.renderDashboardWeek([{giorno:'Lunedì - Venerdì',titolo:'Messa feriale',orario:'ore 18:00',is_attivo:true}],[{titolo:'Avviso datato',data_evento:days[1],contenuto:'Incontro comunitario'}],{});
+  assert.equal((nodes('dashWeeklyCalendar').innerHTML.match(/class="weekly-day /g)||[]).length,7);
+  assert.equal((nodes('dashWeeklyCalendar').innerHTML.match(/Messa feriale/g)||[]).length,5);
+  assert.ok(nodes('dashWeeklyCalendar').innerHTML.includes('Avviso datato'));
+  assert.ok(template.indexOf('id="dashUserCalendariGrid"')>template.indexOf('id="viewCalendari"'));
+  // Stesso percorso date → appello per oratorio e doposcuola, con salvataggio sulla data scelta.
+  const staffRegister=vm.runInContext('StaffGroupRegister',context);
+  for(const category of ['oratorio','doposcuola']) {
+    const route='/api/calendari-gruppi/'+category+'/9/registro';
+    const data={...register,gruppo:{id:9,nome:'Gruppo '+category,anno_pastorale:'2026/2027'},puo_cancellare:true};
+    fixtures[route+'?periodo=anno']=data;fixtures[route+'?mese=2026-11']=data;fixtures[route]={success:true};
+    await staffRegister.openDates(category,9);
+    assert.ok(nodes(category+'RegisterSection').innerHTML.includes('Storico incontri'));
+    await staffRegister.openAttendance(category,'2026-11-08');
+    staffRegister.mark(category,people[1].codice_fiscale,false);
+    nodes(category+'MeetingTitle').value='Incontro di prova';nodes(category+'MeetingPercentage').checked=true;
+    await staffRegister.save(category,{preventDefault(){}});
+    const post=requests.find(r=>r.url===route && r.options.method==='POST');
+    assert.equal(JSON.parse(post.options.body).data,'2026-11-08');
+    assert.equal(JSON.parse(post.options.body).presenze[0].presente,false);
+  }
   console.log('Alpha famiglia: attività fissata, selezione multipla, quota, invio unico, consensi e salute verificati.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

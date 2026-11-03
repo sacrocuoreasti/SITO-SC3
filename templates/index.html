@@ -373,6 +373,7 @@ Domenica: dopo le Sante Messe</p>
           <i>📋</i> Attività & Iscrizioni
         </a>
 
+        <a class="nav-item" data-view="calendari" onclick="navigateTo('calendari')"><i>📅</i> Calendari & Appuntamenti</a>
         <!-- Sezione Pastorale & Servizi (Role-based) -->
         <div class="nav-section-label" id="sectionLabelPastorale">Attività & Pastorale</div>
         <a class="nav-item role-nav oratorio-nav" data-view="oratorio" onclick="navigateTo('oratorio')">
@@ -505,11 +506,11 @@ Domenica: dopo le Sante Messe</p>
             </div>
           </div>
 
-          <div class="dashboard-columns">
+          <div class="dashboard-columns" id="dashColumns">
             <!-- Attività Aperte in primo piano -->
             <div class="card">
               <div class="card-header">
-                <h3><i>✦</i> Attività Parrocchiali Pubblicate</h3>
+                <h3 id="dashActivitiesTitle">Le prossime attività della tua famiglia</h3>
                 <button class="btn btn-sm btn-secondary" onclick="navigateTo('attivita')">Tutte le attività →</button>
               </div>
               <div class="card-body" id="dashAttivitaList">
@@ -524,19 +525,16 @@ Domenica: dopo le Sante Messe</p>
                 <h3><i>🔔</i> Avvisi & Orari Messe</h3>
               </div>
               <div class="card-body">
-                <div id="dashOrariMesseBlock" style="background: var(--primary-light); border: 1px solid var(--primary-border); border-radius: var(--radius-md); padding: 14px; margin-bottom: 16px;">
-                  <strong style="color: var(--primary); display: block; margin-bottom: 6px;">⛪ Orari Sante Messe Parrocchiali</strong>
-                  <div id="dashOrariMesseContainer">
-                    <p style="font-size: 13px; color: var(--ink-500); margin: 0;">Caricamento orari messe...</p>
-                  </div>
-                </div>
-
-                <div id="dashAvvisiContainer">
-                  <p style="font-size: 13px; color: var(--ink-500);">Nessun avviso straordinario al momento.</p>
-                </div>
+                <div id="dashWeeklyCalendar" aria-live="polite"></div>
+                <div id="dashAvvisiContainer"></div>
               </div>
             </div>
 
+            </aside>
+          </div>
+        </section>
+
+        <section id="viewCalendari" class="view-panel" style="display:none"><div class="page-header"><div class="page-header-title"><h1>Calendari & Appuntamenti Parrocchiali</h1><p>I calendari della comunità e dei gruppi della tua famiglia.</p></div></div>
           <!-- Calendari Comunitari & Personali -->
           <div class="card" style="margin-top: 24px;">
             <div class="card-header">
@@ -550,8 +548,6 @@ Domenica: dopo le Sante Messe</p>
                 <p style="color: var(--ink-500); font-size: 13px;">Caricamento calendari comunitari...</p>
               </div>
             </div>
-          </div>
-            </aside>
           </div>
         </section>
 
@@ -639,6 +635,7 @@ Domenica: dopo le Sante Messe</p>
             </div>
           </div>
 
+          <div class="activity-time-filter"><label for="activityTimeFilter">Periodo degli eventi</label><select id="activityTimeFilter" class="form-control" onchange="filterAttivitaByTime(this.value)"><option value="upcoming">Eventi futuri e in corso</option><option value="past">Eventi passati</option><option value="all">Tutti gli eventi</option></select></div>
           <div class="activities-grid" id="activitiesCatalogGrid"></div>
         </section>
 
@@ -657,6 +654,7 @@ Domenica: dopo le Sante Messe</p>
 
           <!-- SEZIONE STAFF / ANIMATORI / SEGRETERIA -->
           <div id="oratorioStaffSection">
+            <div id="oratorioGroupsOverview">
             <!-- Navigazione Sotto-Sezioni Oratorio: Estivo vs Invernale vs Allergie -->
             <div style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border-light); padding-bottom: 12px; flex-wrap: wrap;">
               <button type="button" class="btn btn-sm btn-primary tab-ora-btn active" id="tabOraEstivoBtn" onclick="switchOratorioTab('estivo')">☀️ Oratorio Estivo (Estate Ragazzi)</button>
@@ -725,6 +723,8 @@ Domenica: dopo le Sante Messe</p>
                 </div>
               </div>
             </div>
+            </div>
+            <section id="oratorioRegisterSection" class="card catechismo-dates" style="display:none" aria-live="polite"></section>
           </div>
 
           <!-- SEZIONE GENITORE / UTENTE (VEDE SOLO I PROPRI FIGLI) -->
@@ -899,6 +899,7 @@ Domenica: dopo le Sante Messe</p>
 
           <!-- SEZIONE STAFF / EDUCATORI / SEGRETERIA -->
           <div id="doposcuolaStaffSection">
+            <div id="doposcuolaGroupsOverview">
             <!-- Archivio Anno Scolastico (SOLO PULSANTI) & Ricerca Gruppi -->
             <div class="card" style="margin-bottom: 20px; padding: 14px 20px;">
               <div style="display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap;">
@@ -917,6 +918,8 @@ Domenica: dopo le Sante Messe</p>
             </div>
 
             <div class="catechismo-grid" id="doposcuolaGruppiGrid"></div>
+            </div>
+            <section id="doposcuolaRegisterSection" class="card catechismo-dates" style="display:none" aria-live="polite"></section>
           </div>
 
           <!-- SEZIONE GENITORE / UTENTE (VEDE SOLO I PROPRI FIGLI) -->
@@ -4246,9 +4249,10 @@ Domenica: dopo le Sante Messe</p>
   <div class="toast-container" id="toastContainer"></div>
 
   <script src="{{ url_for('static', filename='js/group-calendar.js', v=asset_version) }}" defer></script>
+  <script src="{{ url_for('static', filename='js/portal-views.js', v=asset_version) }}" defer></script>
   <script src="{{ url_for('static', filename='js/app.js', v=asset_version) }}" defer></script>
 
-<div class="modal-overlay" id="modalPartecipantiEvento"><div class="modal-window"><div class="modal-header"><h3>Iscritti e disiscrizioni</h3><button type="button" class="btn-close-modal" onclick="closeModal('modalPartecipantiEvento')">×</button></div><div class="modal-body" id="partecipantiEventoElenco"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="closeModal('modalPartecipantiEvento')">Chiudi</button></div></div></div>
+<div class="modal-overlay" id="modalPartecipantiEvento"><div class="modal-window"><div class="modal-header"><h3 id="partecipantiEventoTitle">Iscritti e disiscrizioni</h3><button type="button" class="btn-close-modal" onclick="closeModal('modalPartecipantiEvento')">×</button></div><div class="modal-body" id="partecipantiEventoElenco"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="closeModal('modalPartecipantiEvento')">Chiudi</button></div></div></div>
 
 </body>
 </html>

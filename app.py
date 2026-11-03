@@ -171,7 +171,7 @@ def create_app(config_class=Config):
 
     @app.route('/')
     def index():
-        version = os.environ.get('RENDER_GIT_COMMIT') or str(max(os.stat(app.static_folder + '/' + name).st_mtime_ns for name in ['css/style.css', 'js/app.js','js/group-calendar.js']))
+        version = os.environ.get('RENDER_GIT_COMMIT') or str(max(os.stat(app.static_folder + '/' + name).st_mtime_ns for name in ['css/style.css', 'js/app.js','js/group-calendar.js','js/portal-views.js']))
         return render_template('index.html', asset_version=version, quick_login_enabled=quick_login_enabled())
 
     @app.route('/health')
