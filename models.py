@@ -31,6 +31,12 @@ gruppo_doposcuola_persona = db.Table(
     db.Column('codice_fiscale', db.String(16), db.ForeignKey('persona.codice_fiscale', ondelete='CASCADE'), primary_key=True)
 )
 
+gruppo_doposcuola_educatori = db.Table(
+    'gruppo_doposcuola_educatori',
+    db.Column('gruppo_id', db.Integer, db.ForeignKey('gruppo_doposcuola.id', ondelete='CASCADE'), primary_key=True),
+    db.Column('utente_id', db.Integer, db.ForeignKey('utente.id', ondelete='CASCADE'), primary_key=True)
+)
+
 # Tabella di associazione molti-a-molti: GruppoCatechismo <-> Utente (Più catechisti per gruppo)
 gruppo_catechismo_catechisti = db.Table(
     'gruppo_catechismo_catechisti',
@@ -673,9 +679,15 @@ class GruppoDoposcuola(db.Model):
     studenti = db.relationship('Persona', secondary=gruppo_doposcuola_persona, backref='gruppi_doposcuola')
     educatore = db.relationship('Persona', foreign_keys=[educatore_cf])
     educatore_utente = db.relationship('Utente', foreign_keys=[educatore_utente_id])
+    educatori = db.relationship('Utente', secondary=gruppo_doposcuola_educatori)
     attivita = db.relationship('Attivita')
 
     def to_dict(self, include_studenti=True):
+        educators={u.id:u for u in self.educatori}
+        if self.educatore_utente:
+            educators[self.educatore_utente.id]=self.educatore_utente
+        educators=list(educators.values())
+        names=', '.join(u.persona.nominativo if u.persona else u.email.split('@')[0] for u in educators)
         d = {
             'id': self.id,
             'google_calendar_url': self.google_calendar_url or '',
@@ -687,7 +699,9 @@ class GruppoDoposcuola(db.Model):
             'anno_scolastico': self.anno_scolastico or '2026/2027',
             'anno_pastorale': self.anno_scolastico or '2026/2027',
             'fascia_eta': self.fascia_eta or '',
-            'educatore_nome': self.educatore_nome or (self.educatore.nominativo if self.educatore else 'Da assegnare'),
+            'educatore_nome': names or self.educatore_nome or (self.educatore.nominativo if self.educatore else 'Da assegnare'),
+            'educatori_ids': [u.id for u in educators],
+            'educatori': [{'id':u.id,'nominativo':u.persona.nominativo if u.persona else u.email.split('@')[0],'email':u.email,'codice_fiscale':u.codice_fiscale or ''} for u in educators],
             'educatore_cf': self.educatore_cf or '',
             'educatore_utente_id': self.educatore_utente_id,
             'giorni_orari': self.giorni_orari or '',

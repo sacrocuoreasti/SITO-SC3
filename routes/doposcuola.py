@@ -7,6 +7,7 @@ from flask_login import current_user
 from models import db, Attivita, Persona, Presenza, GruppoDoposcuola, Utente
 from services.cf_validator import normalizza_cf
 from datetime import date, datetime
+from services.doposcuola_staff import apply_educators
 
 doposcuola_bp = Blueprint('doposcuola_bp', __name__, url_prefix='/api/doposcuola')
 register_age_guard(doposcuola_bp, GruppoDoposcuola, 'studenti')
@@ -17,9 +18,9 @@ def get_educatori():
     """Ritorna tutti gli utenti che possono svolgere il ruolo di educatore/volontario per il doposcuola."""
     utenti = Utente.query.filter(Utente.is_attivo == True).all()
     educatori = []
+    from services.access_control import can
     for u in utenti:
-        roles = u.get_all_roles()
-        if any(r in ['educatore', 'oratorio', 'catechista', 'admin', 'parroco', 'segreteria'] for r in roles) or u.ruolo in ['educatore', 'oratorio', 'catechista']:
+        if can('doposcuola.staff',u):
             educatori.append({
                 'id': u.id,
                 'email': u.email,
@@ -70,6 +71,7 @@ def create_gruppo():
     )
     apply_calendar(nuovo, data)
     apply_age_range(nuovo, data)
+    apply_educators(nuovo,data)
     db.session.add(nuovo)
     db.session.commit()
 
@@ -101,6 +103,8 @@ def update_gruppo(id):
     if 'note' in data: g.note = data['note'].strip()
     if 'stato' in data: g.stato = data['stato'].strip()
     if 'attivita_id' in data: g.attivita_id = data['attivita_id']
+
+    apply_educators(g,data)
 
     db.session.commit()
     return jsonify({

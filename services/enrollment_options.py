@@ -35,7 +35,9 @@ def available_groups(category):
     people = group_candidates()
     results = []
     for group in model.query.filter_by(stato='pubblico').order_by(model.nome).all():
-        candidates = [p for p in people if p not in getattr(group, collection) and age_eligible(p, group)]
+        from services.catechismo_membership import conflicting_group
+        candidates = [p for p in people if p not in getattr(group, collection) and age_eligible(p, group)
+                      and (category != 'catechismo' or not conflicting_group(p, group))]
         if not candidates:
             continue
         info = group.to_dict(**({'include_studenti': False} if category == 'doposcuola' else {'include_ragazzi': False}))

@@ -20,7 +20,7 @@ def can_record(category,group):
         return current_user.id==group.catechista_utente_id or current_user.codice_fiscale==group.catechista_cf and bool(group.catechista_cf) or any(u.id==current_user.id for u in group.catechisti)
     if category=='oratorio':
         return current_user.id==group.animatore_utente_id or current_user.codice_fiscale==group.animatore_cf and bool(group.animatore_cf) or any(u.id==current_user.id for u in group.animatori)
-    return current_user.id==group.educatore_utente_id or current_user.codice_fiscale==group.educatore_cf and bool(group.educatore_cf)
+    return current_user.id==group.educatore_utente_id or current_user.codice_fiscale==group.educatore_cf and bool(group.educatore_cf) or any(u.id==current_user.id for u in group.educatori)
 
 
 def group_records(category,group,people=None):

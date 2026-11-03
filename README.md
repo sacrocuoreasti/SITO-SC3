@@ -226,3 +226,16 @@ subordinato ai permessi sanitari/cucina e all’assegnazione al gruppo.
 I profili personalizzati si rinominano senza cambiare codice e assegnazioni;
 si possono eliminare dopo aver rimosso le assegnazioni, anche agli account
 inattivi. I profili di sistema restano disponibili.
+
+I menu pastorali hanno sei voci distinte: **Oratorio / Oratorio staff**,
+**Catechismo / Catechismo staff**, **Doposcuola / Doposcuola staff**.
+Le voci familiari seguono le opportunità e le iscrizioni del nucleo; quelle staff
+richiedono il permesso operativo della categoria e mantengono i vincoli di gruppo.
+L’appello dell’oratorio usa la stessa matrice del catechismo, con frequenza e
+conteggio immediato dei presenti e assenti.
+
+Le nuove iscrizioni al catechismo sono limitate a un gruppo per persona e anno
+pastorale, anche tramite API, assegnazioni di massa e richieste simultanee.
+I gruppi genitori sono distinti e le eventuali iscrizioni precedenti non vengono
+cancellate automaticamente. Per il doposcuola, la tabella di associazione degli
+educatori permette più incaricati, conservando anche gli assegnatari precedenti.

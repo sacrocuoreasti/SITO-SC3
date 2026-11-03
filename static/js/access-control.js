@@ -1,5 +1,6 @@
 /* Il server decide gli accessi; questa vista presenta gli stessi permessi nei menu. */
 function hasPermission(key) {
+  if(key.endsWith('_staff'))key=key.slice(0,-6)+'.staff';
   if(!currentUser)return false;
   if(Array.isArray(currentUser.permessi))return currentUser.permessi.includes(key);
   const roles=currentUser.tutti_i_ruoli||[currentUser.ruolo];
@@ -60,7 +61,7 @@ const AccessUI=(()=>{
     if(!currentUser || !Array.isArray(currentUser.permessi))return;
     document.querySelectorAll('.nav-item[data-view]').forEach(link=>{
       const view=link.dataset.view;let allowed=hasPermission(view);
-      if(['oratorio','catechismo','doposcuola'].includes(view) && !hasPermission(view+'.staff'))allowed=allowed && !!(enrollmentOptions?.gruppi?.[view]?.length || enrollmentOptions?.gruppi_iscritti?.[view]?.length);
+      if(['oratorio','catechismo','doposcuola'].includes(view))allowed=allowed && !!(enrollmentOptions?.gruppi?.[view]?.length || enrollmentOptions?.gruppi_iscritti?.[view]?.length);
       link.style.display=allowed?'flex':'none';
     });
     document.querySelectorAll('[data-permission],button[onclick],form[onsubmit]').forEach(element=>{
@@ -77,12 +78,12 @@ const AccessUI=(()=>{
       tabContentOraAllergie:'oratorio.cucina',tbodySegreteriaCalendari:'segreteria.calendari',tableSegreteriaEventi:'segreteria.avvisi'};
     for(const [id,key] of Object.entries(mappings)){const el=document.getElementById(id);if(el)gate(el,hasPermission(key));}
     for(const label of ['sectionLabelGestione','sectionLabelPastorale']){
-      const modules=label==='sectionLabelGestione'?['segreteria','anagrafica','excel','utenti']:['oratorio','catechismo','doposcuola'];
+      const modules=label==='sectionLabelGestione'?['segreteria','anagrafica','excel','utenti']:['oratorio','catechismo','doposcuola','oratorio_staff','catechismo_staff','doposcuola_staff'];
       const el=document.getElementById(label);if(el)el.style.display=modules.some(module=>document.querySelector(`.nav-item[data-view="${module}"]`)?.style.display!=='none' && hasPermission(module))?'block':'none';
     }
     document.querySelectorAll('h4,fieldset.family-section legend').forEach(heading=>{
       if(!/fascicolo sanitario|scheda sanitaria|allergie|intolleranze|terapie/i.test(heading.textContent||''))return;
-      const module=heading.closest('#viewOratorio,#viewCatechismo,#viewDoposcuola,#modalAllergieGruppoCatechismo');
+      const module=heading.closest('#viewOratorio,#viewCatechismo,#viewDoposcuola,#viewOratorioStaff,#viewCatechismoStaff,#viewDoposcuolaStaff,#modalAllergieGruppoCatechismo');
       const key=module ? (module.id.includes('Oratorio')?'oratorio':module.id.includes('Doposcuola')?'doposcuola':'catechismo')+'.salute' : (currentView==='anagrafica'?'anagrafica':'famiglia')+'.salute';
       if(!hasPermission(key)) {
         if(heading.tagName==='LEGEND')heading.parentElement.style.display='none';

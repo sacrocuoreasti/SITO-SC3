@@ -682,7 +682,7 @@ function navigateTo(viewName) {
   const isStaff = roles.some(r => ['admin', 'segreteria', 'parroco'].includes(r));
 
   if(Array.isArray(currentUser?.permessi) && !hasPermission(viewName)) {
-    viewName=['dashboard','famiglia','attivita','calendari','oratorio','catechismo','doposcuola','segreteria','anagrafica','excel','utenti'].find(key=>hasPermission(key));
+    viewName=['dashboard','famiglia','attivita','calendari','oratorio','catechismo','doposcuola','oratorio_staff','catechismo_staff','doposcuola_staff','segreteria','anagrafica','excel','utenti'].find(key=>hasPermission(key));
     if(!viewName){document.querySelectorAll('.view-panel').forEach(el=>el.style.display='none');document.getElementById('viewNoAccess').style.display='block';return;}
   }
   currentView = viewName;
@@ -697,7 +697,7 @@ function navigateTo(viewName) {
   });
 
   const breadcrumb = document.getElementById('breadcrumbCurrent');
-  breadcrumb.textContent = viewName.toUpperCase();
+  breadcrumb.textContent = viewName.replace('_staff',' staff').toUpperCase();
 
   const viewMap = {
     'dashboard': { id: 'viewDashboard', fn: loadDashboard },
@@ -705,8 +705,11 @@ function navigateTo(viewName) {
     'famiglia': { id: 'viewFamiglia', fn: loadFamiglia },
     'attivita': { id: 'viewAttivita', fn: loadAttivita },
     'oratorio': { id: 'viewOratorio', fn: loadOratorio },
+    'oratorio_staff': { id: 'viewOratorioStaff', fn: loadOratorio },
     'catechismo': { id: 'viewCatechismo', fn: loadCatechismo },
+    'catechismo_staff': { id: 'viewCatechismoStaff', fn: loadCatechismo },
     'doposcuola': { id: 'viewDoposcuola', fn: loadDoposcuola },
+    'doposcuola_staff': { id: 'viewDoposcuolaStaff', fn: loadDoposcuola },
     'segreteria': { id: 'viewSegreteria', fn: loadSegreteria },
     'anagrafica': { id: 'viewAnagrafica', fn: () => loadAnagrafica() },
     'excel': { id: 'viewExcel', fn: () => {} },
@@ -1156,7 +1159,7 @@ let currentEditingOratorioId = null;
 async function loadOratorio() {
   const roles = (currentUser && currentUser.tutti_i_ruoli) || [currentUser ? currentUser.ruolo : 'utente'];
   const isSupervisor = roles.some(r => ['admin', 'parroco', 'segreteria'].includes(r));
-  const isAnimatore = hasPermission('oratorio.staff');
+  const isAnimatore = currentView==='oratorio_staff' && hasPermission('oratorio.staff');
 
   if (!isAnimatore) {
     // Genitore / Fedele: visualizza iscrizioni e presenze dei propri figli
@@ -1180,8 +1183,7 @@ async function loadOratorio() {
   const parentSec = document.getElementById('oratorioParentSection');
   if (staffSec) staffSec.style.display = 'block';
   if (staffActions) staffActions.style.display = 'flex';
-  if (parentSec) parentSec.style.display = 'block';
-  await loadOratorioParentView();
+  if (parentSec) parentSec.style.display = 'none';
   StaffGroupRegister.reset('oratorio');
   const titleEl = document.getElementById('oratorioPageTitle');
   const descEl = document.getElementById('oratorioPageDesc');
@@ -1828,7 +1830,7 @@ let statoPresenzeCorrentiCatechismo = {};
 async function loadCatechismo() {
   const roles = (currentUser && currentUser.tutti_i_ruoli) || [currentUser ? currentUser.ruolo : 'utente'];
   const isSupervisor = roles.some(r => ['admin', 'parroco', 'segreteria'].includes(r));
-  const isCatechista = hasPermission('catechismo.staff');
+  const isCatechista = currentView==='catechismo_staff' && hasPermission('catechismo.staff');
 
   if (!isCatechista) {
     // Profilo Utente / Genitore: carica SOLO la vista per i propri figli
@@ -1852,8 +1854,7 @@ async function loadCatechismo() {
   const parentSec = document.getElementById('catechismoParentSection');
   if (staffSec) staffSec.style.display = 'block';
   if (staffActions) staffActions.style.display = 'flex';
-  if (parentSec) parentSec.style.display = 'block';
-  await loadCatechismoParentView();
+  if (parentSec) parentSec.style.display = 'none';
   tornaGruppiCatechismo();
   const titleEl = document.getElementById('catechismoPageTitle');
   const descEl = document.getElementById('catechismoPageDesc');
@@ -2180,42 +2181,7 @@ function renderTabellaRegistroCatechismo() {
     return;
   }
 
-  bodyEl.innerHTML = studenti.map((s, idx) => {
-    const isPresente = statoPresenzeCorrentiCatechismo[s.codice_fiscale] === true;
-
-    const percColor = s.percentuale >= 75 ? '#10b981' : (s.percentuale >= 50 ? '#f59e0b' : '#ef4444');
-
-    return `
-      <tr style="border-bottom: 1px solid var(--border-light);">
-        <td style="text-align: center; color: var(--ink-400); font-weight: 600; font-size: 12px;">${idx + 1}</td>
-        <td>
-          <div style="font-weight: 700; color: var(--ink-900); font-size: 13.5px;">${escapeHtml(s.nominativo)}</div>
-          <div style="font-size: 11px; color: var(--ink-500);">${escapeHtml(s.codice_fiscale)}${s.eta !== null && s.eta !== undefined ? ` · ${s.eta} anni` : ''}</div>
-        </td>
-        <td style="text-align: center; background: #f0f9ff; border-left: 2px solid #38bdf8; border-right: 2px solid #38bdf8; padding: 6px;">
-          <div style="display: inline-flex; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--border-light); background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-            <button type="button" id="btn-pres-cat-${s.codice_fiscale}" class="btn btn-sm ${isPresente ? 'btn-success' : 'btn-outline-success'}" style="border: none; border-radius: 0; padding: 4px 10px; font-size: 12px; ${isPresente ? 'font-weight:700;' : ''}" onclick="togglePresenzaRagazzoCatechismo('${s.codice_fiscale}', true)">
-              ✓ Presente
-            </button>
-            <button type="button" id="btn-ass-cat-${s.codice_fiscale}" class="btn btn-sm ${!isPresente ? 'btn-danger' : 'btn-outline-danger'}" style="border: none; border-radius: 0; padding: 4px 10px; font-size: 12px; ${!isPresente ? 'font-weight:700;' : ''}" onclick="togglePresenzaRagazzoCatechismo('${s.codice_fiscale}', false)">
-              ✗ Assente
-            </button>
-          </div>
-        </td>
-        <td style="text-align: center; font-size: 12.5px; font-weight: 600; color: var(--ink-700);">
-          ${s.presenti} / ${s.totale_incontri}
-        </td>
-        <td style="text-align: center;">
-          <div style="display: flex; flex-direction: column; align-items: center; gap: 3px;">
-            <strong style="font-size: 12px; color: ${percColor};">${s.percentuale}%</strong>
-            <div style="width: 48px; background: #e2e8f0; height: 5px; border-radius: 3px; overflow: hidden;">
-              <div style="width: ${s.percentuale}%; background: ${percColor}; height: 100%;"></div>
-            </div>
-          </div>
-        </td>
-      </tr>
-    `;
-  }).join('');
+  bodyEl.innerHTML = attendanceRows(studenti,statoPresenzeCorrentiCatechismo,'catechismo');
 
   aggiornaConteggioLiveCatechismo();
 }
@@ -2687,7 +2653,7 @@ let statoPresenzeCorrentiDoposcuola = {};
 async function loadDoposcuola() {
   const roles = (currentUser && currentUser.tutti_i_ruoli) || [currentUser ? currentUser.ruolo : 'utente'];
   const isSupervisor = roles.some(r => ['admin', 'parroco', 'segreteria'].includes(r));
-  const isStaffOrEducatore = hasPermission('doposcuola.staff');
+  const isStaffOrEducatore = currentView==='doposcuola_staff' && hasPermission('doposcuola.staff');
 
   if (!isStaffOrEducatore) {
     const staffSec = document.getElementById('doposcuolaStaffSection');
@@ -2709,8 +2675,7 @@ async function loadDoposcuola() {
   const parentSec = document.getElementById('doposcuolaParentSection');
   if (staffSec) staffSec.style.display = 'block';
   if (staffActions) staffActions.style.display = 'flex';
-  if (parentSec) parentSec.style.display = 'block';
-  await loadDoposcuolaParentView();
+  if (parentSec) parentSec.style.display = 'none';
   StaffGroupRegister.reset('doposcuola');
   const titleEl = document.getElementById('doposcuolaPageTitle');
   const descEl = document.getElementById('doposcuolaPageDesc');
@@ -2830,26 +2795,15 @@ function renderGruppiDoposcuolaGrid() {
   }).join('');
 }
 
-async function loadEducatoriDoposcuolaSelect(selectId) {
-  const sel = document.getElementById(selectId);
-  if (!sel) return;
-  try {
-    const res = await fetch('/api/doposcuola/educatori');
-    const data = await res.json();
-    const educatori = data.educatori || [];
-    if (!educatori.length) {
-      sel.innerHTML = '<option value="">(Nessun educatore registrato)</option>';
-    } else {
-      sel.innerHTML = '<option value="">-- Seleziona Educatore / Volontario --</option>' + educatori.map(e => `
-        <option value="${escapeHtml(e.nominativo)}" data-id="${e.id}" data-cf="${e.codice_fiscale || ''}">
-          ${escapeHtml(e.nominativo)} (${escapeHtml(e.email)})
-        </option>
-      `).join('');
-    }
-  } catch (err) {
-    console.error('Errore educatori doposcuola:', err);
-  }
+async function loadEducatoriDoposcuolaSelect(selectId,current=[]) {
+  const container=document.getElementById(selectId);if(!container)return;
+  const data=await apiJson('/api/doposcuola/educatori');
+  const options=new Map((data.educatori||[]).map(u=>[u.id,u]));
+  for(const user of current)if(!options.has(user.id))options.set(user.id,user);
+  const selected=new Set(current.map(u=>u.id));
+  container.innerHTML=[...options.values()].map(u=>`<label class="choice-row"><input type="checkbox" value="${u.id}" ${selected.has(u.id)?'checked':''}><span>${escapeHtml(u.nominativo)}<small> · ${escapeHtml(u.email||'')}</small></span></label>`).join('')||'<p>Nessun educatore disponibile.</p>';
 }
+function selectedDopEducators(id) {return [...document.querySelectorAll('#'+id+' input:checked')].map(input=>Number(input.value));}
 
 async function openModalNuovoGruppoDoposcuola() {
   document.getElementById('dopNomeGruppo').value = '';
@@ -2871,11 +2825,7 @@ async function handleSalvaGruppoDoposcuola(e) {
   const anno = document.getElementById('dopAnnoScolastico')?.value || '2026/2027';
   const stato = document.getElementById('dopStatoGruppo')?.value || 'pubblico';
   const fascia = document.getElementById('dopFasciaEta').value.trim();
-  const sel = document.getElementById('dopSelectEducatore');
-  const educatoreNome = sel ? sel.value.trim() : '';
-  const selectedOpt = sel && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex] : null;
-  const edId = selectedOpt ? selectedOpt.getAttribute('data-id') : null;
-  const edCF = selectedOpt ? selectedOpt.getAttribute('data-cf') : null;
+  const educators=selectedDopEducators('dopSelectEducatore');
   const orario = document.getElementById('dopOrario').value.trim();
   const aula = document.getElementById('dopAula').value.trim();
   const note = document.getElementById('dopNote').value.trim();
@@ -2891,9 +2841,7 @@ async function handleSalvaGruppoDoposcuola(e) {
         anno_scolastico: anno,
         stato,
         fascia_eta: fascia,
-        educatore_nome: educatoreNome,
-        educatore_cf: edCF,
-        educatore_utente_id: edId ? parseInt(edId) : null,
+        educatori_ids: educators,
         giorni_orari: orario,
         aula,
         note
@@ -2925,16 +2873,7 @@ async function openModalModificaGruppoDoposcuola(id) {
   document.getElementById('modDopAula').value = g.aula || '';
   document.getElementById('modDopNote').value = g.note || '';
 
-  await loadEducatoriDoposcuolaSelect('modDopEducatoreSelect');
-  const sel = document.getElementById('modDopEducatoreSelect');
-  if (sel && g.educatore_utente_id) {
-    for (let opt of sel.options) {
-      if (opt.getAttribute('data-id') == g.educatore_utente_id) {
-        opt.selected = true;
-        break;
-      }
-    }
-  }
+  await loadEducatoriDoposcuolaSelect('modDopEducatoreSelect',g.educatori||[]);
 
   document.getElementById('modDopGoogleCalendarUrl').value = g.google_calendar_url || '';
   setGroupAges('modDop', g);
@@ -2948,11 +2887,9 @@ async function handleSalvaModificaGruppoDoposcuola(e) {
   const anno = document.getElementById('modDopAnnoScolastico').value;
   const stato = document.getElementById('modDopStatoGruppo')?.value || 'pubblico';
   const fascia = document.getElementById('modDopFasciaEta').value.trim();
-  const sel = document.getElementById('modDopEducatoreSelect');
-  const edNome = sel ? sel.value.trim() : '';
-  const selectedOpt = sel && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex] : null;
-  const edId = selectedOpt ? selectedOpt.getAttribute('data-id') : null;
-  const edCF = selectedOpt ? selectedOpt.getAttribute('data-cf') : null;
+  const educators=selectedDopEducators('modDopEducatoreSelect');
+  const previous=(cacheGruppiDoposcuola.find(g=>g.id===Number(id))?.educatori_ids||[]);
+  const changed=JSON.stringify([...educators].sort())!==JSON.stringify([...previous].sort());
   const orario = document.getElementById('modDopOrario').value.trim();
   const aula = document.getElementById('modDopAula').value.trim();
   const note = document.getElementById('modDopNote').value.trim();
@@ -2968,9 +2905,7 @@ async function handleSalvaModificaGruppoDoposcuola(e) {
         anno_scolastico: anno,
         stato,
         fascia_eta: fascia,
-        educatore_nome: edNome,
-        educatore_cf: edCF,
-        educatore_utente_id: edId ? parseInt(edId) : null,
+        ...(changed?{educatori_ids:educators}:{}),
         giorni_orari: orario,
         aula,
         note
@@ -8241,12 +8176,10 @@ async function refreshEnrollmentOptions() {
   enrollmentOptions=data;
   let visible=false;
   for(const category of ['oratorio','catechismo','doposcuola']) {
-    const managed=managesGroupCategory(category);
-    const available=managed || (!(currentUser.is_gestione_pura || !currentUser.codice_fiscale) && (!!data.gruppi?.[category]?.length || !!data.gruppi_iscritti?.[category]?.length));
+    const available=(!(currentUser.is_gestione_pura || !currentUser.codice_fiscale) && (!!data.gruppi?.[category]?.length || !!data.gruppi_iscritti?.[category]?.length));
     const nav=document.querySelector('.'+category+'-nav');
     if(nav) nav.style.display=available ? 'flex' : 'none';
     visible=visible || available;
-    if(!available && currentView===category) navigateTo('dashboard');
   }
   const label=document.getElementById('sectionLabelPastorale');
   if(label) label.style.display=visible ? 'block' : 'none';
@@ -8271,7 +8204,7 @@ function availableGroupCards(category, groups) {
     const winter = category === 'oratorio' && g.tipo_oratorio === 'invernale';
     const year = g.anno_scolastico || g.anno_pastorale || 'Da definire';
     const course = category === 'catechismo' ? g.anno_catechismo : category === 'doposcuola' ? g.fascia_eta : winter ? 'Oratorio invernale' : 'Oratorio estivo';
-    const staff = category === 'catechismo' ? g.catechisti : category === 'oratorio' ? g.animatori : null;
+    const staff = category === 'catechismo' ? g.catechisti : category === 'oratorio' ? g.animatori : g.educatori;
     const reference = staff?.length ? staff.map(person=>person.nominativo).filter(Boolean).join(', ') : (g.catechista_nome || g.educatore_nome || g.animatori_nomi || g.animatore_referente_nome || 'Da assegnare');
     const members = g.totale_studenti ?? g.totale_ragazzi ?? 0;
     return `<form class="catechismo-card family-enrollment-card family-enrollment-card--${category}${winter ? ' family-enrollment-card--invernale' : ''}" onsubmit="enrollFamilyGroup(event,'${category}',${g.id})">
@@ -8313,7 +8246,7 @@ async function loadFamilyGroupView(category,loadAssigned) {
     const joined=data?.gruppi_iscritti?.[category] || [];
     const section=document.getElementById(category+'ParentSection');
     if(section)section.style.display=(groups.length || joined.length)?'block':'none';
-    if(!groups.length && !joined.length) {if(currentView===category && !hasPermission(category+'.staff')) navigateTo('dashboard');return;}
+    if(!groups.length && !joined.length) {if(currentView===category && hasPermission('dashboard'))navigateTo('dashboard');return;}
     container.innerHTML=`<div class="family-group-assigned" id="${category}AssignedContainer"></div>`+(groups.length ? `<div class="family-group-heading"><div><h2>Gruppi disponibili</h2><p>Consulta le informazioni e scegli chi iscrivere.</p></div><span class="badge badge-neutral">${groups.length} ${groups.length===1 ? 'gruppo':'gruppi'}</span></div><div class="family-group-grid">${availableGroupCards(category,groups)}</div>` : '');
     await loadAssigned();
   } catch(error) {showToast(error.message,'error');}
@@ -8397,16 +8330,16 @@ async function loadAssignedGroupRegisters(category) {
 }
 async function openCalendarGroupAttendance(category,id,day) {
   if(category==='catechismo') {
-    if(currentView!=='catechismo') await navigateTo('catechismo');
+    if(currentView!=='catechismo_staff') await navigateTo('catechismo_staff');
     if(!cacheGruppiCatechismo.some(group=>group.id===id)) cacheGruppiCatechismo=(await apiJson('/api/catechismo/gruppi')).gruppi || [];
     await openModalAppelloCatechismo(id,day);
   } else if(category==='doposcuola') {
     if(!cacheGruppiDoposcuola.some(group=>group.id===id)) cacheGruppiDoposcuola=(await apiJson('/api/doposcuola/gruppi')).gruppi || [];
-    if(currentView!=='doposcuola') await navigateTo('doposcuola');
+    if(currentView!=='doposcuola_staff') await navigateTo('doposcuola_staff');
     await StaffGroupRegister.openAttendance('doposcuola',day,id);
   } else if(category==='oratorio') {
     if(!cacheGruppiOratorio.some(group=>group.id===id)) cacheGruppiOratorio=(await apiJson('/api/oratorio/gruppi')).gruppi || [];
-    if(currentView!=='oratorio') await navigateTo('oratorio');
+    if(currentView!=='oratorio_staff') await navigateTo('oratorio_staff');
     await StaffGroupRegister.openAttendance('oratorio',day,id);
   }
 }

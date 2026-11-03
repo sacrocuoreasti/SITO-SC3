@@ -40,6 +40,10 @@ def register_age_guard(blueprint, model, collection):
         path = request.path
         if not (path.endswith('/iscrivi-figlio') or path.endswith('/'+collection) or path.endswith('/'+collection+'/batch')): return
         data = request.get_json() or {}
+        if model.__name__=='GruppoCatechismo':
+            from services.catechismo_membership import lock_enrollment
+            supplied=data.get('codici_fiscali',[data.get('codice_fiscale','')])
+            lock_enrollment([normalizza_cf(cf) for cf in supplied if isinstance(cf,str)] if isinstance(supplied,list) else [])
         group_id = (request.view_args or {}).get('id') or data.get('gruppo_id')
         try: group = db.session.get(model,int(group_id))
         except (TypeError,ValueError): return
@@ -55,4 +59,8 @@ def register_age_guard(blueprint, model, collection):
         for cf in members:
             if not isinstance(cf,str): raise BadRequest('Codice fiscale non valido')
             person = db.session.get(Persona,normalizza_cf(cf))
-            if person and person not in getattr(group,collection): validate_member_age(group,person)
+            if person and person not in getattr(group,collection):
+                validate_member_age(group,person)
+                if model.__name__=='GruppoCatechismo':
+                    from services.catechismo_membership import ensure_unique
+                    ensure_unique(group,[person])

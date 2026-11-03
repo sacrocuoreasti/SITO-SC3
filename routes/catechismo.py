@@ -12,6 +12,12 @@ from datetime import date, datetime
 catechismo_bp = Blueprint('catechismo_bp', __name__, url_prefix='/api/catechismo')
 register_age_guard(catechismo_bp, GruppoCatechismo, 'ragazzi')
 
+@catechismo_bp.before_request
+def guard_year_change():
+    if request.method=='PUT' and (request.get_json(silent=True) or {}).get('anno_pastorale') is not None:
+        from services.catechismo_membership import lock_enrollment
+        lock_enrollment([row[0] for row in db.session.query(Persona.codice_fiscale).all()])
+
 
 @catechismo_bp.route('/catechisti', methods=['GET'])
 def get_catechisti():
@@ -119,10 +125,14 @@ def update_gruppo(id):
         return jsonify({'error': 'Gruppo non trovato'}), 404
 
     data = request.get_json() or {}
+    previous_year=g.anno_pastorale
     apply_calendar(g, data)
     apply_age_range(g, data)
     if 'nome' in data: g.nome = data['nome'].strip()
     if 'anno_pastorale' in data: g.anno_pastorale = data['anno_pastorale'].strip()
+    if g.anno_pastorale!=previous_year:
+        from services.catechismo_membership import ensure_unique
+        ensure_unique(g,list(g.ragazzi),preserve_existing=False)
     if 'anno_catechismo' in data: g.anno_catechismo = data['anno_catechismo'].strip()
     if 'catechista_nome' in data: g.catechista_nome = data['catechista_nome'].strip()
     if 'catechista_cf' in data: g.catechista_cf = normalizza_cf(data['catechista_cf']) or None
@@ -387,6 +397,7 @@ def add_ragazzi_batch(id):
 
 @catechismo_bp.route('/gruppi/<int:id>/assegnabili', methods=['GET'])
 def assignable_people(id):
+    from services.catechismo_membership import conflicting_group
     from services.family_service import staff_user
     from services.enrollment_options import age_eligible
     from services.catechismo_parents import members,is_parent_group
@@ -395,7 +406,7 @@ def assignable_people(id):
     group=db.session.get(GruppoCatechismo,id)
     if not group: return jsonify(error='Gruppo non trovato'),404
     existing={p.codice_fiscale for p in members(group)}
-    candidates=[] if is_parent_group(group) else [p.to_dict() for p in Persona.query.order_by(Persona.cognome,Persona.nome).all() if p.codice_fiscale not in existing and age_eligible(p,group)]
+    candidates=[] if is_parent_group(group) else [p.to_dict() for p in Persona.query.order_by(Persona.cognome,Persona.nome).all() if p.codice_fiscale not in existing and age_eligible(p,group) and not conflicting_group(p,group)]
     return jsonify(persone=candidates,total=len(candidates))
 
 

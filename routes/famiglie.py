@@ -332,6 +332,9 @@ def enroll_family_group():
     if not isinstance(category,str) or category not in GROUP_MODELS:
         return jsonify(error='Categoria non valida'),400
     model, collection = GROUP_MODELS[category]
+    if category=='catechismo':
+        from services.catechismo_membership import lock_enrollment
+        lock_enrollment(data.get('partecipanti') if isinstance(data.get('partecipanti'),list) else [])
     try:
         group = db.session.get(model, int(data.get('gruppo_id')))
     except (ValueError, TypeError):
@@ -349,6 +352,9 @@ def enroll_family_group():
         if not age_eligible(allowed[cf],group):
             return jsonify(error='Uno dei partecipanti non rientra nella fascia di età'),400
     members = getattr(group,collection)
+    if category=='catechismo':
+        from services.catechismo_membership import ensure_unique
+        ensure_unique(group,[allowed[cf] for cf in cfs])
     for cf in cfs:
         if allowed[cf] not in members:
             members.append(allowed[cf])

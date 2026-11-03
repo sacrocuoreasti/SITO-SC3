@@ -104,9 +104,12 @@ class CatechismoParentsTests(unittest.TestCase):
         self.assertEqual(self.client.get(f'/api/catechismo/gruppi/{self.first_id}/assegnabili').status_code,403)
 
     def test_assignable_list_excludes_existing_out_of_age_and_automatic_parent_groups(self):
+        free_cf=fixture.fiscal_code('RSSMRA14A01H501')
+        with self.app.app_context():
+            db.session.add(Persona(codice_fiscale=free_cf,nome='Nuovo',cognome='Iscritto',data_nascita=date(2014,1,1)));db.session.commit()
         response=self.client.get(f'/api/catechismo/gruppi/{self.first_id}/assegnabili')
         self.assertEqual(response.status_code,200,response.json)
-        self.assertEqual({p['codice_fiscale'] for p in response.json['persone']},{self.other_child_cf})
+        self.assertEqual({p['codice_fiscale'] for p in response.json['persone']},{free_cf})
         self.assertEqual(self.client.get(f'/api/catechismo/gruppi/{self.parents_id}/assegnabili').json['persone'],[])
         self.assertEqual(self.client.post(f'/api/catechismo/gruppi/{self.first_id}/ragazzi/batch',json={'codici_fiscali':[self.head_cf]}).status_code,400)
         self.assertEqual(self.client.post(f'/api/catechismo/gruppi/{self.parents_id}/ragazzi',json={'codice_fiscale':self.other_parent_cf}).status_code,400)

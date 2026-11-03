@@ -103,20 +103,23 @@ const StaffGroupRegister=(()=>{
       current.data=data;
       for(const person of data.studenti)current.marks[person.codice_fiscale]=person.presenze_map[day]!==false;
       const meeting=data.date_incontri.find(row=>row.data===day);
-      pane(category).innerHTML=frame(category,'Appello del '+day.split('-').reverse().join('/'),'back')+`<p>${escapeHtml(data.gruppo.nome)} · ${day.split('-').reverse().join('/')}</p>${data.avviso_calendario?`<p role="status">${escapeHtml(data.avviso_calendario)}</p>`:''}<form onsubmit="${action(category,'save','event')}"><div class="staff-register-tools"><label for="${category}MeetingTitle">Titolo incontro<input class="form-control" id="${category}MeetingTitle" value="${escapeHtml(meeting?.titolo_incontro||'')}" maxlength="100"></label><label class="choice-row"><input id="${category}MeetingPercentage" type="checkbox" ${meeting?.concorre_percentuale===false?'':'checked'}>Concorre alla percentuale delle presenze</label></div><div class="staff-register-tools"><button class="btn btn-secondary" type="button" onclick="${action(category,'markAll','true')}">Tutti presenti</button><button class="btn btn-secondary" type="button" onclick="${action(category,'markAll','false')}">Tutti assenti</button></div>
-      <div class="staff-attendance-people">${data.studenti.map(person=>`<div class="staff-attendance-person"><strong>${escapeHtml(person.nominativo)}</strong><div><button id="sgp-${category}-${person.codice_fiscale}" type="button" aria-pressed="${current.marks[person.codice_fiscale]}" class="btn btn-sm ${current.marks[person.codice_fiscale]?'btn-success':'btn-secondary'}" onclick="${action(category,'mark',`'${person.codice_fiscale}',true`)}">Presente</button><button id="sga-${category}-${person.codice_fiscale}" type="button" aria-pressed="${!current.marks[person.codice_fiscale]}" class="btn btn-sm ${current.marks[person.codice_fiscale]?'btn-secondary':'btn-danger'}" onclick="${action(category,'mark',`'${person.codice_fiscale}',false`)}">Assente</button></div></div>`).join('')||'<p>Nessun partecipante iscritto al gruppo.</p>'}</div><p>Le presenze sono registrate solo premendo Salva.</p><div class="staff-register-tools"><button type="submit" id="${category}SaveAttendance" class="btn btn-primary" ${data.studenti.length?'':'disabled'}>Salva presenze</button><button type="button" class="btn btn-secondary" onclick="${action(category,'back')}">Annulla</button>${meeting?.registrato && data.puo_cancellare?`<button type="button" class="btn btn-danger" onclick="${action(category,'removeMeeting')}">Cancella appello</button>`:''}</div></form>`;
+      pane(category).innerHTML=frame(category,'Appello del '+day.split('-').reverse().join('/'),'back')+`<div class="attendance-group-banner"><div><small>Gruppo ${category==='oratorio'?'Oratorio':'Doposcuola'}</small><h3>${escapeHtml(data.gruppo.nome)}</h3><p>${escapeHtml(data.gruppo.anno_scolastico||data.gruppo.anno_pastorale||'')}</p></div><span class="badge badge-info">${data.studenti.length} iscritti</span></div>${data.avviso_calendario?`<p role="status">${escapeHtml(data.avviso_calendario)}</p>`:''}<form onsubmit="${action(category,'save','event')}"><div class="attendance-toolbar"><div class="staff-register-tools"><label>Data incontro<input type="date" class="form-control" value="${day}" readonly></label><label for="${category}MeetingTitle">Titolo incontro<input class="form-control" id="${category}MeetingTitle" value="${escapeHtml(meeting?.titolo_incontro||'')}" maxlength="100"></label><label class="choice-row"><input id="${category}MeetingPercentage" type="checkbox" ${meeting?.concorre_percentuale===false?'':'checked'}>Concorre alla percentuale delle presenze</label></div><div class="staff-register-tools"><span id="${category}AttendanceCount" class="badge badge-info"></span><button class="btn btn-secondary" type="button" onclick="${action(category,'markAll','true')}">Tutti presenti</button><button class="btn btn-secondary" type="button" onclick="${action(category,'markAll','false')}">Tutti assenti</button></div></div>
+      <div class="table-responsive attendance-matrix"><table class="custom-table"><thead><tr><th>#</th><th>Partecipante</th><th>Appello data selezionata</th><th>Presenze</th><th>% Pres.</th></tr></thead><tbody>${attendanceRows(data.studenti,current.marks,category)||'<tr><td colspan="5">Nessun partecipante iscritto al gruppo.</td></tr>'}</tbody></table></div><p>Le presenze sono registrate solo premendo Salva.</p><div class="staff-register-tools"><button type="submit" id="${category}SaveAttendance" class="btn btn-primary" ${data.studenti.length?'':'disabled'}>Salva presenze</button><button type="button" class="btn btn-secondary" onclick="${action(category,'back')}">Annulla</button>${meeting?.registrato && data.puo_cancellare?`<button type="button" class="btn btn-danger" onclick="${action(category,'removeMeeting')}">Cancella appello</button>`:''}</div></form>`;
+      updateCount(category);
       document.getElementById(category+'RegisterTitle').focus?.();
     } catch(error) {if(sequence===current.sequence)pane(category).innerHTML=frame(category,'Appello non disponibile','back')+`<p role="alert">${escapeHtml(error.message)}</p>`;}
   }
-  function mark(category,cf,present) {
+  function updateCount(category) {const values=Object.values(state(category).marks);const present=values.filter(Boolean).length;document.getElementById(category+'AttendanceCount').textContent=`${present} presenti · ${values.length-present} assenti`;}
+  function mark(category,cf,present,update=true) {
     const current=state(category);if(!(cf in current.marks))return;
     current.marks[cf]=present;
     for(const [prefix,value,active] of [['sgp',present,'btn-success'],['sga',!present,'btn-danger']]) {
       const button=document.getElementById(prefix+'-'+category+'-'+cf);
-      button.className='btn btn-sm '+(value?active:'btn-secondary');button.setAttribute?.('aria-pressed',String(value));
+      button.className='btn btn-sm '+(value?active:(prefix==='sgp'?'btn-outline-success':'btn-outline-danger'));button.style.fontWeight=value?'700':'normal';button.setAttribute?.('aria-pressed',String(value));
     }
+    if(update)updateCount(category);
   }
-  function markAll(category,value) {for(const cf of Object.keys(state(category).marks))mark(category,cf,value);}
+  function markAll(category,value) {for(const cf of Object.keys(state(category).marks))mark(category,cf,value,false);updateCount(category);}
   async function save(category,event) {
     event.preventDefault();const current=state(category);if(!current.data)return;
     const button=document.getElementById(category+'SaveAttendance');if(button.disabled)return;button.disabled=true;
@@ -170,4 +173,44 @@ async function openGroupHealth(category,id) {
     content.innerHTML=`<div class="health-summary-counts"><span><strong>${counts.iscritti}</strong> iscritti</span><span><strong>${counts.esigenze_alimentari}</strong> con allergie o intolleranze segnalate</span><span><strong>${counts.terapie}</strong> con terapie segnalate</span></div>`+
       (data.persone.length?`<div class="table-responsive"><table class="custom-table"><thead><tr><th>Iscritto</th><th>Allergie</th><th>Intolleranze alimentari</th><th>Terapie / medicinali</th><th>Note</th><th>Contatti familiari</th></tr></thead><tbody>${data.persone.map(p=>`<tr><td><strong>${escapeHtml(p.nominativo)}</strong></td><td>${escapeHtml(p.allergie||'Non indicate')}</td><td>${escapeHtml(p.intolleranze_alimentari||'Non indicate')}</td><td>${escapeHtml(p.terapie_medicinali||'Non indicate')}</td><td>${escapeHtml(p.note_mediche||'—')}</td><td>${p.contatti.map(c=>`${escapeHtml(c.nominativo)}<br>${escapeHtml(c.telefono||'Numero non indicato')}`).join('<br>')||'Non indicati'}</td></tr>`).join('')}</tbody></table></div>`:'<p>Nessun iscritto in questo gruppo.</p>');
   } catch(error){if(sequence===groupHealthRequest){document.getElementById('groupHealthTitle').textContent='';content.textContent=error.message;}}
+}
+
+function attendanceRows(studenti,marks,category) {
+  return studenti.map((s, idx) => {
+    const isPresente = marks[s.codice_fiscale] === true;
+
+    const percColor = s.percentuale >= 75 ? '#10b981' : (s.percentuale >= 50 ? '#f59e0b' : '#ef4444');
+
+    return `
+      <tr style="border-bottom: 1px solid var(--border-light);">
+        <td style="text-align: center; color: var(--ink-400); font-weight: 600; font-size: 12px;">${idx + 1}</td>
+        <td>
+          <div style="font-weight: 700; color: var(--ink-900); font-size: 13.5px;">${escapeHtml(s.nominativo)}</div>
+          <div style="font-size: 11px; color: var(--ink-500);">${escapeHtml(s.codice_fiscale)}${s.eta !== null && s.eta !== undefined ? ` · ${s.eta} anni` : ''}</div>
+        </td>
+        <td style="text-align: center; background: #f0f9ff; border-left: 2px solid #38bdf8; border-right: 2px solid #38bdf8; padding: 6px;">
+          <div style="display: inline-flex; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--border-light); background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+            <button type="button" aria-pressed="${isPresente}" id="${category==='catechismo'?'btn-pres-cat-':'sgp-'+category+'-'}${s.codice_fiscale}" class="btn btn-sm ${isPresente ? 'btn-success' : 'btn-outline-success'}" style="border: none; border-radius: 0; padding: 4px 10px; font-size: 12px; ${isPresente ? 'font-weight:700;' : ''}" onclick="${category==='catechismo'?`togglePresenzaRagazzoCatechismo('${s.codice_fiscale}', true)`:`StaffGroupRegister.mark('${category}','${s.codice_fiscale}',true)`}">
+              ✓ Presente
+            </button>
+            <button type="button" aria-pressed="${!isPresente}" id="${category==='catechismo'?'btn-ass-cat-':'sga-'+category+'-'}${s.codice_fiscale}" class="btn btn-sm ${!isPresente ? 'btn-danger' : 'btn-outline-danger'}" style="border: none; border-radius: 0; padding: 4px 10px; font-size: 12px; ${!isPresente ? 'font-weight:700;' : ''}" onclick="${category==='catechismo'?`togglePresenzaRagazzoCatechismo('${s.codice_fiscale}', false)`:`StaffGroupRegister.mark('${category}','${s.codice_fiscale}',false)`}">
+              ✗ Assente
+            </button>
+          </div>
+        </td>
+        <td style="text-align: center; font-size: 12.5px; font-weight: 600; color: var(--ink-700);">
+          ${s.presenti} / ${s.totale_incontri}
+        </td>
+        <td style="text-align: center;">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 3px;">
+            <strong style="font-size: 12px; color: ${percColor};">${s.percentuale}%</strong>
+            <div style="width: 48px; background: #e2e8f0; height: 5px; border-radius: 3px; overflow: hidden;">
+              <div style="width: ${s.percentuale}%; background: ${percColor}; height: 100%;"></div>
+            </div>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
 }

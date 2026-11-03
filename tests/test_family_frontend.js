@@ -271,14 +271,17 @@ vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['
     await staffRegister.openDates(category,9);
     assert.ok(nodes(category+'RegisterSection').innerHTML.includes('Storico incontri'));
     await staffRegister.openAttendance(category,'2026-11-08');
+    assert.ok(nodes(category+'RegisterSection').innerHTML.includes('attendance-matrix'));
+    assert.ok(nodes(category+'RegisterSection').innerHTML.includes('% Pres.'));
     staffRegister.mark(category,people[1].codice_fiscale,false);
+    assert.equal(nodes(category+'AttendanceCount').textContent,'0 presenti · 1 assenti');
     nodes(category+'MeetingTitle').value='Incontro di prova';nodes(category+'MeetingPercentage').checked=true;
     await staffRegister.save(category,{preventDefault(){}});
     const post=requests.find(r=>r.url===route && r.options.method==='POST');
     assert.equal(JSON.parse(post.options.body).data,'2026-11-08');
     assert.equal(JSON.parse(post.options.body).presenze[0].presente,false);
   }
-  // Un incarico pastorale aggiunge la gestione senza nascondere la famiglia.
+  // Menu familiari e staff distinti: cambiare vista non miscela le due aree.
   vm.runInContext("currentUser={id:1,codice_fiscale:'RSSMRA80A01H501U',ruolo:'utente',tutti_i_ruoli:['utente','catechista','oratorio','educatore'],permessi:['oratorio','catechismo','doposcuola',...['oratorio','catechismo','doposcuola'].flatMap(c=>['staff','salute','cucina','calendario','storico','elenco'].map(p=>c+'.'+p))]};",context);
   fixtures['/api/oratorio/allergie']={conteggi:{},segnalazioni:[]};
   fixtures['/api/famiglie/opportunita'].gruppi_iscritti={};
@@ -290,23 +293,57 @@ vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['
     vm.runInContext("currentView='"+category+"';",context);
     await context[load]();
     assert.equal(nodes(category+'ParentSection').style.display,'block');
-    assert.equal(nodes(category+'StaffSection').style.display,'block');
+    assert.equal(nodes(category+'StaffSection').style.display,'none');
     const content=nodes(category+'ParentContainer').innerHTML;
     assert.ok(content.indexOf(category+'AssignedContainer')<content.indexOf('Gruppi disponibili'));
     assert.ok(nodes(category+'AssignedContainer').innerHTML.includes('I tuoi gruppi e le presenze'));
     assert.ok(template.indexOf('id="'+category+'ParentSection"')<template.indexOf('id="'+category+'StaffSection"'));
+    vm.runInContext("currentView='"+category+"_staff';",context);
+    await context[load]();
+    assert.equal(nodes(category+'StaffSection').style.display,'block');
+    assert.equal(nodes(category+'ParentSection').style.display,'none');
     fixtures['/api/famiglie/opportunita'].gruppi[category]=[];
     fixtures['/api/famiglie/opportunita'].gruppi_iscritti[category]=[];
     await context[load]();
     assert.equal(nodes(category+'ParentSection').style.display,'none');
     assert.equal(nodes(category+'StaffSection').style.display,'block');
-    assert.equal(vm.runInContext('currentView',context),category);
+    assert.equal(vm.runInContext('currentView',context),category+'_staff');
+    assert.ok(template.includes('data-view="'+category+'_staff"'));
+    assert.equal(context.hasPermission(category+'_staff'),true);
   }
   fixtures['/api/calendari-gruppi/catechismo/9/sanita']={gruppo:'Gruppo di prova',conteggi:{iscritti:1,esigenze_alimentari:1,terapie:0},persone:[{nominativo:'Nome <prova>',allergie:'Arachidi',intolleranze_alimentari:'',terapie_medicinali:'',note_mediche:'',contatti:[]}]};
   await context.openGroupHealth('catechismo',9);
   assert.ok(nodes('groupHealthContent').innerHTML.includes('Arachidi'));
   assert.ok(nodes('groupHealthContent').innerHTML.includes('Nome &lt;prova&gt;'));
   assert.ok(!nodes('groupHealthContent').innerHTML.includes('Nome <prova>'));
+  // I sei collegamenti aprono pannelli distinti e gli utenti senza incarico non entrano nello staff.
+  const beforeNavigation=context.document.querySelectorAll;
+  context.document.querySelectorAll=selector=>selector==='.view-panel'?['Oratorio','Catechismo','Doposcuola'].flatMap(c=>[nodes('view'+c),nodes('view'+c+'Staff')]):beforeNavigation(selector);
+  await context.navigateTo('catechismo_staff');
+  assert.equal(nodes('viewCatechismoStaff').style.display,'block');
+  assert.equal(nodes('viewCatechismo').style.display,'none');
+  fixtures['/api/famiglie/opportunita'].gruppi.catechismo=[{id:3,nome:'Gruppo disponibile',partecipanti:[people[1]]}];
+  await context.navigateTo('catechismo');
+  assert.equal(nodes('viewCatechismo').style.display,'block');
+  assert.equal(nodes('viewCatechismoStaff').style.display,'none');
+  vm.runInContext("currentUser.permessi=['dashboard'];",context);
+  await context.navigateTo('catechismo_staff');
+  assert.equal(context.hasPermission('catechismo_staff'),false);
+  assert.equal(vm.runInContext('currentView',context),'dashboard');
+  context.document.querySelectorAll=beforeNavigation;
+  vm.runInContext("currentUser.permessi=['doposcuola','doposcuola.staff'];currentView='doposcuola_staff';",context);
+  // La selezione multipla degli educatori arriva alla API come elenco di ID.
+  fixtures['/api/doposcuola/educatori']={educatori:[{id:41,nominativo:'Educatore uno',email:'uno@example.test'},{id:42,nominativo:'Educatore due',email:'due@example.test'}]};
+  await context.loadEducatoriDoposcuolaSelect('dopSelectEducatore',[{id:41,nominativo:'Educatore uno'}]);
+  assert.equal((nodes('dopSelectEducatore').innerHTML.match(/type="checkbox"/g)||[]).length,2);
+  assert.equal((nodes('dopSelectEducatore').innerHTML.match(/checked/g)||[]).length,1);
+  const previousSelections=context.document.querySelectorAll;
+  context.document.querySelectorAll=selector=>selector==='#dopSelectEducatore input:checked'?[{value:'41'},{value:'42'}]:previousSelections(selector);
+  nodes('dopNomeGruppo').value='Gruppo condiviso';
+  await context.handleSalvaGruppoDoposcuola({preventDefault(){}});
+  const groupPost=requests.find(r=>r.url==='/api/doposcuola/gruppi' && r.options.method==='POST');
+  assert.deepEqual(JSON.parse(groupPost.options.body).educatori_ids,[41,42]);
+  context.document.querySelectorAll=previousSelections;
   vm.runInContext("currentUser.permessi=['calendari','calendari.comunita'];",context);
   assert.equal(context.hasPermission('calendari.comunita'),true);
   assert.equal(context.hasPermission('utenti.permessi'),false);
