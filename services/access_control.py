@@ -141,8 +141,10 @@ def required_permissions():
         elif path.endswith('/iscrivi-figlio'):child=None
         else:child=None
         if child:caps.append(category+'.'+child)
+        if category=='oratorio' and path=='/api/oratorio/allergie':caps.append('oratorio.cucina')
         return caps
     if bp=='famiglie_bp':
+        if path.endswith('/mia'):return ['famiglia']
         if path.endswith('/opportunita'):return [] # autorizzazioni filtrate nella risposta
         if '/registri-gruppi/' in path:return [(request.view_args or {}).get('category','famiglia')]
         if path.endswith('/calendari-gruppi'):return ['calendari.gruppi']
