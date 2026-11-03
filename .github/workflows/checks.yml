@@ -22,6 +22,7 @@ jobs:
       - run: node --check static/js/app.js
       - run: node --check static/js/group-calendar.js
       - run: node --check static/js/portal-views.js
+      - run: node --check static/js/access-control.js
       - run: node tests/test_frontend.js
       - run: node tests/test_google_script.js
       - run: node tests/test_family_frontend.js

@@ -389,6 +389,7 @@ function applyRolePermissions() {
   if (famigliaNav) {
     famigliaNav.style.display = isGestionePura ? 'none' : 'flex';
   }
+  if(typeof AccessUI!=='undefined') AccessUI.start();
 }
 
 function updateQuickLoginRequirement() {
@@ -652,11 +653,9 @@ function navigateTo(viewName) {
   const roles = currentUser ? (currentUser.tutti_i_ruoli || [currentUser.ruolo]) : [];
   const isStaff = roles.some(r => ['admin', 'segreteria', 'parroco'].includes(r));
 
-  if (viewName === 'famiglia' && currentUser && (currentUser.is_gestione_pura || ['segreteria', 'oratorio'].includes(currentUser.ruolo))) {
-    viewName = 'dashboard';
-  }
-  if (!isStaff && ['anagrafica', 'excel', 'segreteria', 'utenti'].includes(viewName)) {
-    viewName = 'dashboard';
+  if(Array.isArray(currentUser?.permessi) && !hasPermission(viewName)) {
+    viewName=['dashboard','famiglia','attivita','calendari','oratorio','catechismo','doposcuola','segreteria','anagrafica','excel','utenti'].find(key=>hasPermission(key));
+    if(!viewName){document.querySelectorAll('.view-panel').forEach(el=>el.style.display='none');document.getElementById('viewNoAccess').style.display='block';return;}
   }
   currentView = viewName;
 
@@ -718,7 +717,7 @@ function toggleSidebar() {
 async function loadDashboard() {
   try {
     const roles = currentUser ? (currentUser.tutti_i_ruoli || [currentUser.ruolo]) : [];
-    const isStaff = roles.some(r => ['admin', 'segreteria', 'parroco'].includes(r));
+    const isStaff = hasPermission('dashboard.cassa');
 
     if (isStaff) {
       const [statsRes, attRes] = await Promise.all([
@@ -974,7 +973,7 @@ async function loadFamilyIscrizioni() {
 // ================= VIEW 3: ATTIVITÀ & BOZZE/PUBBLICAZIONE =================
 async function loadAttivita() {
   try {
-    const isStaff = currentUser && (currentUser.tutti_i_ruoli || []).some(r => ['admin', 'segreteria', 'parroco'].includes(r));
+    const isStaff = hasPermission('attivita.gestione');
     const url = isStaff ? '/api/attivita?include_bozze=true&solo_attive=false' : '/api/attivita?solo_attive=false';
     const res = await fetch(url);
     const data = await res.json();
@@ -988,7 +987,7 @@ async function loadAttivita() {
 
 function renderAttivitaCatalog(items) {
   const container = document.getElementById('activitiesCatalogGrid');
-  const isStaff = currentUser && (currentUser.tutti_i_ruoli || []).some(r => ['admin', 'segreteria', 'parroco'].includes(r));
+  const isStaff = hasPermission('attivita.gestione');
 
   items=items.filter(a=>currentTimeFilter==='all' || activityIsPast(a)===(currentTimeFilter==='past'));
   if (!isStaff) items = items.filter(a => {
@@ -1085,7 +1084,7 @@ async function togglePubblicazioneAttivita(id) {
 let currentCatFilter = '';
 let currentStatusFilter = 'all';
 let currentTimeFilter = 'upcoming';
-function filterAttivitaByTime(value) {currentTimeFilter=value;applyAttivitaFilters();}
+function filterAttivitaByTime(value) {currentTimeFilter=hasPermission('attivita.passati')?value:'upcoming';applyAttivitaFilters();}
 
 function applyAttivitaFilters() {
   let list = cacheAttivita;
@@ -1129,7 +1128,7 @@ let currentEditingOratorioId = null;
 async function loadOratorio() {
   const roles = (currentUser && currentUser.tutti_i_ruoli) || [currentUser ? currentUser.ruolo : 'utente'];
   const isSupervisor = roles.some(r => ['admin', 'parroco', 'segreteria'].includes(r));
-  const isAnimatore = isSupervisor || roles.some(r=>['oratorio','animatore'].includes(r));
+  const isAnimatore = hasPermission('oratorio.staff');
 
   if (!isAnimatore) {
     // Genitore / Fedele: visualizza iscrizioni e presenze dei propri figli
@@ -1209,6 +1208,7 @@ async function loadOratorio() {
 }
 
 function switchOratorioTab(tab) {
+  if(Array.isArray(currentUser?.permessi) && !hasPermission('oratorio.'+(tab==='allergie'?'cucina':tab))) {tab=['estivo','invernale'].find(key=>hasPermission('oratorio.'+key));if(!tab)return;}
   currentOratorioTipoTab = tab;
   document.querySelectorAll('.tab-ora-btn').forEach(btn => {
     btn.className = 'btn btn-sm btn-secondary tab-ora-btn';
@@ -1290,10 +1290,6 @@ function renderGruppiOratorioGrid() {
       ? '<span class="badge badge-danger" style="font-size: 11px;">🔴 Chiuso</span>'
       : (isBozza ? '<span class="badge badge-warning" style="font-size: 11px;">🟡 Bozza</span>' : '<span class="badge badge-success" style="font-size: 11px;">🟢 Pubblico</span>');
 
-    const animatoriBadges = (g.animatori && g.animatori.length)
-      ? g.animatori.map(a => `<span class="badge badge-neutral" style="font-size: 11.5px; margin-right: 4px;">👤 ${escapeHtml(a.nominativo)}</span>`).join('')
-      : `<span style="color: var(--ink-500); font-size: 12px; font-style: italic;">Nessun animatore assegnato</span>`;
-
     return `
       <div class="card" style="border-top: 4px solid ${currentOratorioTipoTab === 'estivo' ? '#eab308' : '#3b82f6'}; display: flex; flex-direction: column; justify-content: space-between;">
         <div class="card-header" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
@@ -1314,10 +1310,6 @@ function renderGruppiOratorioGrid() {
             <div style="margin-top: 4px;">👥 <strong>Iscritti:</strong> <span class="badge badge-info">${numIscritti} ragazzi</span> ${g.max_iscritti ? `<small style="color:var(--ink-500);">(Max: ${g.max_iscritti})</small>` : ''}</div>
           </div>
 
-          <div style="margin-top: 10px; border-top: 1px dashed var(--border-light); padding-top: 8px;">
-            <strong style="font-size: 12px; color: var(--ink-600); display: block; margin-bottom: 4px;">Animatori Responsabili:</strong>
-            <div style="display: flex; flex-wrap: wrap; gap: 4px;">${animatoriBadges}</div>
-          </div>
         </div>
 
         <div class="card-footer" style="background: #f8fafc; border-top: 1px solid var(--border-light); display: flex; gap: 6px; flex-wrap: wrap; justify-content: space-between; align-items: center; padding: 10px 14px;">
@@ -1357,21 +1349,6 @@ async function openModalNuovoGruppoOratorio(tipoPredefinito = 'estivo') {
   document.getElementById('nuovoOratorioMaxIscritti').value = '0';
   document.getElementById('nuovoOratorioStato').value = 'pubblico';
 
-  const sel = document.getElementById('nuovoOratorioAnimatoriSelect');
-  sel.innerHTML = '<option value="">Caricamento persone...</option>';
-
-  try {
-    const res = await fetch('/api/persone');
-    const data = await res.json();
-    const persone = data.persone || [];
-
-    sel.innerHTML = persone.map(p => `
-      <option value="${p.id}">${escapeHtml(p.nominativo)} (${escapeHtml(p.codice_fiscale)})</option>
-    `).join('');
-  } catch (err) {
-    console.error('Errore caricamento persone per animatori:', err);
-  }
-
   document.getElementById('nuovoOratorioGoogleCalendarUrl').value = '';
   setGroupAges('nuovoOratorio', {});
   openModal('modalNuovoGruppoOratorio');
@@ -1379,9 +1356,6 @@ async function openModalNuovoGruppoOratorio(tipoPredefinito = 'estivo') {
 
 async function handleSalvaNuovoGruppoOratorio(e) {
   e.preventDefault();
-  const animatoriSel = document.getElementById('nuovoOratorioAnimatoriSelect');
-  const animatoriIds = Array.from(animatoriSel.selectedOptions).map(o => parseInt(o.value)).filter(Boolean);
-
   const payload = {
     ...readGroupAges('nuovoOratorio'),
     google_calendar_url: document.getElementById('nuovoOratorioGoogleCalendarUrl').value.trim(),
@@ -1391,8 +1365,7 @@ async function handleSalvaNuovoGruppoOratorio(e) {
     orario_incontri: document.getElementById('nuovoOratorioOrario').value.trim(),
     luogo: document.getElementById('nuovoOratorioLuogo').value.trim(),
     max_iscritti: parseInt(document.getElementById('nuovoOratorioMaxIscritti').value) || 0,
-    stato: document.getElementById('nuovoOratorioStato').value,
-    animatori_ids: animatoriIds
+    stato: document.getElementById('nuovoOratorioStato').value
   };
 
   try {
@@ -1426,24 +1399,6 @@ async function openModalModificaGruppoOratorio(id) {
   document.getElementById('modOratorioMaxIscritti').value = g.max_iscritti || 0;
   document.getElementById('modOratorioStato').value = g.stato || 'pubblico';
 
-  const sel = document.getElementById('modOratorioAnimatoriSelect');
-  sel.innerHTML = '<option value="">Caricamento animatori...</option>';
-
-  try {
-    const res = await fetch('/api/persone');
-    const data = await res.json();
-    const persone = data.persone || [];
-    const animatoriIds = new Set((g.animatori || []).map(a => a.id));
-
-    sel.innerHTML = persone.map(p => `
-      <option value="${p.id}" ${animatoriIds.has(p.id) ? 'selected' : ''}>
-        ${escapeHtml(p.nominativo)} (${escapeHtml(p.codice_fiscale)})
-      </option>
-    `).join('');
-  } catch (err) {
-    console.error('Errore animatori:', err);
-  }
-
   document.getElementById('modOratorioGoogleCalendarUrl').value = g.google_calendar_url || '';
   setGroupAges('modOratorio', g);
   openModal('modalModificaGruppoOratorio');
@@ -1452,9 +1407,6 @@ async function openModalModificaGruppoOratorio(id) {
 async function handleSalvaModificaGruppoOratorio(e) {
   e.preventDefault();
   if (!currentEditingOratorioId) return;
-
-  const animatoriSel = document.getElementById('modOratorioAnimatoriSelect');
-  const animatoriIds = Array.from(animatoriSel.selectedOptions).map(o => parseInt(o.value)).filter(Boolean);
 
   const payload = {
     ...readGroupAges('modOratorio'),
@@ -1465,8 +1417,7 @@ async function handleSalvaModificaGruppoOratorio(e) {
     orario_incontri: document.getElementById('modOratorioOrario').value.trim(),
     luogo: document.getElementById('modOratorioLuogo').value.trim(),
     max_iscritti: parseInt(document.getElementById('modOratorioMaxIscritti').value) || 0,
-    stato: document.getElementById('modOratorioStato').value,
-    animatori_ids: animatoriIds
+    stato: document.getElementById('modOratorioStato').value
   };
 
   try {
@@ -1847,7 +1798,7 @@ let statoPresenzeCorrentiCatechismo = {};
 async function loadCatechismo() {
   const roles = (currentUser && currentUser.tutti_i_ruoli) || [currentUser ? currentUser.ruolo : 'utente'];
   const isSupervisor = roles.some(r => ['admin', 'parroco', 'segreteria'].includes(r));
-  const isCatechista = isSupervisor || roles.includes('catechista');
+  const isCatechista = hasPermission('catechismo.staff');
 
   if (!isCatechista) {
     // Profilo Utente / Genitore: carica SOLO la vista per i propri figli
@@ -2704,7 +2655,7 @@ let statoPresenzeCorrentiDoposcuola = {};
 async function loadDoposcuola() {
   const roles = (currentUser && currentUser.tutti_i_ruoli) || [currentUser ? currentUser.ruolo : 'utente'];
   const isSupervisor = roles.some(r => ['admin', 'parroco', 'segreteria'].includes(r));
-  const isStaffOrEducatore = isSupervisor || roles.some(r => ['educatore', 'oratorio', 'catechista'].includes(r));
+  const isStaffOrEducatore = hasPermission('doposcuola.staff');
 
   if (!isStaffOrEducatore) {
     const staffSec = document.getElementById('doposcuolaStaffSection');
@@ -3395,6 +3346,7 @@ async function loadSegreteria() {
 }
 
 function switchSegreteriaTab(tab) {
+  if(Array.isArray(currentUser?.permessi) && !hasPermission('segreteria.'+tab)) {tab=['iscrizioni','liste','celebrazioni','homepage','configurazioni','campi_account'].find(key=>hasPermission('segreteria.'+key));if(!tab)return;}
   currentSegTab = tab;
   document.getElementById('tabContentSegIscrizioni').style.display = tab === 'iscrizioni' ? 'block' : 'none';
   document.getElementById('tabContentSegListe').style.display = tab === 'liste' ? 'block' : 'none';
@@ -4713,17 +4665,12 @@ let allRegisteredUsers = [];
 
 async function loadUtenti() {
   try {
+    await AccessUI.load();
     const res = await fetch('/api/utenti');
     const data = await res.json();
     allRegisteredUsers = data.utenti || [];
 
-    // Mostra SOLO gli utenti che possiedono privilegi/ruoli speciali (Admin, Segreteria, Parroco, Catechista, Oratorio)
-    const staffRoles = ['admin', 'segreteria', 'parroco', 'catechista', 'oratorio'];
-    cacheUtenti = allRegisteredUsers.filter(u => {
-      const roles = u.tutti_i_ruoli || [u.ruolo];
-      return roles.some(r => staffRoles.includes(r));
-    });
-
+    cacheUtenti=allRegisteredUsers;
     filtraUtenti();
   } catch (err) {
     console.error('Errore utenti:', err);
@@ -4783,7 +4730,7 @@ async function openModalAssegnaPermessiUtente(preselectedUserId = null) {
       if (detailsBox) detailsBox.style.display = 'none';
       document.querySelectorAll('.chk-extra-perm').forEach(c => c.checked = false);
       const primSelect = document.getElementById('assegnaPermessoRuoloPrimario');
-      if (primSelect) primSelect.value = 'catechista';
+      if (primSelect) primSelect.value = 'utente';
     }
 
     openModal('modalAssegnaPermessiUtente');
@@ -4808,13 +4755,8 @@ function onSelectUtenteForPermessi(userId) {
   }
 
   const primarioSelect = document.getElementById('assegnaPermessoRuoloPrimario');
-  if (['admin', 'segreteria', 'parroco', 'catechista', 'oratorio'].includes(u.ruolo)) {
-    if (primarioSelect) primarioSelect.value = u.ruolo;
-  } else {
-    if (primarioSelect) primarioSelect.value = 'catechista';
-  }
-
-  const userRoles = new Set(u.tutti_i_ruoli || [u.ruolo]);
+  if(primarioSelect) primarioSelect.value=u.ruolo_base || u.ruolo;
+  const userRoles=new Set(u.privilegi || u.tutti_i_ruoli || [u.ruolo]);
   document.querySelectorAll('.chk-extra-perm').forEach(chk => {
     chk.checked = userRoles.has(chk.value);
   });
@@ -4879,7 +4821,7 @@ function renderTableUtenti(items) {
         <td style="font-family:monospace; font-size:12px;">${escapeHtml(u.codice_fiscale || '-')}</td>
         <td><span class="badge badge-info">${escapeHtml(u.ruolo.toUpperCase())}</span></td>
         <td>
-          ${(u.tutti_i_ruoli || []).map(r => `<span class="badge badge-neutral" style="margin:1px;">${escapeHtml(r)}</span>`).join('')}
+          ${(u.privilegi || []).map(r => `<span class="badge badge-neutral" style="margin:1px;">${escapeHtml(AccessUI.label(r))}</span>`).join('')}
         </td>
         <td><span class="badge ${u.is_attivo ? 'badge-success' : 'badge-danger'}">${u.is_attivo ? 'Attivo' : 'Disattivato'}</span></td>
         <td>
@@ -5070,6 +5012,7 @@ async function eliminaSingoloUtente(id) {
 }
 
 function openModalNuovoUtente() {
+  AccessUI.populate();
   document.getElementById('nuovoUtenteNome').value = '';
   document.getElementById('nuovoUtenteCognome').value = '';
   document.getElementById('nuovoUtenteCF').value = '';
@@ -5090,26 +5033,7 @@ function generaPasswordCasuale(targetId) {
   if (el) el.value = pw;
 }
 
-function sincronizzaPrivilegiDaRuolo(ruolo) {
-  const allPrivs = ['utente', 'catechista', 'oratorio', 'segreteria', 'parroco', 'admin'];
-  allPrivs.forEach(p => {
-    const el = document.getElementById(`priv_${p}`);
-    if (el) el.checked = false;
-  });
-
-  const baseEl = document.getElementById('priv_utente');
-  if (baseEl) baseEl.checked = true;
-
-  const targetEl = document.getElementById(`priv_${ruolo}`);
-  if (targetEl) targetEl.checked = true;
-
-  if (ruolo === 'admin') {
-    allPrivs.forEach(p => {
-      const el = document.getElementById(`priv_${p}`);
-      if (el) el.checked = true;
-    });
-  }
-}
+function sincronizzaPrivilegiDaRuolo() {document.querySelectorAll('.new-user-privilege').forEach(el=>el.checked=false);}
 
 async function handleSalvaNuovoUtente(e) {
   e.preventDefault();
@@ -5120,12 +5044,7 @@ async function handleSalvaNuovoUtente(e) {
   const password = document.getElementById('nuovoUtentePassword').value.trim();
   const ruolo = document.getElementById('nuovoUtenteRuolo').value;
 
-  const allPrivs = ['utente', 'catechista', 'oratorio', 'segreteria', 'parroco', 'admin'];
-  const privilegi = allPrivs.filter(p => {
-    const el = document.getElementById(`priv_${p}`);
-    return el && el.checked;
-  });
-  if (!privilegi.includes(ruolo)) privilegi.push(ruolo);
+  const privilegi=[...document.querySelectorAll('.new-user-privilege:checked')].map(el=>el.value);
 
   try {
     const res = await fetch('/api/utenti', {
@@ -7940,7 +7859,7 @@ async function loadUserCalendari() {
   const container = document.getElementById('dashUserCalendariGrid');
   if (!container) return;
   try {
-    const [data,groups]=await Promise.all([apiJson('/api/impostazioni/calendari?solo_pubblici=true'),apiJson('/api/famiglie/calendari-gruppi')]);
+    const [data,groups]=await Promise.all([hasPermission('calendari.comunita')?apiJson('/api/impostazioni/calendari?solo_pubblici=true'):Promise.resolve({calendari:[]}),hasPermission('calendari.gruppi')?apiJson('/api/famiglie/calendari-gruppi'):Promise.resolve({calendari:[]})]);
     const calendari = data.calendari || [];
     if (!calendari.length && !groups.calendari?.length) {
       container.innerHTML = `<div style="grid-column: 1/-1; padding: 16px; color: var(--ink-500); text-align: center;">Nessun calendario parrocchiale attivo al momento.</div>`;
@@ -8296,6 +8215,7 @@ async function refreshEnrollmentOptions() {
   }
   const label=document.getElementById('sectionLabelPastorale');
   if(label) label.style.display=visible ? 'block' : 'none';
+  if(typeof AccessUI!=='undefined') AccessUI.apply();
   return data;
 }
 function activityEnrollmentAction(activity,staff=false) {
@@ -8415,7 +8335,7 @@ function updateDocumentAge(id,age) {
     group.style.display=visible ? 'block':'none';input.disabled=!visible;
   });
 }
-function groupCalendarMarkup(group) {return GroupCalendar.markup(group);}
+function groupCalendarMarkup(group) {const category=(group.calendar_api_url||'').split('/')[3];return category && !hasPermission(category+'.calendario')?'':GroupCalendar.markup(group);}
 
 function loadGroupCalendar(button) {return GroupCalendar.load(button);}
 

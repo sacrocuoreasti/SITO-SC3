@@ -36,9 +36,12 @@ def get_educatori():
 def get_gruppi_doposcuola():
     """Ritorna i gruppi del doposcuola configurati."""
     gruppi_db = GruppoDoposcuola.query.order_by(GruppoDoposcuola.id.asc()).all()
+    from services.access_control import can,is_admin
+    if not is_admin() and can('doposcuola.staff') and not can('doposcuola.tutti'):
+        gruppi_db=[group for group in gruppi_db if can_record('doposcuola',group)]
 
     # Ritorna i gruppi con studenti inclusi
-    gruppi = [g.to_dict(include_studenti=True) for g in gruppi_db]
+    gruppi = [g.to_dict(include_studenti=bool(can_record('doposcuola',g))) for g in gruppi_db]
     return jsonify({
         'gruppi': gruppi,
         'totale': len(gruppi)

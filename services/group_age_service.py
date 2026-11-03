@@ -7,7 +7,10 @@ from services.cf_validator import normalizza_cf
 
 def apply_age_range(group, data):
     from services.family_service import staff_user
-    if any(key in data for key in ('eta_min', 'eta_max')) and not staff_user():
+    from services.access_control import can,is_admin
+    category=(request.blueprint or '').replace('_bp','')
+    can_edit=staff_user() or is_admin() or can(('attivita' if category=='attivita' else category)+'.gestione')
+    if any(key in data for key in ('eta_min', 'eta_max')) and not can_edit:
         raise Forbidden('Solo l’amministrazione può modificare le fasce di età')
     values = {}
     for key in ('eta_min', 'eta_max'):
@@ -44,7 +47,8 @@ def register_age_guard(blueprint, model, collection):
         from services.catechismo_parents import is_parent_group
         if model.__name__=='GruppoCatechismo' and not path.endswith('/iscrivi-figlio'):
             from services.family_service import staff_user
-            if not staff_user(): raise Forbidden('Assegnazione riservata alla segreteria')
+            from services.access_control import can
+            if not staff_user() and not can('catechismo.assegnazioni'): raise Forbidden('Assegnazione riservata alla segreteria')
         if is_parent_group(group): raise BadRequest('I genitori sono iscritti automaticamente tramite i figli: non servono assegnazioni manuali.')
         members = data.get('codici_fiscali', [data.get('codice_fiscale','')])
         if not isinstance(members,list): raise BadRequest('Elenco dei partecipanti non valido')

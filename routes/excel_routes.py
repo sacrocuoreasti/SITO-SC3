@@ -1,3 +1,4 @@
+from services.access_control import can
 import os
 from flask import Blueprint, request, jsonify, send_file, current_app
 from models import Persona, Attivita
@@ -108,7 +109,7 @@ def export_anagrafica():
     else:
         persone = Persona.query.order_by(Persona.cognome.asc(), Persona.nome.asc()).all()
 
-    stream = esporta_anagrafica_excel(persone)
+    stream = esporta_anagrafica_excel(persone,include_health=can('anagrafica.salute'))
     return send_file(
         stream,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -125,7 +126,7 @@ def export_attivita(id):
     if not att:
         return jsonify({'error': 'Attività non trovata'}), 404
 
-    stream = esporta_iscritti_attivita_excel(att)
+    stream = esporta_iscritti_attivita_excel(att,include_health=can('anagrafica.salute'))
     nome_sanitizzato = "".join(c for c in att.titolo if c.isalnum() or c in (' ', '_', '-')).strip()
     return send_file(
         stream,

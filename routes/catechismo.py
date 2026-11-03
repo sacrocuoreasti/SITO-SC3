@@ -1,6 +1,7 @@
 from services.group_attendance import can_record, group_records, save_group_records, registry_data
 from werkzeug.exceptions import Forbidden
 from services.group_calendar import apply_calendar
+from services.catechismo_parents import is_parent_group
 from services.group_age_service import apply_age_range, register_age_guard
 from flask import Blueprint, request, jsonify
 from flask_login import current_user
@@ -43,34 +44,13 @@ def get_gruppi_catechismo():
     """
     gruppi_query = GruppoCatechismo.query.order_by(GruppoCatechismo.id.asc())
     gruppi_db = gruppi_query.all()
+    from services.access_control import can,is_admin
+    if not is_admin() and can('catechismo.staff') and not can('catechismo.tutti'):
+        gruppi_db=[group for group in gruppi_db if can_record('catechismo',group)]
 
-    is_catechista_only = False
-    if current_user.is_authenticated:
-        roles = current_user.get_all_roles()
-        is_supervisor = any(r in ['admin', 'parroco', 'segreteria'] for r in roles)
-        if not is_supervisor and ('catechista' in roles or current_user.ruolo == 'catechista'):
-            is_catechista_only = True
-            user_cf = (current_user.codice_fiscale or '').upper()
-            user_id = current_user.id
-            user_nom = (current_user.persona.nominativo if current_user.persona else current_user.email.split('@')[0]).lower()
-            user_email = current_user.email.lower()
-
-            filtered = []
-            for g in gruppi_db:
-                match = False
-                if hasattr(g, 'catechisti') and any(u.id == user_id for u in g.catechisti):
-                    match = True
-                elif g.catechista_utente_id and g.catechista_utente_id == user_id:
-                    match = True
-                elif user_cf and g.catechista_cf and g.catechista_cf.upper() == user_cf:
-                    match = True
-                elif g.catechista_nome:
-                    gn = g.catechista_nome.lower()
-                    if user_nom in gn or gn in user_nom or user_email in gn:
-                        match = True
-                if match:
-                    filtered.append(g)
-            gruppi_db = filtered
+    is_catechista_only = not (can('catechismo.gestione') or can('catechismo.assegnazioni'))
+    if not can('catechismo.genitori'):
+        gruppi_db=[group for group in gruppi_db if not is_parent_group(group)]
 
     # Ritorna i gruppi specifici configurati
     gruppi = [g.to_dict(include_ragazzi=bool(can_record('catechismo',g))) for g in gruppi_db]
@@ -410,7 +390,8 @@ def assignable_people(id):
     from services.family_service import staff_user
     from services.enrollment_options import age_eligible
     from services.catechismo_parents import members,is_parent_group
-    if not staff_user(): raise Forbidden('Assegnazione riservata alla segreteria')
+    from services.access_control import can
+    if not staff_user() and not can('catechismo.assegnazioni'): raise Forbidden('Assegnazione riservata alla segreteria')
     group=db.session.get(GruppoCatechismo,id)
     if not group: return jsonify(error='Gruppo non trovato'),404
     existing={p.codice_fiscale for p in members(group)}

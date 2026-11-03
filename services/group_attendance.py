@@ -12,14 +12,15 @@ from services.catechismo_parents import group_people,is_parent_group,expected_me
 
 def can_record(category,group):
     if not current_user.is_authenticated: return False
-    if staff_user(): return True
-    roles=set(current_user.get_all_roles())
-    if category in ('oratorio','doposcuola') and 'oratorio' in roles: return True
+    from services.access_control import can,is_admin
+    if is_admin(): return True
+    if not can(category+'.staff'): return False
+    if can(category+'.tutti'): return True
     if category=='catechismo':
-        return 'catechista' in roles and (current_user.id==group.catechista_utente_id or current_user.codice_fiscale==group.catechista_cf and bool(group.catechista_cf) or any(u.id==current_user.id for u in group.catechisti))
+        return current_user.id==group.catechista_utente_id or current_user.codice_fiscale==group.catechista_cf and bool(group.catechista_cf) or any(u.id==current_user.id for u in group.catechisti)
     if category=='oratorio':
-        return bool(roles & {'oratorio','animatore'}) and (current_user.id==group.animatore_utente_id or current_user.codice_fiscale==group.animatore_cf and bool(group.animatore_cf) or any(u.id==current_user.id for u in group.animatori))
-    return bool(roles & {'educatore','doposcuola','oratorio','catechista'}) and (current_user.id==group.educatore_utente_id or current_user.codice_fiscale==group.educatore_cf and bool(group.educatore_cf))
+        return current_user.id==group.animatore_utente_id or current_user.codice_fiscale==group.animatore_cf and bool(group.animatore_cf) or any(u.id==current_user.id for u in group.animatori)
+    return current_user.id==group.educatore_utente_id or current_user.codice_fiscale==group.educatore_cf and bool(group.educatore_cf)
 
 
 def group_records(category,group,people=None):

@@ -92,7 +92,7 @@ def genera_template_excel() -> BytesIO:
     return output
 
 
-def esporta_anagrafica_excel(persone_list) -> BytesIO:
+def esporta_anagrafica_excel(persone_list, include_health=True) -> BytesIO:
     """
     Esporta l'elenco delle persone con i dettagli del nucleo familiare in un file Excel.
     """
@@ -130,8 +130,8 @@ def esporta_anagrafica_excel(persone_list) -> BytesIO:
         ws.cell(row=row_idx, column=12, value=p.email or "")
         ws.cell(row=row_idx, column=13, value=p.nucleo.nome_famiglia if p.nucleo else "")
         ws.cell(row=row_idx, column=14, value=p.ruolo_famiglia or "")
-        ws.cell(row=row_idx, column=15, value=p.intolleranze_alimentari or "")
-        ws.cell(row=row_idx, column=16, value=p.allergie or "")
+        ws.cell(row=row_idx, column=15, value=(p.intolleranze_alimentari or "") if include_health else "")
+        ws.cell(row=row_idx, column=16, value=(p.allergie or "") if include_health else "")
 
     for col in ws.columns:
         max_len = max(len(str(cell.value or '')) for cell in col)
@@ -144,7 +144,7 @@ def esporta_anagrafica_excel(persone_list) -> BytesIO:
     return output
 
 
-def esporta_iscritti_attivita_excel(attivita) -> BytesIO:
+def esporta_iscritti_attivita_excel(attivita, include_health=True) -> BytesIO:
     """
     Esporta gli iscritti di un'attività con colonne per quote e note sanitarie/allergie.
     """
@@ -188,8 +188,8 @@ def esporta_iscritti_attivita_excel(attivita) -> BytesIO:
         ws.cell(row=row_idx, column=12, value=isc.importo_dovuto)
         ws.cell(row=row_idx, column=13, value=isc.importo_pagato)
         ws.cell(row=row_idx, column=14, value=isc.note_iscrizione or "")
-        ws.cell(row=row_idx, column=15, value=p.intolleranze_alimentari or "")
-        ws.cell(row=row_idx, column=16, value=p.allergie or "")
+        ws.cell(row=row_idx, column=15, value=(p.intolleranze_alimentari or "") if include_health else "")
+        ws.cell(row=row_idx, column=16, value=(p.allergie or "") if include_health else "")
 
     for col in ws.columns:
         max_len = max(len(str(cell.value or '')) for cell in col)

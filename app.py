@@ -121,17 +121,16 @@ def create_app(config_class=Config):
             return
         if not current_user.is_authenticated:
             abort(401)
-        roles = set(current_user.get_all_roles())
-        staff = bool(roles & {'admin', 'parroco', 'segreteria'})
-        if request.blueprint in {'utenti_bp', 'segreteria_bp', 'excel_bp', 'liste_bp'} and not staff:
-            abort(403)
-        if request.blueprint in {'impostazioni_bp', 'configurazioni_bp', 'celebrazioni_bp', 'attivita_bp'} and not staff:
-            abort(403)
+        from services.access_control import authorize_request
+        authorize_request()
         if request.is_json and not isinstance(request.get_json(), dict):
             abort(400, description='Il corpo JSON deve essere un oggetto')
 
     # Registrazione Blueprint API
+    from services.access_control import filter_response
+    app.after_request(filter_response)
     from routes.auth import auth_bp
+    from routes.accessi import accessi_bp
     from routes.persone import persone_bp
     from routes.famiglie import famiglie_bp
     from routes.calendari_gruppi import calendari_gruppi_bp
@@ -153,6 +152,7 @@ def create_app(config_class=Config):
     app.register_blueprint(documenti_bp)
     app.register_blueprint(backup_bp)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(accessi_bp)
     app.register_blueprint(persone_bp)
     app.register_blueprint(famiglie_bp)
     app.register_blueprint(calendari_gruppi_bp)
@@ -171,7 +171,7 @@ def create_app(config_class=Config):
 
     @app.route('/')
     def index():
-        version = os.environ.get('RENDER_GIT_COMMIT') or str(max(os.stat(app.static_folder + '/' + name).st_mtime_ns for name in ['css/style.css', 'js/app.js','js/group-calendar.js','js/portal-views.js']))
+        version = os.environ.get('RENDER_GIT_COMMIT') or str(max(os.stat(app.static_folder + '/' + name).st_mtime_ns for name in ['css/style.css', 'js/app.js','js/group-calendar.js','js/portal-views.js','js/access-control.js']))
         return render_template('index.html', asset_version=version, quick_login_enabled=quick_login_enabled())
 
     @app.route('/health')

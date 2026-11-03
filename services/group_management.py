@@ -21,7 +21,8 @@ def managed_group(category,id):
 
 
 def can_manage_members(category):
-    return staff_user() or category=='oratorio' and 'oratorio' in current_user.get_all_roles()
+    from services.access_control import can,is_admin
+    return is_admin() or can(category+'.assegnazioni')
 
 
 def day_value(value):

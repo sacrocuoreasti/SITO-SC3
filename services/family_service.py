@@ -18,7 +18,8 @@ REGISTRATION_CONSENTS = {
 
 
 def staff_user():
-    return current_user.is_authenticated and bool(set(current_user.get_all_roles()) & {'admin', 'segreteria', 'parroco'})
+    from services.access_control import staff_scope
+    return staff_scope()
 
 
 def can_manage_family(family):

@@ -14,6 +14,7 @@ def backup_sqlite(engine):
     tables = set(inspector.get_table_names())
     missing = any(table in tables and not columns.issubset({c['name'] for c in inspector.get_columns(table)}) for table, columns in expected.items())
     missing = missing or ('persona' in tables and 'documento_persona' not in tables)
+    missing = missing or ('utente' in tables and 'definizione_accesso' not in tables)
     if not missing or not engine.url.database or engine.url.database == ':memory:':
         return None
     directory = os.path.join(os.path.dirname(os.path.abspath(engine.url.database)), 'backups')

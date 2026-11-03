@@ -60,7 +60,8 @@ def get_mia_famiglia():
 def get_famiglie():
     q = request.args.get('q', '').strip()
     query = NucleoFamiliare.query
-    if not staff_user():
+    from services.access_control import can
+    if not staff_user() and not can('anagrafica.nuclei'):
         query = query.filter_by(id=current_user.persona.nucleo_id if current_user.persona else None)
 
     if q:
@@ -82,7 +83,8 @@ def get_famiglia(id):
     f = db.session.get(NucleoFamiliare, id)
     if not f:
         return jsonify({'error': 'Nucleo familiare non trovato'}), 404
-    if not staff_user() and not family_member(f):
+    from services.access_control import can
+    if not staff_user() and not can('anagrafica.nuclei') and not family_member(f):
         return jsonify(error='Accesso al nucleo non autorizzato'), 403
     return jsonify({'famiglia': f.to_dict(include_members=True)})
 

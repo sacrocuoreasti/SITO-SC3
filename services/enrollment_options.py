@@ -61,7 +61,8 @@ def enrollment_options():
         from routes.iscrizioni import can_withdraw
         withdrawals=[{'id':r.id,'nominativo':r.partecipante.nominativo,'puo_disiscriversi':can_withdraw(r)} for r in records if r.attivita_id==activity.id and r.stato != 'annullata']
         activities[activity.id] = {'partecipanti':candidates, 'gia_iscritto':bool(enrolled), 'ha_iscrizioni':any(r.attivita_id==activity.id for r in records), 'iscrizioni':withdrawals}
-    return {'attivita':activities, 'gruppi':{category:available_groups(category) for category in GROUP_MODELS}, 'gruppi_iscritti':{category:assigned_groups(category) for category in GROUP_MODELS}}
+    from services.access_control import can
+    return {'attivita':activities if can('attivita') or can('dashboard.attivita') else {}, 'gruppi':{category:available_groups(category) if can(category) else [] for category in GROUP_MODELS}, 'gruppi_iscritti':{category:assigned_groups(category) if can(category) else [] for category in GROUP_MODELS}}
 
 
 def assigned_groups(category):

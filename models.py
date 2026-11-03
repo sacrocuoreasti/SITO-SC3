@@ -265,6 +265,14 @@ class RichiestaNucleo(db.Model):
 
 
 
+class DefinizioneAccesso(db.Model):
+    __tablename__ = 'definizione_accesso'
+    chiave = db.Column(db.String(30), primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    tipo = db.Column(db.String(20), nullable=False)
+    permessi = db.Column(db.Text, nullable=False, default='[]')
+
+
 class Utente(UserMixin, db.Model):
     __tablename__ = 'utente'
 
@@ -294,15 +302,8 @@ class Utente(UserMixin, db.Model):
         return check_password_hash(self.password_hash, password)
 
     def get_all_roles(self):
-        roles = {self.ruolo}
-        try:
-            extra = json.loads(self.privilegi_extra or '[]')
-            if isinstance(extra, list):
-                for r in extra:
-                    roles.add(r)
-        except Exception:
-            pass
-        return list(roles)
+        from services.access_control import technical_roles
+        return technical_roles(self)
 
     def has_role(self, *ruoli):
         all_roles = self.get_all_roles()
@@ -322,6 +323,7 @@ class Utente(UserMixin, db.Model):
         return False
 
     def to_dict(self):
+        from services.access_control import identity
         campi_extra_dict = {}
         try:
             campi_extra_dict = json.loads(self.campi_extra or '{}')
@@ -333,6 +335,7 @@ class Utente(UserMixin, db.Model):
             'email': self.email,
             'ruolo': self.ruolo,
             'tutti_i_ruoli': self.get_all_roles(),
+            **identity(self),
             'codice_fiscale': self.codice_fiscale,
             'is_attivo': self.is_attivo,
             'gestito_da_id': self.gestito_da_id,

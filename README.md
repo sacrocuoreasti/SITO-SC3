@@ -195,3 +195,19 @@ Questo flusso conserva i dati attraverso gli aggiornamenti controllati. Render
 Free resta privo di disco persistente: un riavvio o sospensione non pianificati
 possono riportare lo stato all'ultimo snapshot di rilascio. Per proteggere anche
 le scritture successive contro questi eventi serve uno storage persistente.
+
+## Ruoli, privilegi e viste
+
+In **Utenti e privilegi → Ruoli, privilegi e viste**, l’amministratore configura
+separatamente ogni menu laterale e le sue funzioni. I ruoli base sono Admin,
+Segreteria e Utente; Animatore, Responsabile oratorio e Catechista sono privilegi
+aggiuntivi. È possibile creare altri ruoli e privilegi. Il profilo Educatore
+conserva la compatibilità con gli incarichi del doposcuola già assegnati.
+
+I permessi del ruolo e degli incarichi si sommano: per disabilitare una funzione
+occorre rimuoverla da tutti i profili che la concedono. Admin mantiene sempre
+accesso completo e soltanto un amministratore può modificare account e permessi.
+Le verifiche sono applicate anche alle API private, mantenendo i vincoli sui
+nuclei familiari e sui gruppi assegnati. Le definizioni iniziali sono nel codice;
+le personalizzazioni sono conservate nel database e incluse nei backup di rilascio.
+Gli account precedenti non vengono riscritti durante l’aggiornamento.

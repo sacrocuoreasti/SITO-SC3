@@ -39,6 +39,7 @@ const context = vm.createContext({
 });
 vm.runInContext(fs.readFileSync('static/js/group-calendar.js','utf8'),context);
 vm.runInContext(fs.readFileSync('static/js/portal-views.js','utf8'),context);
+vm.runInContext(fs.readFileSync('static/js/access-control.js','utf8'),context);
 vm.runInContext(fs.readFileSync('static/js/app.js','utf8'),context);
 const loadDashboardOriginal=context.loadDashboard;
 vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['utente'],is_capofamiglia:true}; showToast=()=>{}; loadDashboard=async()=>{};",context);
@@ -277,5 +278,15 @@ vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['
     assert.equal(JSON.parse(post.options.body).data,'2026-11-08');
     assert.equal(JSON.parse(post.options.body).presenze[0].presente,false);
   }
+  vm.runInContext("currentUser.permessi=['calendari','calendari.comunita'];",context);
+  assert.equal(context.hasPermission('calendari.comunita'),true);
+  assert.equal(context.hasPermission('utenti.permessi'),false);
+  vm.runInContext("currentUser.permessi=[];",context);
+  const requestCount=requests.length;
+  context.navigateTo('utenti');
+  assert.equal(nodes('viewNoAccess').style.display,'block');
+  assert.equal(requests.length,requestCount);
+  assert.ok(template.includes('data-permission="excel.template"'));
+  assert.ok(!template.includes('id="nuovoOratorioAnimatoriSelect"'));
   console.log('Alpha famiglia: attività fissata, selezione multipla, quota, invio unico, consensi e salute verificati.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

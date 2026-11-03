@@ -448,6 +448,7 @@ Domenica: dopo le Sante Messe</p>
       <!-- Main Dynamic Content Area -->
       <main class="content-area" id="contentArea">
         
+        <section id="viewNoAccess" class="view-panel" style="display:none"><h1>Nessuna vista abilitata</h1><p>Chiedi all’amministratore di abilitare le viste del tuo ruolo. Puoi sempre uscire dal tuo account.</p></section>
         <!-- ================= VIEW 1: DASHBOARD ================= -->
         <section id="viewDashboard" class="view-panel">
           <div class="page-header">
@@ -508,7 +509,7 @@ Domenica: dopo le Sante Messe</p>
 
           <div class="dashboard-columns" id="dashColumns">
             <!-- Attività Aperte in primo piano -->
-            <div class="card">
+            <div class="card" data-permission="dashboard.attivita">
               <div class="card-header">
                 <h3 id="dashActivitiesTitle">Le prossime attività della tua famiglia</h3>
                 <button class="btn btn-sm btn-secondary" onclick="navigateTo('attivita')">Tutte le attività →</button>
@@ -520,12 +521,12 @@ Domenica: dopo le Sante Messe</p>
 
             <aside class="dashboard-aside">
             <!-- Avvisi ed Eventi -->
-            <div class="card">
+            <div class="card" data-permission="dashboard.settimana">
               <div class="card-header">
                 <h3><i>🔔</i> Avvisi & Orari Messe</h3>
               </div>
               <div class="card-body">
-                <div id="dashWeeklyCalendar" aria-live="polite"></div>
+                <div id="dashWeeklyCalendar" data-permission="dashboard.settimana" aria-live="polite"></div>
                 <div id="dashAvvisiContainer"></div>
               </div>
             </div>
@@ -635,7 +636,7 @@ Domenica: dopo le Sante Messe</p>
             </div>
           </div>
 
-          <div class="activity-time-filter"><label for="activityTimeFilter">Periodo degli eventi</label><select id="activityTimeFilter" class="form-control" onchange="filterAttivitaByTime(this.value)"><option value="upcoming">Eventi futuri e in corso</option><option value="past">Eventi passati</option><option value="all">Tutti gli eventi</option></select></div>
+          <div class="activity-time-filter"><label for="activityTimeFilter">Periodo degli eventi</label><select id="activityTimeFilter" data-permission="attivita.passati" class="form-control" onchange="filterAttivitaByTime(this.value)"><option value="upcoming">Eventi futuri e in corso</option><option value="past">Eventi passati</option><option value="all">Tutti gli eventi</option></select></div>
           <div class="activities-grid" id="activitiesCatalogGrid"></div>
         </section>
 
@@ -737,7 +738,7 @@ Domenica: dopo le Sante Messe</p>
         <section id="viewCatechismo" class="view-panel" style="display: none;">
           <div class="page-header">
             <div class="page-header-title">
-              <h1 id="catechismoPageTitle">Gruppi di Catechismo & Archivio</h1>
+              <h1 id="catechismoPageTitle" data-permission="catechismo">Gruppi di Catechismo & Archivio</h1>
               <p id="catechismoPageDesc">Archivio per anni pastorali, appello presenze, storico incontri svolti, allergie e intolleranze dei ragazzi.</p>
             </div>
             <div class="header-actions" id="catechismoStaffHeaderActions" style="display: flex; gap: 10px; flex-wrap: wrap;">
@@ -768,7 +769,7 @@ Domenica: dopo le Sante Messe</p>
 
             <div class="catechismo-grid" id="catechismoGruppiGrid"></div>
             </div>
-            <section id="catechismoDatesSection" class="card catechismo-dates" style="display:none" aria-labelledby="catechismoDatesTitle">
+            <section id="catechismoDatesSection" data-permission="catechismo.appelli" class="card catechismo-dates" style="display:none" aria-labelledby="catechismoDatesTitle">
               <div class="catechismo-dates-header">
                 <div><h2 id="catechismoDatesTitle" tabindex="-1">Incontri del gruppo</h2><p id="catechismoDatesDetails"></p></div>
                 <button type="button" class="btn btn-secondary" onclick="tornaGruppiCatechismo()">← Gruppi</button>
@@ -787,7 +788,7 @@ Domenica: dopo le Sante Messe</p>
                 <button type="submit" class="btn btn-secondary">Apri appello per questa data</button>
               </form>
             </section>
-  <section id="catechismoAttendanceSection" class="card catechismo-attendance" style="display:none" aria-labelledby="catechismoAttendanceTitle">
+  <section id="catechismoAttendanceSection" data-permission="catechismo.appelli" class="card catechismo-attendance" style="display:none" aria-labelledby="catechismoAttendanceTitle">
       <div class="modal-header">
         <div>
           <h3 id="catechismoAttendanceTitle" tabindex="-1" style="margin:0">
@@ -1658,7 +1659,7 @@ Domenica: dopo le Sante Messe</p>
               <p>Carica file Excel (.xlsx o .csv) per creare o aggiornare le anagrafiche e i nuclei familiari parrocchiali.</p>
             </div>
             <div class="header-actions">
-              <a href="/api/excel/template" class="btn btn-secondary"><i>📥</i> Scarica File Modello Excel</a>
+              <a href="/api/excel/template" data-permission="excel.template" class="btn btn-secondary"><i>📥</i> Scarica File Modello Excel</a>
             </div>
           </div>
 
@@ -1668,7 +1669,7 @@ Domenica: dopo le Sante Messe</p>
                 <h3><i>↥</i> Carica File Excel Parrocchiale</h3>
               </div>
               <div class="card-body">
-                <div class="dropzone" id="excelDropzone" onclick="document.getElementById('excelFileInput').click()">
+                <div data-permission="excel.import" class="dropzone" id="excelDropzone" onclick="document.getElementById('excelFileInput').click()">
                   <div class="dropzone-icon">📊</div>
                   <strong style="font-size: 15px;">Trascina qui il file Excel (.xlsx o .csv)</strong>
                   <p style="font-size: 12.5px; color: var(--ink-500);">oppure clicca per selezionarlo dal tuo computer</p>
@@ -1711,17 +1712,22 @@ Domenica: dopo le Sante Messe</p>
           <div class="page-header">
             <div class="page-header-title">
               <h1>Gestione Utenti & Privilegi</h1>
-              <p>Amministrazione account e assegnazione privilegi multipli: Parroco, Segreteria, Admin, Catechista, Oratorio.</p>
+              <p>Ruoli base, privilegi operativi e controllo delle viste di ogni profilo.</p>
             </div>
             <div class="header-actions">
               <button class="btn btn-primary" onclick="openModalAssegnaPermessiUtente()"><i>+</i> Assegna Permessi</button>
             </div>
           </div>
 
+<section class="card access-manager" id="accessManager" data-permission="utenti.permessi">
+  <h2>Ruoli, privilegi e viste</h2><p>I permessi del ruolo e dei privilegi assegnati si sommano. Admin mantiene sempre l’accesso completo. Le limitazioni ai gruppi assegnati e al proprio nucleo restano attive.</p>
+  <form onsubmit="AccessUI.save(event)"><div class="staff-register-tools"><label for="accessProfile">Profilo da configurare<select class="form-control" id="accessProfile" onchange="AccessUI.showProfile()"></select></label><label for="accessProfileName">Nome del profilo<input class="form-control" id="accessProfileName" maxlength="100" required></label></div><div id="accessTree"></div><button class="btn btn-primary" type="submit" id="accessSave">Salva viste e permessi</button></form>
+  <details class="catechismo-history"><summary>Crea un nuovo ruolo o privilegio</summary><form class="access-create" onsubmit="AccessUI.create(event)"><label for="accessNewName">Nome<input class="form-control" id="accessNewName" maxlength="100" required></label><label for="accessNewKey">Codice univoco<input class="form-control" id="accessNewKey" pattern="[a-z][a-z0-9_]{1,29}" maxlength="30" required placeholder="es. referente_eventi"></label><label for="accessNewType">Tipo<select class="form-control" id="accessNewType"><option value="ruolo">Ruolo base</option><option value="privilegio">Privilegio aggiuntivo</option></select></label><button type="submit" class="btn btn-secondary">Crea profilo</button></form></details>
+</section>
           <div class="card">
             <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
               <div style="display: flex; align-items: center; gap: 8px;">
-                <h3><i>👥</i> Utenti con Privilegi di Sistema</h3>
+                <h3><i>👥</i> Account registrati</h3>
                 <span id="utentiCountBadge" class="badge badge-info">0 autorizzati</span>
               </div>
               <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
@@ -1744,7 +1750,7 @@ Domenica: dopo le Sante Messe</p>
             </div>
             <div class="card-body">
               <!-- Barra Azioni di Massa (Visibile quando ci sono utenti selezionati) -->
-              <div id="bulkUtentiBar" style="display: none; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 16px; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+              <div id="bulkUtentiBar" data-permission="utenti.gestione" style="display: none; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius-md); padding: 12px 16px; margin-bottom: 16px; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
                 <div style="display: flex; align-items: center; gap: 10px;">
                   <span style="font-weight: 700; color: #1e40af; font-size: 13.5px;" id="bulkUtentiCountText">0 utenti selezionati</span>
                   <button type="button" class="btn btn-sm btn-secondary" onclick="deselezionaTuttiUtenti()" style="font-size: 11.5px; padding: 2px 8px;">Deseleziona</button>
@@ -2481,30 +2487,15 @@ Domenica: dopo le Sante Messe</p>
         <input type="hidden" id="ruoliUtenteId">
         <div class="modal-body">
           <p id="ruoliUtenteEmail" style="font-weight: 700; margin-bottom: 14px;"></p>
-          
+
           <div class="form-group">
             <label>Ruolo Primario</label>
-            <select id="ruoloPrimarioSelect" class="form-control">
-              <option value="utente">Utente / Fedele (Default)</option>
-              <option value="genitore">Genitore / Famiglia</option>
-              <option value="oratorio">Oratorio / Animatore</option>
-              <option value="catechista">Catechista</option>
-              <option value="segreteria">Segreteria Parrocchiale</option>
-              <option value="parroco">Parroco</option>
-              <option value="admin">Amministratore Sistema</option>
-            </select>
+            <select id="ruoloPrimarioSelect" class="form-control"><option value="utente">Utente</option><option value="segreteria">Segreteria</option><option value="admin">Admin</option></select>
           </div>
 
           <div style="margin-top: 16px;">
             <label style="font-size: 12px; font-weight: 700; text-transform: uppercase;">Privilegi Extra Attribuiti:</label>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; font-size: 13px;">
-              <label><input type="checkbox" name="privilegiCheck" value="utente"> Utente</label>
-              <label><input type="checkbox" name="privilegiCheck" value="oratorio"> Oratorio</label>
-              <label><input type="checkbox" name="privilegiCheck" value="catechista"> Catechista</label>
-              <label><input type="checkbox" name="privilegiCheck" value="segreteria"> Segreteria</label>
-              <label><input type="checkbox" name="privilegiCheck" value="parroco"> Parroco</label>
-              <label><input type="checkbox" name="privilegiCheck" value="admin"> Admin</label>
-            </div>
+            <div id="editUserPrivileges" class="access-assignment"></div>
           </div>
         </div>
         <div class="modal-footer">
@@ -2803,26 +2794,11 @@ Domenica: dopo le Sante Messe</p>
           </div>
           <div class="form-group">
             <label>Ruolo Primario *</label>
-            <select id="nuovoUtenteRuolo" class="form-control" required onchange="sincronizzaPrivilegiDaRuolo(this.value)">
-              <option value="utente">Utente Parrocchiano (Base)</option>
-              <option value="genitore">Genitore / Capofamiglia</option>
-              <option value="catechista">Catechista</option>
-              <option value="oratorio">Responsabile Oratorio</option>
-              <option value="segreteria">Segreteria Parrocchiale</option>
-              <option value="parroco">Parroco</option>
-              <option value="admin">Amministratore Completo</option>
-            </select>
+            <select id="nuovoUtenteRuolo" class="form-control" required onchange="sincronizzaPrivilegiDaRuolo(this.value)"><option value="utente">Utente</option><option value="segreteria">Segreteria</option><option value="admin">Admin</option></select>
           </div>
           <div class="form-group">
             <label>Privilegi e Aree Assegnate:</label>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; background:var(--bg-subtle); padding:10px 14px; border-radius:var(--radius-sm); border:1px solid var(--border-light);">
-              <label style="font-size:13px; display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" id="priv_utente" value="utente" checked> Utente Base</label>
-              <label style="font-size:13px; display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" id="priv_catechista" value="catechista"> Catechista</label>
-              <label style="font-size:13px; display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" id="priv_oratorio" value="oratorio"> Oratorio</label>
-              <label style="font-size:13px; display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" id="priv_segreteria" value="segreteria"> Segreteria</label>
-              <label style="font-size:13px; display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" id="priv_parroco" value="parroco"> Parroco</label>
-              <label style="font-size:13px; display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" id="priv_admin" value="admin"> Amministratore</label>
-            </div>
+            <div id="newUserPrivileges" class="access-assignment"></div>
           </div>
         </div>
         <div class="modal-footer">
@@ -3448,7 +3424,7 @@ Domenica: dopo le Sante Messe</p>
       <form onsubmit="handleSalvaAssegnaPermessiUtente(event)">
         <div class="modal-body">
           <p style="font-size: 13px; color: var(--ink-600); margin-bottom: 16px;">
-            Seleziona un account registrato per assegnargli o modificarne i privilegi operativi (Admin, Segreteria, Parroco, Catechista, Oratorio).
+            Seleziona un account registrato, il ruolo base e gli eventuali privilegi aggiuntivi.
           </p>
 
           <div class="form-group">
@@ -3465,34 +3441,12 @@ Domenica: dopo le Sante Messe</p>
 
           <div class="form-group">
             <label>Ruolo Primario Assegnato *</label>
-            <select id="assegnaPermessoRuoloPrimario" class="form-control" required>
-              <option value="catechista">Catechista (gestione gruppi catechismo, appello e presenze)</option>
-              <option value="oratorio">Oratorio (gestione attività oratorio, squadre e presenze)</option>
-              <option value="segreteria">Segreteria (gestione generale, messe, iscrizioni, quote)</option>
-              <option value="parroco">Parroco (supervisione pastorale completa)</option>
-              <option value="admin">Amministratore di Sistema</option>
-            </select>
+            <select id="assegnaPermessoRuoloPrimario" class="form-control" required><option value="utente">Utente</option><option value="segreteria">Segreteria</option><option value="admin">Admin</option></select>
           </div>
 
           <div class="form-group">
             <label style="display: block; margin-bottom: 8px;">Tutti i Privilegi da Assegnare:</label>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px;">
-              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                <input type="checkbox" class="chk-extra-perm" value="catechista"> Catechista
-              </label>
-              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                <input type="checkbox" class="chk-extra-perm" value="oratorio"> Oratorio
-              </label>
-              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                <input type="checkbox" class="chk-extra-perm" value="segreteria"> Segreteria
-              </label>
-              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                <input type="checkbox" class="chk-extra-perm" value="parroco"> Parroco
-              </label>
-              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                <input type="checkbox" class="chk-extra-perm" value="admin"> Amministratore
-              </label>
-            </div>
+            <div id="assignmentPrivileges" class="access-assignment"></div>
           </div>
         </div>
         <div class="modal-footer">
@@ -3789,11 +3743,7 @@ Domenica: dopo le Sante Messe</p>
             </div>
           </div>
 
-          <div class="form-group">
-            <label>Animatori / Educatori Responsabili</label>
-            <select id="nuovoOratorioAnimatoriSelect" class="form-control" multiple style="height: 90px;"></select>
-            <small style="color: var(--ink-500);">Tieni premuto Ctrl / Cmd per selezionare più animatori</small>
-          </div>
+
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal('modalNuovoGruppoOratorio')">Annulla</button>
@@ -3858,10 +3808,7 @@ Domenica: dopo le Sante Messe</p>
             </div>
           </div>
 
-          <div class="form-group">
-            <label>Animatori / Educatori Responsabili</label>
-            <select id="modOratorioAnimatoriSelect" class="form-control" multiple style="height: 90px;"></select>
-          </div>
+
         </div>
         <div class="modal-footer" style="display: flex; justify-content: space-between;">
           <button type="button" class="btn btn-danger" onclick="handleEliminaGruppoOratorioCorrente()">🗑️ Elimina Gruppo</button>
@@ -4250,6 +4197,7 @@ Domenica: dopo le Sante Messe</p>
 
   <script src="{{ url_for('static', filename='js/group-calendar.js', v=asset_version) }}" defer></script>
   <script src="{{ url_for('static', filename='js/portal-views.js', v=asset_version) }}" defer></script>
+  <script src="{{ url_for('static', filename='js/access-control.js', v=asset_version) }}" defer></script>
   <script src="{{ url_for('static', filename='js/app.js', v=asset_version) }}" defer></script>
 
 <div class="modal-overlay" id="modalPartecipantiEvento"><div class="modal-window"><div class="modal-header"><h3 id="partecipantiEventoTitle">Iscritti e disiscrizioni</h3><button type="button" class="btn-close-modal" onclick="closeModal('modalPartecipantiEvento')">×</button></div><div class="modal-body" id="partecipantiEventoElenco"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="closeModal('modalPartecipantiEvento')">Chiudi</button></div></div></div>

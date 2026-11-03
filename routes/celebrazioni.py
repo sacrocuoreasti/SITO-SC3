@@ -1,19 +1,17 @@
 from flask import Blueprint, request, jsonify
 from flask_login import current_user
 from models import db, Celebrazione
+from services.access_control import can
 
 celebrazioni_bp = Blueprint('celebrazioni_bp', __name__, url_prefix='/api/celebrazioni')
 
 def check_staff():
-    if not current_user.is_authenticated:
-        return False
-    roles = current_user.get_all_roles()
-    return any(r in ['admin', 'segreteria', 'parroco'] for r in roles)
+    return can('segreteria.celebrazioni')
 
 @celebrazioni_bp.route('', methods=['GET'])
 def get_celebrazioni():
     sezione = request.args.get('sezione', '').strip().lower()
-    include_inattivi = request.args.get('tutti', 'false').lower() == 'true' or check_staff()
+    include_inattivi = check_staff()
     query = Celebrazione.query
     if not include_inattivi:
         query = query.filter_by(is_attivo=True)

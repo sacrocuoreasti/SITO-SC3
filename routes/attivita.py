@@ -3,6 +3,7 @@ from flask_login import current_user
 from models import db, Attivita, Iscrizione
 from datetime import datetime
 from services.group_age_service import apply_age_range
+from services.access_control import can
 
 attivita_bp = Blueprint('attivita_bp', __name__, url_prefix='/api/attivita')
 
@@ -13,7 +14,7 @@ def get_attivita():
     include_bozze = request.args.get('include_bozze', 'false').lower() in ['true', '1']
 
     # Se l'utente è segreteria/admin/parroco, può richiedere anche le bozze
-    is_staff = current_user.is_authenticated and current_user.has_role('segreteria', 'admin', 'parroco')
+    is_staff = can('attivita.gestione')
 
     query = Attivita.query
     if solo_attive:
@@ -39,7 +40,7 @@ def get_attivita_detail(id):
         return jsonify({'error': 'Attività non trovata'}), 404
 
     d = a.to_dict()
-    is_staff = current_user.is_authenticated and current_user.has_role('segreteria', 'admin', 'parroco')
+    is_staff = can('attivita.gestione')
     if not is_staff and (not a.is_pubblicato or not a.is_attiva):
         return jsonify(error='Attività non trovata'), 404
     if is_staff:

@@ -1,3 +1,4 @@
+from services.group_attendance import can_record
 from services.group_calendar import apply_calendar
 from services.group_age_service import apply_age_range, register_age_guard
 from flask import Blueprint, request, jsonify
@@ -46,6 +47,9 @@ def get_gruppi_oratorio():
         query = query.filter_by(anno_pastorale=anno)
 
     gruppi_db = query.order_by(GruppoOratorio.id.asc()).all()
+    from services.access_control import can,is_admin
+    if not is_admin() and can('oratorio.staff') and not can('oratorio.tutti'):
+        gruppi_db=[group for group in gruppi_db if can_record('oratorio',group)]
 
     # Filtro visibilità per utenti non staff
     if current_user.is_authenticated:
@@ -54,7 +58,7 @@ def get_gruppi_oratorio():
         if not is_staff:
             gruppi_db = [g for g in gruppi_db if g.stato in ['pubblico', 'chiuso', 'attivo']]
 
-    gruppi = [g.to_dict(include_ragazzi=True) for g in gruppi_db]
+    gruppi = [g.to_dict(include_ragazzi=bool(can_record('oratorio',g))) for g in gruppi_db]
 
     # Attività correlate
     attivita_oratorio = Attivita.query.filter(Attivita.categoria.in_(['oratorio', 'campo_estivo'])).all()
@@ -116,7 +120,7 @@ def get_gruppo_oratorio(id):
     g = db.session.get(GruppoOratorio, id)
     if not g:
         return jsonify({'error': 'Gruppo Oratorio non trovato'}), 404
-    return jsonify({'gruppo': g.to_dict(include_ragazzi=True)})
+    return jsonify({'gruppo': g.to_dict(include_ragazzi=bool(can_record('oratorio',g)))})
 
 @oratorio_bp.route('/gruppi/<int:id>', methods=['PUT'])
 def update_gruppo_oratorio(id):

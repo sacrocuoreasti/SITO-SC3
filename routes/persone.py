@@ -1,3 +1,4 @@
+from services.access_control import can
 from services.profile_files import profile_payload, commit_profile
 from flask import Blueprint, request, jsonify
 from flask_login import current_user, login_required
@@ -60,7 +61,7 @@ def get_persone():
     # Restrizione profilo utente: l'utente normale non deve vedere l'anagrafica pastorale globale
     if current_user.is_authenticated:
         roles = current_user.get_all_roles()
-        is_staff = any(r in ['admin', 'segreteria', 'parroco', 'catechista', 'educatore', 'oratorio'] for r in roles)
+        is_staff = can('anagrafica.elenco')
         if not is_staff:
             if current_user.persona and current_user.persona.nucleo_id:
                 query = query.filter(Persona.nucleo_id == current_user.persona.nucleo_id)
@@ -85,7 +86,7 @@ def get_persona(cf):
     # Controllo permessi accesso scheda persona
     if current_user.is_authenticated:
         roles = current_user.get_all_roles()
-        is_staff = any(r in ['admin', 'segreteria', 'parroco', 'catechista'] for r in roles)
+        is_staff = can('anagrafica.elenco')
         if not is_staff:
             user_cf = (current_user.codice_fiscale or '').upper()
             family_cfs = []

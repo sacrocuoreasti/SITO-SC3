@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_login import current_user
 from models import db, Utente, Persona
 import json
+from services.access_control import validate_assignment,definitions,is_admin,retain_admin,assigned
 
 utenti_bp = Blueprint('utenti_bp', __name__, url_prefix='/api/utenti')
 
@@ -48,15 +49,7 @@ def create_utente():
     if cf and Utente.query.filter_by(codice_fiscale=cf).first():
         return jsonify({'error': 'Un utente con questo Codice Fiscale è già registrato'}), 400
 
-    valid_roles = ['utente', 'genitore', 'oratorio', 'catechista', 'segreteria', 'parroco', 'admin']
-    if ruolo not in valid_roles:
-        ruolo = 'utente'
-
-    privilegi = data.get('privilegi', [ruolo])
-    if not isinstance(privilegi, list):
-        privilegi = [ruolo]
-    if ruolo not in privilegi:
-        privilegi.append(ruolo)
+    ruolo,privilegi=validate_assignment(ruolo,data.get('privilegi',[]))
 
     # Se è specificato il CF, assicura che esista una Persona associata per soddisfare la foreign key
     if cf:
@@ -102,17 +95,10 @@ def update_ruoli(id):
         return jsonify({'error': 'Utente non trovato'}), 404
 
     data = request.get_json() or {}
-    ruolo_primario = data.get('ruolo')
-    privilegi_lista = data.get('privilegi', [])
-
-    valid_roles = ['utente', 'genitore', 'oratorio', 'catechista', 'segreteria', 'parroco', 'admin']
-
-    if ruolo_primario and ruolo_primario in valid_roles:
-        utente.ruolo = ruolo_primario
-
-    if isinstance(privilegi_lista, list):
-        clean_privs = [r for r in privilegi_lista if r in valid_roles]
-        utente.privilegi_extra = json.dumps(clean_privs)
+    role,privileges=validate_assignment(data.get('ruolo',utente.ruolo),data.get('privilegi',[]))
+    if is_admin(utente) and role!='admin':retain_admin({utente.id})
+    utente.ruolo=role
+    utente.privilegi_extra=json.dumps(privileges)
 
     db.session.commit()
 
@@ -134,6 +120,7 @@ def toggle_stato(id):
     else:
         utente.is_attivo = not utente.is_attivo
 
+    if not utente.is_attivo and is_admin(utente):retain_admin({utente.id})
     db.session.commit()
     return jsonify({
         'success': True,
@@ -191,6 +178,8 @@ def delete_utente(id):
     if not utente:
         return jsonify({'error': 'Utente non trovato'}), 404
 
+    if is_admin(utente):retain_admin({utente.id})
+
     from models import Iscrizione, GruppoCatechismo
     for isc in Iscrizione.query.filter_by(iscritto_da_id=id).all():
         isc.iscritto_da_id = None
@@ -211,6 +200,7 @@ def bulk_stato():
     if not isinstance(ids, list) or not ids:
         return jsonify({'error': 'Nessun utente specificato'}), 400
 
+    if not nuovo_stato:retain_admin(set(ids))
     conteggio = 0
     for uid in ids:
         if current_user.is_authenticated and current_user.id == uid and not nuovo_stato:
@@ -236,9 +226,8 @@ def bulk_privilegi():
     ruolo_azione = data.get('azione', 'aggiungi')
     ruolo_target = data.get('ruolo', '').strip().lower()
 
-    valid_roles = ['utente', 'genitore', 'oratorio', 'catechista', 'segreteria', 'parroco', 'admin']
-    if ruolo_target not in valid_roles:
-        return jsonify({'error': f'Ruolo non valido: {ruolo_target}'}), 400
+    if ruolo_target not in definitions() or definitions()[ruolo_target]['tipo']!='privilegio':
+        return jsonify(error='Seleziona un privilegio valido'),400
 
     if not isinstance(ids, list) or not ids:
         return jsonify({'error': 'Nessun utente specificato'}), 400
@@ -248,14 +237,9 @@ def bulk_privilegi():
         u = db.session.get(Utente, uid)
         if not u:
             continue
-
-        try:
-            current_privs = json.loads(u.privilegi_extra or '[]')
-        except Exception:
-            current_privs = []
-
-        if not isinstance(current_privs, list):
-            current_privs = [u.ruolo]
+        base,profiles=assigned(u)
+        current_privs=[key for key in profiles if definitions()[key]['tipo']=='privilegio']
+        u.ruolo=base
 
         if ruolo_azione == 'aggiungi':
             if ruolo_target not in current_privs:
@@ -267,10 +251,6 @@ def bulk_privilegi():
                 continue
             if ruolo_target in current_privs:
                 current_privs.remove(ruolo_target)
-            if not current_privs:
-                current_privs = ['utente']
-            if u.ruolo == ruolo_target:
-                u.ruolo = current_privs[0]
             u.privilegi_extra = json.dumps(current_privs)
             conteggio += 1
 
@@ -293,6 +273,7 @@ def bulk_delete():
 
     from models import Iscrizione, GruppoCatechismo
 
+    retain_admin(set(ids))
     conteggio = 0
     for uid in ids:
         if current_user.is_authenticated and current_user.id == uid:
