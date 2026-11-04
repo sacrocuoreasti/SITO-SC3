@@ -255,6 +255,15 @@ const ParishWeek=(()=>{
     while(cache.size>64)cache.delete(cache.keys().next().value);
     return value;
   }
+  const sourceColor=value=>/^#[a-f0-9]{6}$/i.test(value||'')?value:'#8B1E1E';
+  function eventStyle(event) {
+    if(!event.fonti[0]?.colore)return '';
+    const color=sourceColor(event.fonti[0].colore);
+    return ` style="border-color:${color};background:${color}12"`;
+  }
+  function sourceLabels(event) {
+    return event.fonti.map(source=>source.colore?`<span style="display:inline-block;border-left:3px solid ${sourceColor(source.colore)};padding-left:5px">${escapeHtml(source.nome)}</span>`:escapeHtml(source.nome)).join(' · ');
+  }
   function markup(days,events,errors,stale) {
     const dateLabel=day=>new Date(day+'T12:00:00').toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'numeric'});
     return `<div class="weekly-toolbar"><strong>${dateLabel(days[0])} – ${dateLabel(days[6])}</strong><div><button type="button" class="btn btn-sm btn-secondary" aria-label="Settimana precedente" onclick="ParishWeek.move(-1)">←</button><button type="button" class="btn btn-sm btn-secondary" onclick="ParishWeek.move(0)">Questa settimana</button><button type="button" class="btn btn-sm btn-secondary" aria-label="Settimana successiva" onclick="ParishWeek.move(1)">→</button></div></div>
@@ -262,7 +271,7 @@ const ParishWeek=(()=>{
       ${stale?'<p>Alcuni appuntamenti provengono dall’ultima copia disponibile del calendario.</p>':''}
       <div class="weekly-calendar">${days.map(day=>{
         const appointments=events.filter(e=>(e.giorni||[e.giorno]).includes(day)).sort((a,b)=>(a.tutto_il_giorno?-1:0)-(b.tutto_il_giorno?-1:0) || (a.minute??celebrationSlots({orario:a.ora})[0].minute)-(b.minute??celebrationSlots({orario:b.ora})[0].minute) || a.titolo.localeCompare(b.titolo,'it'));
-        return `<section class="weekly-day ${day===GroupCalendar.localDate()?'is-today':''}"><h4>${escapeHtml(new Date(day+'T12:00:00').toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'short'}))}</h4>${appointments.map(e=>`<article class="weekly-mass" data-section="${escapeHtml(e.sezione||'calendario')}"><strong>${escapeHtml(e.tutto_il_giorno?'Tutto il giorno':e.giorno<day?'In corso':e.ora||'Orario da definire')}</strong><span>${escapeHtml(e.titolo)}</span><small>${escapeHtml(e.fonti.join(' · '))}</small>${e.luogo?`<small>${escapeHtml(e.luogo)}</small>`:''}</article>`).join('')||'<small class="weekly-empty">Nessun appuntamento</small>'}</section>`;
+        return `<section class="weekly-day ${day===GroupCalendar.localDate()?'is-today':''}"><h4>${escapeHtml(new Date(day+'T12:00:00').toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'short'}))}</h4>${appointments.map(e=>`<article class="weekly-mass" data-section="${escapeHtml(e.sezione||'calendario')}"${eventStyle(e)}><strong>${escapeHtml(e.tutto_il_giorno?'Tutto il giorno':e.giorno<day?'In corso':e.ora||'Orario da definire')}</strong><span>${escapeHtml(e.titolo)}</span><small>${sourceLabels(e)}</small>${e.luogo?`<small>${escapeHtml(e.luogo)}</small>`:''}</article>`).join('')||'<small class="weekly-empty">Nessun appuntamento</small>'}</section>`;
       }).join('')}</div>`;
   }
   async function load() {
@@ -275,22 +284,23 @@ const ParishWeek=(()=>{
     async function worker() {
       while(cursor<sources.length) {
         if(token!==sequence)return;
-        const c=sources[cursor++];
+        const order=cursor++,c=sources[order];
+        const source={nome:c.titolo||c.nome||'Calendario parrocchiale',colore:sourceColor(c.colore),ordine:order};
         try {
           const data=await read(endpoint(c)+'?mese='+month);stale=stale||data.obsoleto;
           for(const event of data.eventi||[]) {
             if(!(event.giorni||[event.giorno]).some(day=>days.includes(day)))continue;
             // I gruppi genitori possono derivare lo stesso incontro con un ID diverso.
             const key=JSON.stringify([event.inizio,event.fine||'',event.titolo.trim().toLocaleLowerCase('it-IT'),(event.luogo||'').trim().toLocaleLowerCase('it-IT')]);
-            if(events.has(key)) {const item=events.get(key);if(!item.fonti.includes(c.titolo||c.nome))item.fonti.push(c.titolo||c.nome);}
-            else events.set(key,{...event,fonti:[c.titolo||c.nome||'Calendario parrocchiale']});
+            if(events.has(key)) {const item=events.get(key);if(!item.fonti.some(s=>s.ordine===order))item.fonti.push(source);item.fonti.sort((a,b)=>a.ordine-b.ordine);}
+            else events.set(key,{...event,fonti:[source]});
           }
         } catch(error) {errors.push(c.titolo||c.nome||'Calendario');}
       }
     }
     await Promise.all(Array.from({length:Math.min(3,sources.length)},worker));
     const publicData=await worship;
-    if(publicData)days.forEach((day,index)=>celebrationDayEntries(publicData.celebrazioni||[],day,index).forEach((c,i)=>events.set('worship:'+day+':'+i,{...c,giorno:day,giorni:[day],ora:c.orario,fonti:['Messe e liturgia']})));
+    if(publicData)days.forEach((day,index)=>celebrationDayEntries(publicData.celebrazioni||[],day,index).forEach((c,i)=>events.set('worship:'+day+':'+i,{...c,giorno:day,giorni:[day],ora:c.orario,fonti:[{nome:'Messe e liturgia'}]})));
     if(token!==sequence)return;
     container.innerHTML=markup(days,[...events.values()],errors,stale);
   }

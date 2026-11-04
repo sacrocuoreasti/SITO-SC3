@@ -346,10 +346,13 @@ vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['
   fixtures['/api/impostazioni/calendari/91/appuntamenti?mese='+month]={eventi:[e,{...e,id:'early',titolo:'Appuntamento mattina',ora:'9:00'}]};
   fixtures['/api/impostazioni/calendari-gruppi/catechismo/92?mese='+month]={eventi:[{...e,id:'derived-parent-uid'},{...e,id:'outside',titolo:'Fuori settimana',giorno:'1900-01-01',giorni:['1900-01-01']}]};
   fixtures['/api/impostazioni/dati-pubblici']={celebrazioni:[]};
-  await summary.setCalendars([{id:91,titolo:'Parrocchia'},{id:'auto:catechismo:92',titolo:'Catechismo',calendar_api_url:'/api/impostazioni/calendari-gruppi/catechismo/92'},{id:93,titolo:'Feed non disponibile'}]);
+  await summary.setCalendars([{id:91,titolo:'Parrocchia',colore:'#2563eb'},{id:'auto:catechismo:92',titolo:'Catechismo',colore:'#8B1E1E',calendar_api_url:'/api/impostazioni/calendari-gruppi/catechismo/92'},{id:93,titolo:'Feed non disponibile'}]);
   const combined=nodes('parishWeeklyCalendar').innerHTML;
   assert.equal((combined.match(/Incontro condiviso/g)||[]).length,1);
-  assert.ok(combined.includes('Parrocchia · Catechismo'));
+  assert.ok(combined.includes('Parrocchia</span> · <span'));
+  assert.ok(combined.includes('border-color:#2563eb;background:#2563eb12'));
+  assert.ok(combined.includes('border-left:3px solid #8B1E1E'));
+  assert.ok(combined.includes('Catechismo</span>'));
   assert.ok(combined.includes('Feed non disponibile'));
   assert.ok(!combined.includes('Fuori settimana'));
   assert.ok(combined.indexOf('Appuntamento mattina')<combined.indexOf('Incontro condiviso'));
