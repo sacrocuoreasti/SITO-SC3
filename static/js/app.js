@@ -7822,10 +7822,10 @@ async function loadUserCalendari() {
   const container = document.getElementById('dashUserCalendariGrid');
   if (!container) return;
   try {
-    const [data,groups]=await Promise.all([hasPermission('calendari.comunita')?apiJson('/api/impostazioni/calendari?solo_pubblici=true'):Promise.resolve({calendari:[]}),hasPermission('calendari.gruppi')?apiJson('/api/famiglie/calendari-gruppi'):Promise.resolve({calendari:[]})]);
+    const [data,groups]=await Promise.all([hasPermission('calendari.comunita')?apiJson('/api/impostazioni/calendari?solo_pubblici='+(!hasPermission('segreteria.calendari'))):Promise.resolve({calendari:[]}),hasPermission('calendari.gruppi')?apiJson('/api/famiglie/calendari-gruppi'):Promise.resolve({calendari:[]})]);
     const calendari = data.calendari || [];
-    const allCalendars=[...calendari,...(groups.calendari||[])];
-    ParishWeek.setCalendars(allCalendars);
+    if(hasPermission('segreteria.calendari'))cacheSegreteriaCalendari=calendari;
+    ParishWeek.setCalendars(calendari.filter(c=>c.is_pubblico!==false));
     if (!calendari.length && !groups.calendari?.length) {
       container.innerHTML = `<div style="grid-column: 1/-1; padding: 16px; color: var(--ink-500); text-align: center;">Nessun calendario parrocchiale attivo al momento.</div>`;
       return;
@@ -7836,7 +7836,7 @@ async function loadUserCalendari() {
       const matches=owned.filter(g=>(c.gruppi_origine||[]).some(origin=>g.id===origin.categoria+':'+origin.id) || (g.google_calendar_url && g.google_calendar_url===c.google_calendar_url));
       matches.forEach(g=>used.add(g.id));
       const related=matches[0];
-      const api=related && hasPermission(related.categoria+'.calendario')?related.calendar_api_url:c.calendar_api_url;
+      const api=related && !c.origine_gruppo && !c.calendar_api_url && hasPermission(related.categoria+'.calendario')?related.calendar_api_url:c.calendar_api_url;
       return {...c,calendar_api_url:api};
     });
     container.innerHTML=groupedCalendarCards([...cards,...owned.filter(g=>!used.has(g.id))]);
@@ -7891,8 +7891,10 @@ async function loadSegreteriaCalendari() {
 }
 
 function openModalNuovoCalendario() {
-  document.getElementById('modalCalTitle').textContent = '📅 Nuovo Calendario Google Parrocchiale';
+  document.getElementById('modalCalTitle').textContent = 'Nuovo calendario parrocchiale';
   document.getElementById('inputCalId').value = '';
+  document.getElementById('inputCalOrigin').value='';
+  document.getElementById('inputCalTipo').value='google';
   document.getElementById('inputCalTitolo').value = '';
   document.getElementById('inputCalDescrizione').value = '';
   document.getElementById('inputCalUrl').value = '';
@@ -7901,14 +7903,17 @@ function openModalNuovoCalendario() {
   document.getElementById('inputCalCategoria').value = 'parrocchia';
   document.getElementById('inputCalOrdine').value = '0';
   document.getElementById('inputCalPubblico').checked = true;
+  updateCalendarMode();
   openModal('modalCalendarioComunita');
 }
 
 function openModalModificaCalendario(id) {
-  const c = cacheSegreteriaCalendari.find(x => x.id === id);
+  const c = cacheSegreteriaCalendari.find(x => String(x.id) === String(id));
   if (!c) return;
   document.getElementById('modalCalTitle').textContent = `✏️ Modifica Calendario: ${c.titolo}`;
-  document.getElementById('inputCalId').value = c.id;
+  document.getElementById('inputCalId').value = c.automatico?'':c.id;
+  document.getElementById('inputCalOrigin').value=c.automatico?c.id:c.origine_gruppo||'';
+  document.getElementById('inputCalTipo').value=c.tipo||'google';
   document.getElementById('inputCalTitolo').value = c.titolo;
   document.getElementById('inputCalDescrizione').value = c.descrizione || '';
   document.getElementById('inputCalUrl').value = c.google_calendar_url;
@@ -7917,6 +7922,7 @@ function openModalModificaCalendario(id) {
   document.getElementById('inputCalCategoria').value = c.categoria || 'parrocchia';
   document.getElementById('inputCalOrdine').value = c.ordine || 0;
   document.getElementById('inputCalPubblico').checked = Boolean(c.is_pubblico);
+  updateCalendarMode();
   openModal('modalCalendarioComunita');
 }
 
@@ -7924,6 +7930,8 @@ async function handleSalvaCalendario(e) {
   e.preventDefault();
   const id = document.getElementById('inputCalId').value;
   const payload = {
+    tipo:document.getElementById('inputCalTipo').value,
+    origine_gruppo:document.getElementById('inputCalOrigin').value||null,
     titolo: document.getElementById('inputCalTitolo').value.trim(),
     descrizione: document.getElementById('inputCalDescrizione').value.trim(),
     google_calendar_url: document.getElementById('inputCalUrl').value.trim(),
@@ -7949,6 +7957,9 @@ async function handleSalvaCalendario(e) {
     await loadSegreteriaCalendari();
     await loadPublicCalendari();
     await loadUserCalendari();
+    ParishWeek.clearCache();
+    await ParishWeek.load();
+    if(d.calendario.tipo==='manuale')openCalendarEvents(d.calendario.id);
   } catch (err) {
     showToast(err.message, 'error');
   }
@@ -8291,7 +8302,7 @@ function updateDocumentAge(id,age) {
     group.style.display=visible ? 'block':'none';input.disabled=!visible;
   });
 }
-function groupCalendarMarkup(group) {if((group.calendar_api_url||'').startsWith('/api/impostazioni/calendari-gruppi/'))return GroupCalendar.markup(group);const category=(group.calendar_api_url||'').split('/')[3];return category && !hasPermission(category+'.calendario')?'':GroupCalendar.markup(group);}
+function groupCalendarMarkup(group) {if(/^\/api\/impostazioni\/calendari(?:-gruppi)?\//.test(group.calendar_api_url||''))return GroupCalendar.markup(group);const category=(group.calendar_api_url||'').split('/')[3];return category && !hasPermission(category+'.calendario')?'':GroupCalendar.markup(group);}
 
 function loadGroupCalendar(button) {return GroupCalendar.load(button);}
 
@@ -8351,5 +8362,6 @@ function chooseCalendarMeeting(select,prefix) {
 function updateCelebrationDateMode() {const specific=document.getElementById('celSezione').value==='avvenimenti';document.getElementById('celWeekdaysGroup').hidden=specific;document.getElementById('celSpecificDateGroup').hidden=!specific;document.getElementById('celDataSpecifica').required=specific;}
 
 function communityCalendarCard(calendar) {
-  return `<div class="card" style="padding:18px;border-top:4px solid ${escapeHtml(calendar.colore||'#8B1E1E')}"><h3>${escapeHtml(calendar.icona||'📅')} ${escapeHtml(calendar.titolo)}</h3><p>${escapeHtml(calendar.descrizione||'')}</p>${groupCalendarMarkup(calendar)}${calendar.google_calendar_url?`<a href="${escapeHtml(calendar.google_calendar_url)}" class="btn btn-sm btn-secondary" target="_blank" rel="noopener noreferrer">Apri / Aggiungi a Google Calendar ↗</a>`:''}</div>`;
+  const manage=hasPermission('segreteria.calendari') && currentView==='calendari';
+  return `<div class="card" style="padding:18px;border-top:4px solid ${escapeHtml(calendar.colore||'#8B1E1E')}"><h3>${escapeHtml(calendar.icona||'📅')} ${escapeHtml(calendar.titolo)}</h3><p>${escapeHtml(calendar.descrizione||'')}</p>${calendar.is_pubblico===false?'<span class="badge badge-neutral">Nascosto dal calendario generale</span>':''}${groupCalendarMarkup(calendar)}${calendar.tipo!=='manuale' && calendar.google_calendar_url?`<a href="${escapeHtml(calendar.google_calendar_url)}" class="btn btn-sm btn-secondary" target="_blank" rel="noopener noreferrer">Apri / Aggiungi a Google Calendar ↗</a>`:''}${manage?`<div class="calendar-manage-actions"><button class="btn btn-sm btn-secondary" data-permission="segreteria.calendari" onclick="openModalModificaCalendario('${escapeHtml(calendar.id)}')">Modifica calendario</button>${calendar.tipo==='manuale'?`<button class="btn btn-sm btn-primary" data-permission="segreteria.calendari" onclick="openCalendarEvents(${calendar.id})">Gestisci appuntamenti</button>`:''}</div>`:''}</div>`;
 }

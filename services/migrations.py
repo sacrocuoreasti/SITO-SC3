@@ -6,7 +6,7 @@ from sqlalchemy import inspect
 
 
 def backup_sqlite(engine):
-    expected = {'definizione_accesso': {'versione_viste'}, 'celebrazione': {'data_specifica'}, 'presenza': {'gruppo_categoria','gruppo_id'}, 'persona': {'terapie_medicinali','civico_residenza','consensi_aggiunta'}, 'nucleo_familiare': {'codice_invito'},
+    expected = {'definizione_accesso': {'versione_viste','eliminato'}, 'calendario_comunita': {'tipo','origine_gruppo'}, 'celebrazione': {'data_specifica'}, 'presenza': {'gruppo_categoria','gruppo_id'}, 'persona': {'terapie_medicinali','civico_residenza','consensi_aggiunta'}, 'nucleo_familiare': {'codice_invito'},
                 'utente': {'consensi_registrazione', 'gestito_da_id'},
                 'gruppo_oratorio': {'eta_min','eta_max','google_calendar_url'}, 'gruppo_catechismo': {'eta_min','eta_max'},
                 'gruppo_doposcuola': {'eta_min','eta_max','google_calendar_url'}}
@@ -17,6 +17,7 @@ def backup_sqlite(engine):
     missing = missing or ('utente' in tables and 'definizione_accesso' not in tables)
     missing = missing or ('gruppo_doposcuola' in tables and 'gruppo_doposcuola_educatori' not in tables)
     missing = missing or ('persona' in tables and not {'gruppo_giovani','gruppo_giovani_persona','gruppo_giovani_responsabili','avviso_gruppo'}.issubset(tables))
+    missing = missing or ('calendario_comunita' in tables and 'evento_calendario_comunita' not in tables)
     if not missing or not engine.url.database or engine.url.database == ':memory:':
         return None
     directory = os.path.join(os.path.dirname(os.path.abspath(engine.url.database)), 'backups')

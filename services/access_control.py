@@ -76,6 +76,8 @@ def definitions():
     from models import DefinizioneAccesso
     result={key:{'chiave':key,'nome':value[0],'tipo':value[1],'permessi':sorted(value[2]),'predefinito':True} for key,value in DEFAULTS.items()}
     for row in DefinizioneAccesso.query.all():
+        if row.eliminato:
+            result.pop(row.chiave,None);continue
         grants=json.loads(row.permessi)
         new_keys=subtree('giovani')|{'dashboard.bacheche'}|{category+'.'+child for category in ('oratorio','catechismo','doposcuola') for child in ('bacheca','avvisi')}
         if not row.versione_viste and not set(grants)&new_keys:grants=legacy_view_grants(row.chiave,grants)
@@ -86,8 +88,8 @@ def definitions():
 def assigned(user):
     config=definitions();raw=raw_roles(user)
     primary=ALIASES.get(user.ruolo,user.ruolo)
-    base='admin' if is_admin(user) else primary if primary in config and config[primary]['tipo']=='ruolo' else 'utente'
-    profiles={base}|{ALIASES.get(role,role) for role in raw if ALIASES.get(role,role) in config}
+    base='admin' if is_admin(user) else primary if primary in config and config[primary]['tipo']=='ruolo' else 'utente' if 'utente' in config else None
+    profiles=({base} if base else set())|{ALIASES.get(role,role) for role in raw if ALIASES.get(role,role) in config}
     return base,profiles
 
 def permissions(user=None):
@@ -102,7 +104,7 @@ def permissions(user=None):
 def can(key,user=None):return key in permissions(user)
 
 def technical_roles(user):
-    base,profiles=assigned(user);roles=set(profiles)|{base}
+    base,profiles=assigned(user);roles=set(profiles)|({base} if base else set())
     if is_admin(user):return ['admin']
     grants=permissions(user)
     if base=='segreteria' or any(key in grants for key in ('anagrafica','excel','segreteria','attivita.gestione','utenti.elenco')):roles.add('segreteria')
@@ -113,7 +115,7 @@ def technical_roles(user):
 
 def identity(user):
     base,profiles=assigned(user);config=definitions()
-    return {'ruolo_base':base,'nome_ruolo':config[base]['nome'],'nomi_profili':{key:config[key]['nome'] for key in profiles},'privilegi':[key for key in sorted(profiles) if config[key]['tipo']=='privilegio'],
+    return {'ruolo_base':base,'nome_ruolo':config[base]['nome'] if base in config else 'Nessun ruolo assegnato','nomi_profili':{key:config[key]['nome'] for key in profiles},'privilegi':[key for key in sorted(profiles) if config[key]['tipo']=='privilegio'],
             'profili_accesso':sorted(profiles),'permessi':sorted(permissions(user)),'is_admin':is_admin(user)}
 
 def staff_scope(user=None):

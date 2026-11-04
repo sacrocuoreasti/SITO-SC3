@@ -33,7 +33,9 @@ def create_definition():
     if not isinstance(key,str) or not re.fullmatch(r'[a-z][a-z0-9_]{1,29}',key):raise BadRequest('Usa un codice di 2–30 lettere minuscole, numeri o underscore')
     if key in definitions() or key in ('parroco','genitore','oratorio','doposcuola'):raise BadRequest('Codice già utilizzato o riservato')
     name,kind,grants=fields(data)
-    db.session.add(DefinizioneAccesso(chiave=key,nome=name,tipo=kind,permessi=json.dumps(grants)))
+    row=db.session.get(DefinizioneAccesso,key) or DefinizioneAccesso(chiave=key)
+    row.nome=name;row.tipo=kind;row.permessi=json.dumps(grants);row.eliminato=False;row.versione_viste=1
+    db.session.add(row)
     db.session.commit();g.pop('access_definitions',None)
     return jsonify(success=True,profilo=definitions()[key]),201
 
@@ -54,15 +56,17 @@ def update_definition(key):
 @accessi_bp.route('/<key>',methods=['DELETE'])
 def delete_definition(key):
     from models import Utente
-    from services.access_control import raw_roles
-    if key in DEFAULTS:
-        raise BadRequest('I profili di sistema non possono essere eliminati; puoi configurarne nome e viste.')
-    row=db.session.get(DefinizioneAccesso,key)
-    if not row:
-        return jsonify(error='Profilo non trovato'),404
-    count=sum(key in raw_roles(user) for user in Utente.query.all())
+    from services.access_control import assigned
+    if key=='admin':raise BadRequest('Il profilo Admin mantiene l’accesso completo al sito')
+    existing=definitions().get(key)
+    if not existing:return jsonify(error='Profilo non trovato'),404
+    count=sum(key in assigned(user)[1] for user in Utente.query.all())
     if count:
         return jsonify(error=f'Profilo assegnato a {count} account: rimuovi prima le assegnazioni per eliminarlo.',assegnazioni=count),409
-    db.session.delete(row)
+    row=db.session.get(DefinizioneAccesso,key)
+    if key in DEFAULTS:
+        if not row:row=DefinizioneAccesso(chiave=key,nome=existing['nome'],tipo=existing['tipo']);db.session.add(row)
+        row.eliminato=True;row.permessi='[]';row.versione_viste=1
+    else:db.session.delete(row)
     db.session.commit();g.pop('access_definitions',None)
     return jsonify(success=True)

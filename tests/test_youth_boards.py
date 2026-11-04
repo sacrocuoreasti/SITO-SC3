@@ -19,26 +19,26 @@ class YouthBoardsTests(unittest.TestCase):
     def create_youth(self,name='Gruppo giovani',year=None,client=None):
         return (client or self.client).post('/api/giovani/gruppi',json={'nome':name,'anno_pastorale':year or current_pastoral_year(),'catechisti_ids':[3]})
 
-    def test_only_two_youth_groups_per_year_including_year_changes(self):
+    def test_multiple_youth_groups_per_year_including_year_changes(self):
         self.assertEqual(self.create_youth('Anno non valido','2026/2028').status_code,400)
         first=self.create_youth('Primo');second=self.create_youth('Secondo')
         self.assertEqual(first.status_code,201,first.json);self.assertEqual(second.status_code,201,second.json)
-        self.assertEqual(self.create_youth('Terzo').status_code,409)
+        self.assertEqual(self.create_youth('Terzo').status_code,201)
         year=current_pastoral_year();start=int(year[:4]);future=f'{start+1}/{start+2}'
         following=self.create_youth('Altro anno',future)
         self.assertEqual(following.status_code,201)
         ident=following.json['gruppo']['id']
-        self.assertEqual(self.client.put('/api/giovani/gruppi/'+str(ident),json={'anno_pastorale':year}).status_code,409)
-        with self.app.app_context():self.assertEqual(db.session.get(GruppoGiovani,ident).anno_pastorale,future)
+        self.assertEqual(self.client.put('/api/giovani/gruppi/'+str(ident),json={'anno_pastorale':year}).status_code,200)
+        with self.app.app_context():self.assertEqual(db.session.get(GruppoGiovani,ident).anno_pastorale,year)
 
-    def test_concurrent_creation_keeps_two_slots(self):
+    def test_concurrent_creation_preserves_all_groups(self):
         self.assertEqual(self.create_youth('Esistente').status_code,201)
         clients=[self.app.test_client(),self.app.test_client()]
         for client in clients:self.login('admin@example.test',client=client)
         with ThreadPoolExecutor(max_workers=2) as pool:
             codes=list(pool.map(lambda args:self.create_youth(args[1],client=args[0]).status_code,zip(clients,['Nuovo A','Nuovo B'])))
-        self.assertEqual(sorted(codes),[201,409])
-        with self.app.app_context():self.assertEqual(GruppoGiovani.query.count(),2)
+        self.assertEqual(sorted(codes),[201,201])
+        with self.app.app_context():self.assertEqual(GruppoGiovani.query.count(),3)
 
     def test_young_family_head_can_enroll_self_and_get_private_group_board(self):
         response=self.create_youth();ident=response.json['gruppo']['id']

@@ -1,5 +1,5 @@
 from flask import Blueprint,jsonify,request
-from werkzeug.exceptions import BadRequest,Forbidden,NotFound,Conflict
+from werkzeug.exceptions import BadRequest,Forbidden,NotFound
 from sqlalchemy import text
 import re
 from models import db,GruppoGiovani,Utente,Presenza,AvvisoGruppo
@@ -43,11 +43,6 @@ def lock_groups():
     else:db.session.query(GruppoGiovani).with_for_update().all()
 
 
-def check_slots(group):
-    with db.session.no_autoflush:
-        others=GruppoGiovani.query.filter(GruppoGiovani.id!=group.id).all() if group.id else GruppoGiovani.query.all()
-    if sum(year_key(other.anno_pastorale)==year_key(group.anno_pastorale) for other in others)>=2:raise Conflict('Sono consentiti al massimo due gruppi giovani per anno pastorale')
-
 
 @giovani_bp.route('/gruppi',methods=['GET','POST'])
 def groups():
@@ -56,7 +51,7 @@ def groups():
         return jsonify(gruppi=[g.to_dict(include_ragazzi=False) for g in rows],anno_pastorale_corrente=current_pastoral_year())
     lock_groups()
     group=GruppoGiovani(anno_pastorale=current_pastoral_year(),stato='pubblico')
-    fields(group,request.get_json() or {});check_slots(group)
+    fields(group,request.get_json() or {})
     db.session.add(group);db.session.commit()
     return jsonify(success=True,gruppo=group.to_dict(include_ragazzi=False)),201
 
@@ -71,7 +66,7 @@ def update_group(id):
         if group.ragazzi or Presenza.query.filter_by(gruppo_categoria='giovani',gruppo_id=id).first() or AvvisoGruppo.query.filter_by(categoria='giovani',gruppo_id=id).first():raise BadRequest('Il gruppo contiene iscritti, appelli o avvisi: puoi chiuderlo per conservarne lo storico')
         db.session.delete(group)
     else:
-        fields(group,request.get_json() or {});check_slots(group)
+        fields(group,request.get_json() or {})
     db.session.commit();return jsonify(success=True)
 
 

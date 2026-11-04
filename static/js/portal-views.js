@@ -244,7 +244,7 @@ const ParishWeek=(()=>{
   const cache=new Map();
   const target=()=>document.getElementById('parishWeeklyCalendar');
   function endpoint(c) {
-    if(c.calendar_api_url && /^\/api\/(?:impostazioni\/)?calendari-gruppi\/(catechismo|oratorio|doposcuola|giovani)\/\d+$/.test(c.calendar_api_url))return c.calendar_api_url;
+    if(c.calendar_api_url && /^(?:\/api\/(?:impostazioni\/)?calendari-gruppi\/(?:catechismo|oratorio|doposcuola|giovani)\/\d+|\/api\/impostazioni\/calendari\/\d+\/appuntamenti)$/.test(c.calendar_api_url))return c.calendar_api_url;
     return Number.isInteger(c.id)?`/api/impostazioni/calendari/${c.id}/appuntamenti`:null;
   }
   async function read(url) {
@@ -309,5 +309,55 @@ const ParishWeek=(()=>{
     calendars=value;return load();
   }
   function move(delta) {offset=delta===0?0:offset+delta;return load();}
-  return {setCalendars,move,load};
+  function clearCache(){cache.clear();}
+  return {setCalendars,move,load,clearCache};
 })();
+
+function updateCalendarMode() {
+  const manual=document.getElementById('inputCalTipo').value==='manuale';
+  document.getElementById('inputCalGoogleGroup').hidden=manual;
+  document.getElementById('inputCalUrl').required=!manual;
+  document.getElementById('inputCalUrl').disabled=manual;
+}
+let calendarEventEditor={id:null,events:[],sequence:0};
+async function openCalendarEvents(id) {
+  calendarEventEditor.id=id;const sequence=++calendarEventEditor.sequence;
+  const calendar=cacheSegreteriaCalendari.find(c=>c.id===id);
+  document.getElementById('calendarEventsTitle').textContent='Appuntamenti · '+(calendar?.titolo||'Calendario');
+  document.getElementById('calendarEventsList').innerHTML='<p>Caricamento appuntamenti…</p>';
+  clearCalendarEvent();openModal('modalCalendarEvents');
+  try {
+    const data=await apiJson(`/api/impostazioni/calendari/${id}/eventi`);
+    if(sequence!==calendarEventEditor.sequence)return;
+    calendarEventEditor.events=data.eventi;
+    document.getElementById('calendarEventsList').innerHTML=data.eventi.map(e=>`<article class="calendar-editor-event"><div><strong>${escapeHtml(e.titolo)}</strong><p>${escapeHtml(new Date(e.inizio).toLocaleString('it-IT'))} – ${escapeHtml(new Date(e.fine).toLocaleString('it-IT'))}${e.tutto_il_giorno?' · Tutto il giorno':''}</p><small>${escapeHtml(e.luogo)}</small></div><div><button type="button" class="btn btn-sm btn-secondary" onclick="editCalendarEvent(${e.id})">Modifica</button><button type="button" class="btn btn-sm btn-danger" onclick="deleteCalendarEvent(${e.id})">Elimina</button></div></article>`).join('')||'<p>Nessun appuntamento: aggiungi il primo con il modulo qui sotto.</p>';
+  } catch(error){document.getElementById('calendarEventsList').textContent=error.message;}
+}
+function clearCalendarEvent() {
+  for(const id of ['calendarEventId','calendarEventName','calendarEventStart','calendarEventEnd','calendarEventPlace'])document.getElementById(id).value='';
+  document.getElementById('calendarEventAllDay').checked=false;
+  document.getElementById('calendarEventFormTitle').textContent='Nuovo appuntamento';
+}
+function editCalendarEvent(id) {
+  const event=calendarEventEditor.events.find(e=>e.id===id);if(!event)return;
+  for(const [field,value] of Object.entries({calendarEventId:event.id,calendarEventName:event.titolo,calendarEventStart:event.inizio,calendarEventEnd:event.fine,calendarEventPlace:event.luogo}))document.getElementById(field).value=value;
+  document.getElementById('calendarEventAllDay').checked=event.tutto_il_giorno;
+  document.getElementById('calendarEventFormTitle').textContent='Modifica appuntamento';
+  document.getElementById('calendarEventName').focus?.();
+}
+async function saveCalendarEvent(event) {
+  event.preventDefault();const calendarId=calendarEventEditor.id,id=document.getElementById('calendarEventId').value;
+  try {
+    await apiJson(`/api/impostazioni/calendari/${calendarId}/eventi`+(id?'/'+id:''),{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({titolo:document.getElementById('calendarEventName').value,inizio:document.getElementById('calendarEventStart').value,fine:document.getElementById('calendarEventEnd').value,luogo:document.getElementById('calendarEventPlace').value,tutto_il_giorno:document.getElementById('calendarEventAllDay').checked})});
+    ParishWeek.clearCache();await openCalendarEvents(calendarId);await ParishWeek.load();
+    showToast('Appuntamento salvato','success');
+  } catch(error){showToast(error.message,'error');}
+}
+async function deleteCalendarEvent(id) {
+  if(!confirm('Eliminare questo appuntamento?'))return;
+  const calendarId=calendarEventEditor.id;
+  try {
+    await apiJson(`/api/impostazioni/calendari/${calendarId}/eventi/${id}`,{method:'DELETE'});
+    ParishWeek.clearCache();await openCalendarEvents(calendarId);await ParishWeek.load();
+  } catch(error){showToast(error.message,'error');}
+}

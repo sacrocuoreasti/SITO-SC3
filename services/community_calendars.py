@@ -26,31 +26,36 @@ def has_calendar(group):
 
 def calendar_catalog(include_private=False):
     year=current_pastoral_year()
-    query=CalendarioComunita.query
-    if not include_private:query=query.filter_by(is_pubblico=True)
-    result=[dict(c.to_dict(),automatico=False) for c in query.order_by(CalendarioComunita.ordine,CalendarioComunita.id).all()]
+    manual=CalendarioComunita.query.order_by(CalendarioComunita.ordine,CalendarioComunita.id).all()
+    overrides={c.origine_gruppo:c for c in manual if c.origine_gruppo}
+    result=[dict(c.to_dict(),automatico=False) for c in manual if not c.origine_gruppo]
     colors={'catechismo':'#8B1E1E','oratorio':'#2563eb','doposcuola':'#d97706','giovani':'#7c3aed'}
     icons={'catechismo':'📖','oratorio':'🏓','doposcuola':'📚','giovani':'🌱'}
     for category,(model,_) in GROUP_MODELS.items():
         for group in model.query.order_by(model.nome,model.id).all():
             group_year=getattr(group,'anno_pastorale',None) or getattr(group,'anno_scolastico',None)
             visible=public_group(group)
-            if year_key(group_year)!=year or not has_calendar(group) or (not visible and not (include_private and can_record(category,group))):continue
+            override=overrides.get(f'auto:{category}:{group.id}')
+            if year_key(group_year)!=year or not (has_calendar(group) or override) or (not visible and not (include_private and can_record(category,group))):continue
             origin={'categoria':category,'id':group.id,'nome':group.nome}
+            if override:
+                result.append(dict(override.to_dict(),automatico=False,anno_pastorale=year,gruppi_origine=[origin]));continue
             result.append({'id':f'auto:{category}:{group.id}','titolo':group.nome,'descrizione':f'{category.capitalize()} · {year}',
                            'google_calendar_url':calendar_info(group),'calendar_embed_url':calendar_info(group),
                            'calendar_api_url':f'/api/impostazioni/calendari-gruppi/{category}/{group.id}',
                            'categoria':category,'colore':colors[category],'icona':icons[category],
                            'is_pubblico':visible,'automatico':True,'anno_pastorale':year,'gruppi_origine':[origin]})
+    # Le impostazioni salvate prevalgono anche se più gruppi condividono lo stesso feed.
+    result.sort(key=lambda entry:bool(entry.get('automatico')))
     merged={}
     for entry in result:
         try:url=calendar_url(entry['google_calendar_url'])
         except BadRequest:url=entry['google_calendar_url']
-        key=(url or str(entry['id']),entry['is_pubblico'])
+        key=url if entry.get('tipo','google')!='manuale' and url else str(entry['id'])
         if key not in merged:merged[key]=entry
         else:
             previous=merged[key]
             previous.setdefault('gruppi_origine',[]).extend(entry.get('gruppi_origine',[]))
             if entry.get('calendar_api_url') and not previous.get('calendar_api_url'):
                 previous['calendar_api_url']=entry['calendar_api_url']
-    return list(merged.values())
+    return [entry for entry in merged.values() if include_private or entry['is_pubblico']]

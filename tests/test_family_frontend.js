@@ -298,7 +298,7 @@ vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['
   nodes('youthSearch').value='';youth.selectYear('2025/2026');
   assert.ok(nodes('youthGroupsGrid').innerHTML.includes('Gruppo archivio'));assert.ok(!nodes('youthGroupsGrid').innerHTML.includes('Gruppo giovani uno'));
   youth.selectYear('');assert.equal((nodes('youthGroupsGrid').innerHTML.match(/class="catechismo-card youth-group-card"/g)||[]).length,3);
-  youth.selectYear('2026/2027');assert.ok(nodes('youthGroupsCount').textContent.includes('2 / 2'));
+  youth.selectYear('2026/2027');assert.ok(nodes('youthGroupsCount').textContent.includes('2 gruppi'));
   assert.ok(template.indexOf('id="dashboardGroupBoards"')<template.indexOf('id="dashKpiGrid"'));
   for(const category of ['oratorio','catechismo','doposcuola','giovani']) {
     assert.ok(template.indexOf('id="'+category+'BoardFamily"')<template.indexOf('id="'+category+'ParentSection"'));
@@ -361,10 +361,28 @@ vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['
   await summary.move(0);
   assert.equal(requests.filter(r=>r.url==='/api/impostazioni/calendari/91/appuntamenti?mese='+month).length,calendarReads);
 
+  // Calendari gestibili dalla sezione dedicata; quelli nascosti restano fuori dal riepilogo.
+  context.oldCalendarUser=vm.runInContext('currentUser',context);context.oldCalendarView=vm.runInContext('currentView',context);
+  vm.runInContext("currentUser={id:999,is_admin:true,permessi:['calendari','calendari.comunita','calendari.gruppi','segreteria.calendari']};currentView='calendari';",context);
+  fixtures['/api/impostazioni/calendari?solo_pubblici=false']={calendari:[{id:91,titolo:'Pubblico',colore:'#2563eb',tipo:'manuale',is_pubblico:true},{id:94,titolo:'Nascosto',tipo:'manuale',is_pubblico:false}]};
+  fixtures['/api/famiglie/calendari-gruppi']={calendari:[{id:'catechismo:95',nome:'Calendario familiare',calendar_api_url:'/api/calendari-gruppi/catechismo/95'}]};
+  const originalSetCalendars=summary.setCalendars;let visibleCalendars=[];summary.setCalendars=value=>{visibleCalendars=value;};
+  await context.loadUserCalendari();summary.setCalendars=originalSetCalendars;
+  assert.deepEqual(Array.from(visibleCalendars,c=>c.id),[91]);
+  assert.ok(nodes('dashUserCalendariGrid').innerHTML.includes('Nascosto dal calendario generale'));
+  assert.ok(nodes('dashUserCalendariGrid').innerHTML.includes('Gestisci appuntamenti'));
+  context.openModalModificaCalendario(94);
+  assert.equal(nodes('inputCalPubblico').checked,false);assert.equal(nodes('inputCalUrl').required,false);assert.equal(nodes('inputCalUrl').disabled,true);
+  context.openModalNuovoCalendario();assert.equal(nodes('inputCalTipo').value,'google');assert.equal(nodes('inputCalUrl').required,true);
+  assert.ok(context.groupCalendarMarkup({calendar_api_url:'/api/impostazioni/calendari/91/appuntamenti'}).includes('Calendario mensile'));
+  fixtures['/api/famiglie/calendari-gruppi']={calendari:[]};
+  vm.runInContext('currentUser=oldCalendarUser;currentView=oldCalendarView;',context);
+
   const menuQuery=context.document.querySelectorAll;
   const youthMenu={dataset:{view:'giovani'},style:{}},youthStaffMenu={dataset:{view:'giovani_staff'},style:{}};
   context.document.querySelectorAll=selector=>selector==='.nav-item[data-view]'?[youthMenu,youthStaffMenu]:[];
   context.beforeMenuUser=vm.runInContext('currentUser',context);
+  context.beforeMenuOptions=vm.runInContext('enrollmentOptions',context);
   vm.runInContext("currentUser={id:999,is_admin:true,permessi:['giovani','giovani.staff']};",context);
   vm.runInContext('AccessUI.apply()',context);
   assert.equal(youthMenu.style.display,'none');assert.equal(youthStaffMenu.style.display,'flex');
@@ -372,9 +390,11 @@ vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['
   await context.navigateTo('giovani');assert.equal(vm.runInContext('currentView',context),'giovani_staff');assert.equal(youthLoaded,1);loadYouth.load=originalYouthLoad;
   vm.runInContext("currentUser={id:999,is_admin:false,permessi:['giovani','giovani.staff']};",context);
   vm.runInContext('AccessUI.apply()',context);
-  assert.equal(youthMenu.style.display,'flex');assert.equal(youthStaffMenu.style.display,'flex');
+  assert.equal(youthMenu.style.display,'none');assert.equal(youthStaffMenu.style.display,'flex');
+  vm.runInContext("enrollmentOptions={gruppi:{giovani:[{id:1}]},gruppi_iscritti:{}};AccessUI.apply();",context);assert.equal(youthMenu.style.display,'flex');
+  vm.runInContext("enrollmentOptions={gruppi:{},gruppi_iscritti:{giovani:[{id:1}]}};AccessUI.apply();",context);assert.equal(youthMenu.style.display,'flex');
   context.document.querySelectorAll=menuQuery;
-  vm.runInContext('currentUser=beforeMenuUser;',context);
+  vm.runInContext('currentUser=beforeMenuUser;enrollmentOptions=beforeMenuOptions;',context);
   context.openModalNuovaCelebrazione();nodes('celSezione').value='avvenimenti';context.updateCelebrationDateMode();
   assert.equal(nodes('celWeekdaysGroup').hidden,true);assert.equal(nodes('celDataSpecifica').required,true);
   nodes('celDataSpecifica').value=days[2];nodes('celTitolo').value='Avvenimento datato';

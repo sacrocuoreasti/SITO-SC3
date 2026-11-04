@@ -285,6 +285,7 @@ class DefinizioneAccesso(db.Model):
     tipo = db.Column(db.String(20), nullable=False)
     permessi = db.Column(db.Text, nullable=False, default='[]')
     versione_viste = db.Column(db.Integer, nullable=False, default=1)
+    eliminato = db.Column(db.Boolean, nullable=False, default=False)
 
 
 class Utente(UserMixin, db.Model):
@@ -1144,6 +1145,9 @@ class CalendarioComunita(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     titolo = db.Column(db.String(150), nullable=False)
     descrizione = db.Column(db.Text, nullable=True)
+    tipo = db.Column(db.String(20), nullable=False, default='google')
+    origine_gruppo = db.Column(db.String(80), nullable=True, unique=True)
+    eventi = db.relationship('EventoCalendarioComunita', backref='calendario', cascade='all, delete-orphan', order_by='EventoCalendarioComunita.inizio')
     google_calendar_url = db.Column(db.String(500), nullable=False)
     colore = db.Column(db.String(30), default='#8B1E1E')
     icona = db.Column(db.String(30), default='📅')
@@ -1156,6 +1160,9 @@ class CalendarioComunita(db.Model):
         return {
             'id': self.id,
             'titolo': self.titolo,
+            'tipo': self.tipo or 'google',
+            'origine_gruppo': self.origine_gruppo,
+            'calendar_api_url': f'/api/impostazioni/calendari/{self.id}/appuntamenti',
             'descrizione': self.descrizione or '',
             'google_calendar_url': self.google_calendar_url,
             'colore': self.colore or '#8B1E1E',
@@ -1164,6 +1171,19 @@ class CalendarioComunita(db.Model):
             'is_pubblico': self.is_pubblico,
             'ordine': self.ordine
         }
+
+class EventoCalendarioComunita(db.Model):
+    __tablename__ = 'evento_calendario_comunita'
+    id = db.Column(db.Integer, primary_key=True)
+    calendario_id = db.Column(db.Integer, db.ForeignKey('calendario_comunita.id', ondelete='CASCADE'), nullable=False, index=True)
+    titolo = db.Column(db.String(300), nullable=False)
+    inizio = db.Column(db.DateTime, nullable=False)
+    fine = db.Column(db.DateTime, nullable=False)
+    tutto_il_giorno = db.Column(db.Boolean, nullable=False, default=False)
+    luogo = db.Column(db.String(500), nullable=False, default='')
+    def to_dict(self):
+        return {'id':self.id,'titolo':self.titolo,'inizio':self.inizio.isoformat(timespec='minutes'),
+                'fine':self.fine.isoformat(timespec='minutes'),'tutto_il_giorno':self.tutto_il_giorno,'luogo':self.luogo}
 
 
 def init_default_configurazioni():
@@ -1179,6 +1199,9 @@ def init_default_configurazioni():
         # Verifica ed aggiunta colonne mancanti per SQLite
         from sqlalchemy import text
         col_checks = [
+            ('definizione_accesso','eliminato','BOOLEAN NOT NULL DEFAULT 0'),
+            ('calendario_comunita','tipo',"VARCHAR(20) NOT NULL DEFAULT 'google'"),
+            ('calendario_comunita','origine_gruppo','VARCHAR(80)'),
             ('presenza','gruppo_categoria','VARCHAR(20)'),
             ('presenza','gruppo_id','INTEGER'),
             ('persona','civico_residenza','VARCHAR(30)'),
@@ -1233,6 +1256,7 @@ def init_default_configurazioni():
                     db.session.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
                     db.session.commit()
 
+        db.session.execute(text('CREATE UNIQUE INDEX IF NOT EXISTS ux_calendario_origine ON calendario_comunita (origine_gruppo)'))
         used = {row[0] for row in db.session.execute(text('SELECT codice_invito FROM nucleo_familiare WHERE codice_invito IS NOT NULL'))}
         for family_id, in db.session.execute(text('SELECT id FROM nucleo_familiare WHERE codice_invito IS NULL')).fetchall():
             code = unique_family_code(used)

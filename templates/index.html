@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Parrocchia Sacro Cuore di Gesù — Asti</title>
   <meta name="description" content="Portale ufficiale della Parrocchia Sacro Cuore di Asti per la gestione delle iscrizioni alle attività parrocchiali, catechismo, Estate Ragazzi e vita comunitaria.">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logo-sacro-cuore.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=asset_version) }}">
 </head>
 <body data-version="{{ app_version }}" data-quick-login="{{ 'true' if quick_login_enabled else 'false' }}">
@@ -19,7 +20,7 @@
     <!-- Navbar Pubblica -->
     <header class="public-navbar">
       <a href="#" class="public-nav-brand" onclick="goToPublicHome()">
-        <div class="brand-icon" style="width: 38px; height: 38px; font-size: 18px;">✟</div>
+        <img class="parish-logo" src="{{ url_for('static', filename='images/logo-sacro-cuore.png') }}" alt="Parrocchia Sacro Cuore di Asti" width="72" height="54">
         <div>
           <strong style="font-family: var(--font-serif); font-size: 18px; color: var(--ink-900); display: block; line-height: 1.1;">Cuore<span style="color:var(--primary);">InRete</span></strong>
           <small style="font-size: 10.5px; color: var(--ink-500); text-transform: uppercase; font-weight: 700;">Parrocchia Sacro Cuore · Asti</small>
@@ -257,7 +258,7 @@ Domenica: dopo le Sante Messe</p>
         </div>
 
         <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 24px;">
-          <div class="brand-icon">✟</div>
+          <img class="parish-logo" src="{{ url_for('static', filename='images/logo-sacro-cuore.png') }}" alt="Parrocchia Sacro Cuore di Asti" width="84" height="63">
           <div>
             <h2 style="font-family: var(--font-serif); font-size: 22px;">Cuore<span>InRete</span></h2>
             <p style="font-size: 11px; color: var(--ink-500); text-transform: uppercase; font-weight: 700;">Parrocchia Sacro Cuore · Asti</p>
@@ -358,7 +359,7 @@ Domenica: dopo le Sante Messe</p>
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
       <div class="brand-section">
-        <div class="brand-icon">✟</div>
+        <img class="parish-logo" src="{{ url_for('static', filename='images/logo-sacro-cuore.png') }}" alt="Parrocchia Sacro Cuore di Asti" width="84" height="63">
         <div class="brand-text">
           <h2>Cuore<span>InRete</span></h2>
           <p>Sacro Cuore · Asti</p>
@@ -545,7 +546,7 @@ Domenica: dopo le Sante Messe</p>
           </div>
         </section>
 
-        <section id="viewCalendari" class="view-panel" style="display:none"><div class="page-header"><div class="page-header-title"><h1>Calendari & Appuntamenti Parrocchiali</h1><p>I calendari della comunità e dei gruppi della tua famiglia.</p></div></div>
+        <section id="viewCalendari" class="view-panel" style="display:none"><div class="page-header"><div class="page-header-title"><h1>Calendari & Appuntamenti Parrocchiali</h1><p>I calendari della comunità e dei gruppi della tua famiglia.</p></div><button type="button" class="btn btn-primary" data-permission="segreteria.calendari" onclick="openModalNuovoCalendario()">+ Nuovo calendario</button></div>
           <div class="card"><div class="card-header"><h3>Riepilogo settimanale della parrocchia</h3></div><div class="card-body" id="parishWeeklyCalendar" aria-live="polite"></div></div>
           <!-- Calendari Comunitari & Personali -->
           <div class="card" style="margin-top: 24px;">
@@ -4125,11 +4126,11 @@ Domenica: dopo le Sante Messe</p>
   <div class="modal-overlay" id="modalCalendarioComunita">
     <div class="modal-window" style="max-width: 560px;">
       <div class="modal-header">
-        <h3 id="modalCalTitle">📅 Nuovo Calendario Google Parrocchiale</h3>
+        <h3 id="modalCalTitle">📅 Nuovo calendario parrocchiale</h3>
         <button class="btn-close-modal" onclick="closeModal('modalCalendarioComunita')">×</button>
       </div>
       <form onsubmit="handleSalvaCalendario(event)">
-        <input type="hidden" id="inputCalId">
+        <input type="hidden" id="inputCalId"><input type="hidden" id="inputCalOrigin">
         <div class="modal-body">
           <div class="form-group">
             <label>Titolo del Calendario *</label>
@@ -4141,7 +4142,7 @@ Domenica: dopo le Sante Messe</p>
               <select id="inputCalCategoria" class="form-control">
                 <option value="parrocchia">⛪ Vita Parrocchiale & Messe</option>
                 <option value="catechismo">📖 Catechismo & Sacramenti</option>
-                <option value="oratorio">🏓 Oratorio & Estate Ragazzi</option>
+                <option value="oratorio">🏓 Oratorio & Estate Ragazzi</option><option value="doposcuola">📚 Doposcuola</option><option value="liturgia">Liturgia</option>
                 <option value="giovani">🎒 Gruppo Giovani & Animatori</option>
                 <option value="famiglie">👨‍👩‍👧 Incontri Famiglie</option>
                 <option value="altro">📌 Altro</option>
@@ -4162,7 +4163,8 @@ Domenica: dopo le Sante Messe</p>
               <input type="number" id="inputCalOrdine" class="form-control" value="0" min="0">
             </div>
           </div>
-          <div class="form-group">
+          <div class="form-group"><label for="inputCalTipo">Appuntamenti da</label><select id="inputCalTipo" class="form-control" onchange="updateCalendarMode()"><option value="google">Link Google Calendar</option><option value="manuale">Eventi inseriti a mano</option></select><small>Gli eventi manuali si gestiscono dopo aver salvato il calendario. Le personalizzazioni del calendario generale non modificano i registri dei gruppi.</small></div>
+          <div class="form-group" id="inputCalGoogleGroup">
             <label>Link Google Calendar (URL Pubblico / Iframe / Condivisione) *</label>
             <input type="url" id="inputCalUrl" class="form-control" placeholder="https://calendar.google.com/calendar/u/0/r..." required>
             <small style="color: var(--ink-500); display: block; margin-top: 4px;">Incolla il link pubblico di condivisione di Google Calendar per permettere ai parrocchiani di visualizzarlo o aggiungerlo al proprio calendario personale.</small>
@@ -4174,7 +4176,7 @@ Domenica: dopo le Sante Messe</p>
           <div class="form-group">
             <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
               <input type="checkbox" id="inputCalPubblico" checked>
-              <span>Mostra sulla Homepage pubblica e nel profilo degli utenti</span>
+              <span>Visibile nel calendario generale e nella pagina pubblica</span>
             </label>
           </div>
         </div>
@@ -4309,5 +4311,6 @@ Domenica: dopo le Sante Messe</p>
     </div>
   </div>
 
+<div class="modal-overlay" id="modalCalendarEvents" data-permission="segreteria.calendari"><div class="modal-window" style="max-width:850px"><div class="modal-header"><h3 id="calendarEventsTitle">Appuntamenti del calendario</h3><button type="button" class="btn-close-modal" onclick="closeModal('modalCalendarEvents')">×</button></div><div class="modal-body"><div id="calendarEventsList"></div><form class="calendar-event-form" onsubmit="saveCalendarEvent(event)"><h3 id="calendarEventFormTitle">Nuovo appuntamento</h3><input type="hidden" id="calendarEventId"><div class="form-group"><label for="calendarEventName">Titolo *</label><input id="calendarEventName" class="form-control" maxlength="300" required></div><div class="form-row"><div class="form-group"><label for="calendarEventStart">Inizio *</label><input type="datetime-local" id="calendarEventStart" class="form-control" required></div><div class="form-group"><label for="calendarEventEnd">Fine *</label><input type="datetime-local" id="calendarEventEnd" class="form-control" required></div></div><label class="choice-row"><input type="checkbox" id="calendarEventAllDay">Tutto il giorno</label><p class="calendar-event-help">Orari della parrocchia (Italia). Per gli eventi di un giorno intero, imposta la fine al giorno successivo.</p><div class="form-group"><label for="calendarEventPlace">Luogo</label><input id="calendarEventPlace" class="form-control" maxlength="500"></div><div class="calendar-manage-actions"><button class="btn btn-primary" type="submit">Salva appuntamento</button><button class="btn btn-secondary" type="button" onclick="clearCalendarEvent()">Nuovo appuntamento</button></div></form></div></div></div>
 </body>
 </html>

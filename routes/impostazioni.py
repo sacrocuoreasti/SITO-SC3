@@ -183,20 +183,15 @@ def get_calendari():
 
 @impostazioni_bp.route('/calendari/<int:id>/appuntamenti',methods=['GET'])
 def community_calendar_month(id):
-    """Appuntamenti dei calendari manuali pubblici, senza dati di iscrizioni."""
-    from urllib.parse import parse_qs,urlsplit
-    from werkzeug.exceptions import NotFound,BadRequest
-    from services.group_calendar import calendar_url
-    from services.calendar_events import month_range,cached_calendar,expand_events,CalendarUnavailable
+    from werkzeug.exceptions import NotFound
+    from services.access_control import can
+    from services.calendar_events import CalendarUnavailable
+    from services.community_calendar_editor import calendar_month
     calendar=db.session.get(CalendarioComunita,id)
-    if not calendar or not calendar.is_pubblico:raise NotFound()
-    start,end=month_range(request.args.get('mese'))
+    if not calendar or (not calendar.is_pubblico and not can('segreteria.calendari')):raise NotFound()
     try:
-        url=calendar_url(calendar.google_calendar_url)
-        if not url:raise BadRequest('Calendario non configurato')
-        source=parse_qs(urlsplit(url).query)['src'][0]
-        parsed,stale=cached_calendar(source)
-        return jsonify(eventi=expand_events(parsed,start,end),obsoleto=stale,mese=start.strftime('%Y-%m'),configurato=True)
+        result=calendar_month(calendar,request.args.get('mese'));result['nome_gruppo']=calendar.titolo
+        return jsonify(result)
     except CalendarUnavailable as error:return jsonify(error=str(error)),502
 
 
@@ -220,22 +215,17 @@ def community_group_month(category,id):
 
 @impostazioni_bp.route('/calendari', methods=['POST'])
 def create_calendario():
-    data = request.get_json() or {}
-    titolo = data.get('titolo', '').strip()
-    url = data.get('google_calendar_url', '').strip()
-    if not titolo or not url:
-        return jsonify({'error': 'Titolo e Link Google Calendar sono obbligatori'}), 400
-
-    cal = CalendarioComunita(
-        titolo=titolo,
-        descrizione=data.get('descrizione', '').strip(),
-        google_calendar_url=url,
-        colore=data.get('colore', '#8B1E1E').strip() or '#8B1E1E',
-        icona=data.get('icona', '📅').strip() or '📅',
-        categoria=data.get('categoria', 'parrocchia').strip() or 'parrocchia',
-        is_pubblico=bool(data.get('is_pubblico', True)),
-        ordine=int(data.get('ordine', 0) or 0)
-    )
+    from services.community_calendar_editor import apply_calendar_fields
+    from werkzeug.exceptions import BadRequest,Conflict
+    data=request.get_json() or {}
+    cal=CalendarioComunita(google_calendar_url='')
+    origin=data.get('origine_gruppo')
+    if origin:
+        entry=next((c for c in calendar_catalog(include_private=True) if c['id']==origin and c.get('automatico')),None)
+        if not entry:raise BadRequest('Calendario del gruppo non trovato')
+        if CalendarioComunita.query.filter_by(origine_gruppo=origin).first():raise Conflict('Calendario già personalizzato: ricarica la pagina')
+        cal.origine_gruppo=origin
+    apply_calendar_fields(cal,data)
     db.session.add(cal)
     db.session.commit()
 
@@ -251,15 +241,8 @@ def update_calendario(id):
     if not cal:
         return jsonify({'error': 'Calendario non trovato'}), 404
 
-    data = request.get_json() or {}
-    if 'titolo' in data: cal.titolo = data['titolo'].strip()
-    if 'descrizione' in data: cal.descrizione = data['descrizione'].strip()
-    if 'google_calendar_url' in data: cal.google_calendar_url = data['google_calendar_url'].strip()
-    if 'colore' in data: cal.colore = data['colore'].strip() or '#8B1E1E'
-    if 'icona' in data: cal.icona = data['icona'].strip() or '📅'
-    if 'categoria' in data: cal.categoria = data['categoria'].strip() or 'parrocchia'
-    if 'is_pubblico' in data: cal.is_pubblico = bool(data['is_pubblico'])
-    if 'ordine' in data: cal.ordine = int(data['ordine'] or 0)
+    from services.community_calendar_editor import apply_calendar_fields
+    apply_calendar_fields(cal,request.get_json() or {})
 
     db.session.commit()
     return jsonify({
@@ -278,3 +261,27 @@ def delete_calendario(id):
     db.session.commit()
     return jsonify({'success': True, 'message': 'Calendario eliminato con successo'})
 
+
+
+@impostazioni_bp.route('/calendari/<int:id>/eventi',methods=['GET','POST'])
+@impostazioni_bp.route('/calendari/<int:id>/eventi/<int:event_id>',methods=['PUT','DELETE'])
+def community_calendar_events(id,event_id=None):
+    from werkzeug.exceptions import Forbidden,NotFound,BadRequest
+    from services.access_control import can
+    from services.community_calendar_editor import apply_event_fields
+    from models import EventoCalendarioComunita
+    if not can('segreteria.calendari'):raise Forbidden()
+    calendar=db.session.get(CalendarioComunita,id)
+    if not calendar:raise NotFound()
+    if request.method=='GET':return jsonify(eventi=[e.to_dict() for e in calendar.eventi])
+    if calendar.tipo!='manuale':raise BadRequest('Gli appuntamenti Google si modificano su Google Calendar')
+    if event_id:
+        event=EventoCalendarioComunita.query.filter_by(id=event_id,calendario_id=id).first()
+        if not event:raise NotFound()
+    else:event=EventoCalendarioComunita(calendario_id=id)
+    if request.method=='DELETE':db.session.delete(event)
+    else:
+        apply_event_fields(event,request.get_json() or {})
+        db.session.add(event)
+    db.session.commit()
+    return jsonify(success=True,evento=event.to_dict() if request.method!='DELETE' else None),201 if request.method=='POST' else 200

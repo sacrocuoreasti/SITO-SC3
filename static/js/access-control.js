@@ -63,7 +63,7 @@ const AccessUI=(()=>{
     document.querySelectorAll('.nav-item[data-view]').forEach(link=>{
       const view=link.dataset.view;let allowed=hasPermission(view);
       if(view==='giovani' && currentUser.is_admin)allowed=false;
-      if(['oratorio','catechismo','doposcuola'].includes(view))allowed=allowed && !!(enrollmentOptions?.gruppi?.[view]?.length || enrollmentOptions?.gruppi_iscritti?.[view]?.length);
+      if(['oratorio','catechismo','doposcuola','giovani'].includes(view))allowed=allowed && !!(enrollmentOptions?.gruppi?.[view]?.length || enrollmentOptions?.gruppi_iscritti?.[view]?.length);
       link.style.display=allowed?'flex':'none';
     });
     document.querySelectorAll('[data-permission],button[onclick],form[onsubmit]').forEach(element=>{
@@ -132,7 +132,7 @@ const AccessUI=(()=>{
     if(!config)return;
     for(const id of ['assegnaPermessoRuoloPrimario','nuovoUtenteRuolo','ruoloPrimarioSelect']){
       const select=document.getElementById(id);if(!select)continue;const previous=select.value;
-      select.innerHTML=roles().map(p=>`<option value="${p.chiave}">${escapeHtml(p.nome)}</option>`).join('');select.value=roles().some(p=>p.chiave===previous)?previous:'utente';
+      select.innerHTML=roles().map(p=>`<option value="${p.chiave}">${escapeHtml(p.nome)}</option>`).join('');select.value=roles().some(p=>p.chiave===previous)?previous:(roles().some(p=>p.chiave==='utente')?'utente':roles().find(p=>p.chiave!=='admin')?.chiave||'admin');
     }
     const filter=document.getElementById('filterUtentiRuolo');if(filter)filter.innerHTML='<option value="">Tutti i ruoli e privilegi</option>'+config.profili.map(p=>`<option value="${p.chiave}">${escapeHtml(p.nome)}</option>`).join('');
     for(const [id,attr] of [['assignmentPrivileges','class="chk-extra-perm"'],['newUserPrivileges','class="new-user-privilege"'],['editUserPrivileges','name="privilegiCheck"']]){
@@ -144,8 +144,8 @@ const AccessUI=(()=>{
     const key=document.getElementById('accessProfile').value,profile=config.profili.find(p=>p.chiave===key);if(!profile)return;
     const locked=key==='admin';const grants=new Set(profile.permessi);
     document.getElementById('accessProfileName').value=profile.nome;document.getElementById('accessProfileName').disabled=locked;document.getElementById('accessSave').disabled=locked;
-    document.getElementById('accessDelete').disabled=profile.predefinito;
-    document.getElementById('accessDeleteHelp').textContent=profile.predefinito?'Profilo di sistema: non eliminabile.':'Puoi eliminare questo profilo dopo aver rimosso le sue assegnazioni agli account.';
+    document.getElementById('accessDelete').disabled=locked;
+    document.getElementById('accessDeleteHelp').textContent=locked?'Admin mantiene l’accesso completo al sito.':'Puoi eliminare questo profilo dopo aver rimosso le sue assegnazioni agli account.';
     document.getElementById('accessTree').innerHTML=config.viste.map(section=>`<fieldset class="access-section"><legend><label><input class="access-check" type="checkbox" value="${section.chiave}" ${grants.has(section.chiave)?'checked':''} ${locked?'disabled':''} onchange="AccessUI.toggleSection(this)"> ${escapeHtml(section.nome)}</label></legend><div class="access-children">${section.figli.map(child=>`<label><input class="access-check" type="checkbox" value="${child.chiave}" ${grants.has(child.chiave)?'checked':''} ${locked||child.solo_admin?'disabled':''} onchange="AccessUI.toggleChild(this)"> ${escapeHtml(child.nome)}</label>`).join('')}</div></fieldset>`).join('');
   }
   function toggleSection(box){document.querySelectorAll('#accessTree .access-check').forEach(child=>{if(child.value.startsWith(box.value+'.') && !child.disabled)child.checked=box.checked;});}
@@ -154,6 +154,6 @@ const AccessUI=(()=>{
     try{const data=await apiJson('/api/accessi/'+key,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome:document.getElementById('accessProfileName').value,permessi:[...document.querySelectorAll('#accessTree .access-check:checked')].filter(x=>!x.disabled).map(x=>x.value)})});config.profili=config.profili.map(p=>p.chiave===key?data.profilo:p);profileOptions(key);populate();filtraUtenti();await refresh();showToast('Nome e permessi salvati','success');}
     catch(error){showToast(error.message,'error');}finally{button.disabled=key==='admin';}}
   async function create(event){event.preventDefault();try{const data=await apiJson('/api/accessi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome:document.getElementById('accessNewName').value,chiave:document.getElementById('accessNewKey').value,tipo:document.getElementById('accessNewType').value,permessi:[]})});await load();document.getElementById('accessProfile').value=data.profilo.chiave;showProfile();showToast('Profilo creato: scegli le viste e salva prima di assegnarlo','success');}catch(error){showToast(error.message,'error');}}
-  async function remove(){const key=document.getElementById('accessProfile').value,profile=config.profili.find(p=>p.chiave===key);if(!profile || profile.predefinito || !confirm(`Eliminare il profilo «${profile.nome}»?`))return;try{await apiJson('/api/accessi/'+key,{method:'DELETE'});await load();showToast('Profilo eliminato','success');}catch(error){showToast(error.message,'error');}}
+  async function remove(){const key=document.getElementById('accessProfile').value,profile=config.profili.find(p=>p.chiave===key);if(!profile || key==='admin' || !confirm(`Eliminare il profilo «${profile.nome}»?`))return;try{await apiJson('/api/accessi/'+key,{method:'DELETE'});await load();showToast('Profilo eliminato','success');}catch(error){showToast(error.message,'error');}}
   return {label,apply,start,refresh,load,populate,showProfile,toggleSection,toggleChild,save,create,remove};
 })();
