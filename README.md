@@ -276,3 +276,9 @@ I profili interamente disabilitati restano tali. Il salvataggio esplicito da
 Utenti e privilegi registra la scelta anche per le nuove viste, evitando
 riattivazioni automatiche successive; le scelte già fatte sulle nuove viste
 sono conservate.
+
+Le bacheche precedono attività, gruppi e indicatori nella panoramica e nei
+pannelli pastorali. Nella bacheca completa gli avvisi precedono il modulo di
+scrittura, raggiungibile dal pulsante Scrivi un avviso. Gruppi giovani usa
+archivio per anno pastorale, ricerca per gruppo/responsabile/aula e schede
+con stato, informazioni e azioni nello stesso impianto di catechismo e doposcuola.

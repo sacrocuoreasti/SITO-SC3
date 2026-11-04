@@ -470,6 +470,7 @@ Domenica: dopo le Sante Messe</p>
             </div>
           </div>
 
+<section class="card" data-permission="dashboard.bacheche" style="margin-bottom:24px"><div class="card-header"><h3>Bacheche dei miei gruppi</h3></div><div class="card-body" id="dashboardGroupBoards"></div></section>
           <!-- KPI Grid -->
           <div class="kpi-grid" id="dashKpiGrid">
             <div class="kpi-card">
@@ -542,7 +543,7 @@ Domenica: dopo le Sante Messe</p>
 
             </aside>
           </div>
-        <section class="card" data-permission="dashboard.bacheche" style="margin-top:24px"><div class="card-header"><h3>Bacheche dei miei gruppi</h3></div><div class="card-body" id="dashboardGroupBoards"></div></section></section>
+        </section>
 
         <section id="viewCalendari" class="view-panel" style="display:none"><div class="page-header"><div class="page-header-title"><h1>Calendari & Appuntamenti Parrocchiali</h1><p>I calendari della comunità e dei gruppi della tua famiglia.</p></div></div>
           <!-- Calendari Comunitari & Personali -->
@@ -660,7 +661,8 @@ Domenica: dopo le Sante Messe</p>
           </div>
 
           <!-- SEZIONE STAFF / ANIMATORI / SEGRETERIA -->
-          <section id="oratorioParentSection" class="pastoral-family-section" style="display:none"><h2>La mia famiglia</h2><div id="oratorioParentContainer" class="pastoral-family-content"></div><div id="oratorioBoardFamily" data-permission="oratorio.bacheca"></div></section>
+          <div id="oratorioBoardFamily" data-permission="oratorio.bacheca"></div>
+<section id="oratorioParentSection" class="pastoral-family-section" style="display:none"><h2>La mia famiglia</h2><div id="oratorioParentContainer" class="pastoral-family-content"></div></section>
 
 
           <!-- SEZIONE GENITORE / UTENTE (VEDE SOLO I PROPRI FIGLI) -->
@@ -755,7 +757,8 @@ Domenica: dopo le Sante Messe</p>
           </div>
 
           <!-- SEZIONE STAFF / CATECHISTI / SEGRETERIA -->
-          <section id="catechismoParentSection" class="pastoral-family-section" style="display:none"><h2>La mia famiglia</h2><div id="catechismoParentContainer" class="pastoral-family-content"></div><div id="catechismoBoardFamily" data-permission="catechismo.bacheca"></div></section>
+          <div id="catechismoBoardFamily" data-permission="catechismo.bacheca"></div>
+<section id="catechismoParentSection" class="pastoral-family-section" style="display:none"><h2>La mia famiglia</h2><div id="catechismoParentContainer" class="pastoral-family-content"></div></section>
 
 
           <!-- SEZIONE GENITORE / UTENTE (VEDE SOLO I PROPRI FIGLI) -->
@@ -907,7 +910,8 @@ Domenica: dopo le Sante Messe</p>
           </div>
 
           <!-- SEZIONE STAFF / EDUCATORI / SEGRETERIA -->
-          <section id="doposcuolaParentSection" class="pastoral-family-section" style="display:none"><h2>La mia famiglia</h2><div id="doposcuolaParentContainer" class="pastoral-family-content"></div><div id="doposcuolaBoardFamily" data-permission="doposcuola.bacheca"></div></section>
+          <div id="doposcuolaBoardFamily" data-permission="doposcuola.bacheca"></div>
+<section id="doposcuolaParentSection" class="pastoral-family-section" style="display:none"><h2>La mia famiglia</h2><div id="doposcuolaParentContainer" class="pastoral-family-content"></div></section>
 
 
           <!-- SEZIONE GENITORE / UTENTE (VEDE SOLO I PROPRI FIGLI) -->
@@ -941,8 +945,20 @@ Domenica: dopo le Sante Messe</p>
           </div></section>
 
 
-<section id="viewGiovani" class="view-panel" style="display:none"><div class="page-header"><div class="page-header-title"><h1>Gruppi giovani</h1><p>Gruppi dell’anno pastorale, calendario e presenze.</p></div></div><section id="giovaniParentSection" class="pastoral-family-section"><div id="giovaniParentContainer" class="pastoral-family-content"></div><div id="giovaniBoardFamily" data-permission="giovani.bacheca"></div></section></section>
-<section id="viewGiovaniStaff" class="view-panel" style="display:none"><div class="page-header"><div class="page-header-title"><h1>Gruppi giovani staff</h1><p>Due gruppi per anno pastorale, incontri, appelli e bacheche riservate.</p></div></div><div id="giovaniStaffSection"><div id="giovaniStaffHeaderActions" class="header-actions"><button class="btn btn-primary" data-permission="giovani.gestione" onclick="YouthGroups.form()">+ Crea gruppo giovani</button></div><div id="giovaniBoardStaff" data-permission="giovani.bacheca"></div><div id="giovaniGroupsOverview"><div class="staff-register-tools"><label>Anno pastorale<select id="youthYear" class="form-control" onchange="YouthGroups.render()"></select></label></div><div id="youthGroupsGrid" class="catechismo-grid"></div></div><section id="giovaniRegisterSection" class="card catechismo-attendance" style="display:none"></section></div></section>
+<section id="viewGiovani" class="view-panel" style="display:none"><div class="page-header"><div class="page-header-title"><h1>Gruppi giovani</h1><p>Gruppi dell’anno pastorale, calendario e presenze.</p></div></div><div id="giovaniBoardFamily" data-permission="giovani.bacheca"></div>
+<section id="giovaniParentSection" class="pastoral-family-section"><div id="giovaniParentContainer" class="pastoral-family-content"></div></section></section>
+<section id="viewGiovaniStaff" class="view-panel" style="display:none">
+  <div class="page-header"><div class="page-header-title"><h1>Gruppi giovani staff</h1><p>Archivio per anno pastorale, calendario, iscritti e appelli.</p></div></div>
+  <div id="giovaniStaffSection">
+    <div id="giovaniBoardStaff" data-permission="giovani.bacheca"></div>
+    <div class="pastoral-staff-heading"><div><h2>Il mio incarico · Gruppi giovani</h2><p>Gestisci i gruppi e consulta le informazioni degli iscritti.</p></div><div id="giovaniStaffHeaderActions" class="header-actions"><button class="btn btn-primary" data-permission="giovani.gestione" onclick="YouthGroups.form()">+ Crea nuovo gruppo giovani</button></div></div>
+    <div id="giovaniGroupsOverview">
+      <div class="card pastoral-group-filters"><div class="pastoral-group-filter-row"><div class="pastoral-year-picker"><strong>📁 Anno pastorale:</strong><input type="hidden" id="youthYear"><div id="youthYearButtons" class="pastoral-year-buttons"></div></div><label class="pastoral-group-search"><span class="sr-only">Cerca gruppi giovani</span><input id="youthSearch" type="search" class="form-control" placeholder="Cerca gruppo, responsabile, aula…" oninput="YouthGroups.render()"></label></div><p id="youthGroupsCount" class="pastoral-group-count" aria-live="polite"></p></div>
+      <div id="youthGroupsGrid" class="catechismo-grid"></div>
+    </div>
+    <section id="giovaniRegisterSection" class="card catechismo-dates" style="display:none" aria-live="polite"></section>
+  </div>
+</section>
         <!-- ================= VIEW 6: SEGRETERIA & QUOTE & LISTE & HOMEPAGE ================= -->
         <section id="viewSegreteria" class="view-panel" style="display: none;">
           <div class="page-header">
@@ -4221,6 +4237,16 @@ Domenica: dopo le Sante Messe</p>
 
 <div class="modal-overlay" id="modalGroupHealth"><div class="modal-window" style="max-width:1100px"><div class="modal-header"><div><h3>Quadro sanitario e cucina</h3><p id="groupHealthTitle"></p></div><button type="button" class="btn-close-modal" onclick="closeModal('modalGroupHealth')">×</button></div><div class="modal-body" id="groupHealthContent"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="closeModal('modalGroupHealth')">Chiudi</button></div></div></div>
 <div class="modal-overlay" id="modalGroupBoard"><div class="modal-window" style="max-width:850px"><div class="modal-header"><h3 id="groupBoardTitle">Bacheca del gruppo</h3><button class="btn-close-modal" onclick="closeModal('modalGroupBoard')">×</button></div><div class="modal-body" id="groupBoardContent"></div></div></div>
-<div class="modal-overlay" id="modalYouthGroup"><div class="modal-window"><div class="modal-header"><h3>Gruppo giovani</h3><button class="btn-close-modal" onclick="closeModal('modalYouthGroup')">×</button></div><form onsubmit="YouthGroups.save(event)"><div class="modal-body"><input type="hidden" id="youthId"><label>Nome del gruppo<input id="youthName" class="form-control" maxlength="120" required></label><label>Anno pastorale<input id="youthGroupYear" class="form-control" maxlength="20" required></label><label>Stato<select id="youthStatus" class="form-control"><option value="pubblico">Pubblico</option><option value="bozza">Bozza</option><option value="chiuso">Chiuso</option></select></label><label>Responsabili</label><div id="youthStaffChoices" class="access-assignment"></div><div class="form-row"><label>Età minima<input id="youthEtaMin" class="form-control" type="number" min="0" max="120" placeholder="Nessun limite"></label><label>Età massima<input id="youthEtaMax" class="form-control" type="number" min="0" max="120" placeholder="Nessun limite"></label></div><label>Orario incontri<input id="youthTime" class="form-control" maxlength="100"></label><label>Aula / luogo<input id="youthRoom" class="form-control" maxlength="50"></label><label>Calendario Google<input id="youthCalendar" class="form-control" type="url"></label><label>Note<textarea id="youthNotes" class="form-control" maxlength="20000"></textarea></label></div><div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="closeModal('modalYouthGroup')">Annulla</button><button class="btn btn-primary" type="submit">Salva gruppo</button></div></form></div></div>
+<div class="modal-overlay" id="modalYouthGroup"><div class="modal-window" style="max-width:720px"><div class="modal-header"><h3 id="youthFormTitle">Gruppo giovani</h3><button class="btn-close-modal" onclick="closeModal('modalYouthGroup')">×</button></div>
+<form onsubmit="YouthGroups.save(event)"><div class="modal-body"><input type="hidden" id="youthId">
+<div class="form-group"><label for="youthName">Nome del gruppo *</label><input id="youthName" class="form-control" maxlength="120" required></div>
+<div class="form-row"><div class="form-group"><label for="youthGroupYear">Anno pastorale *</label><input id="youthGroupYear" class="form-control" maxlength="20" required placeholder="2026/2027"></div><div class="form-group"><label for="youthStatus">Visibilità</label><select id="youthStatus" class="form-control"><option value="pubblico">🟢 Pubblico</option><option value="bozza">🔒 Bozza</option><option value="chiuso">🔴 Chiuso</option></select></div></div>
+<fieldset class="family-section"><legend>Responsabili del gruppo</legend><div id="youthStaffChoices" class="access-assignment"></div></fieldset>
+<fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="youthEtaMin">Età minima</label><input id="youthEtaMin" class="form-control" type="number" min="0" max="120" placeholder="Nessun limite"></div><div class="form-group"><label for="youthEtaMax">Età massima</label><input id="youthEtaMax" class="form-control" type="number" min="0" max="120" placeholder="Nessun limite"></div></div><small>Lascia vuoto per non imporre limiti di età.</small></fieldset>
+<div class="form-row"><div class="form-group"><label for="youthTime">Orario incontri</label><input id="youthTime" class="form-control" maxlength="100"></div><div class="form-group"><label for="youthRoom">Aula / luogo</label><input id="youthRoom" class="form-control" maxlength="50"></div></div>
+<div class="form-group"><label for="youthCalendar">Calendario Google</label><input id="youthCalendar" class="form-control" type="url" placeholder="https://calendar.google.com/calendar/embed?src=..."></div>
+<div class="form-group"><label for="youthNotes">Note sul gruppo</label><textarea id="youthNotes" class="form-control" maxlength="20000" rows="3"></textarea></div></div>
+<div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="closeModal('modalYouthGroup')">Annulla</button><button class="btn btn-primary" type="submit">Salva gruppo</button></div></form></div></div>
+
 </body>
 </html>

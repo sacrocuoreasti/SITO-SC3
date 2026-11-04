@@ -280,13 +280,31 @@ vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['
   assert.ok(nodes('dashboardGroupBoards').innerHTML.includes('<h4>Incontri</h4>'));assert.ok(nodes('dashboardGroupBoards').innerHTML.includes('<h4>Materiali</h4>'));
   assert.equal((nodes('dashboardGroupBoards').innerHTML.match(/Avviso famiglia/g)||[]).length,1);
   fixtures['/api/bacheche/catechismo/12']={gruppo:'Gruppo seguito',puo_gestire:true,avvisi:[boardRows[1]]};
-  await boards.open('catechismo',12);nodes('boardTopic').value='Organizzazione';nodes('boardTitle').value='Nuovo avviso';nodes('boardBody').value='Messaggio del gruppo';nodes('boardPublished').checked=true;
+  await boards.open('catechismo',12);
+  assert.ok(nodes('groupBoardContent').innerHTML.indexOf('Avviso staff')<nodes('groupBoardContent').innerHTML.indexOf('board-editor'));
+  nodes('boardTopic').value='Organizzazione';nodes('boardTitle').value='Nuovo avviso';nodes('boardBody').value='Messaggio del gruppo';nodes('boardPublished').checked=true;
   await boards.save({preventDefault(){}});
   assert.ok(requests.some(r=>r.url==='/api/bacheche/catechismo/12' && r.options.method==='POST' && JSON.parse(r.options.body).argomento==='Organizzazione'));
-  fixtures['/api/giovani/gruppi']={anno_pastorale_corrente:'2026/2027',gruppi:[{id:22,nome:'Gruppo giovani uno',anno_pastorale:'2026/2027',stato:'pubblico',catechista_nome:'Responsabile',totale_ragazzi:2}]};
+  fixtures['/api/giovani/gruppi']={anno_pastorale_corrente:'2026/2027',gruppi:[{id:22,nome:'Gruppo giovani uno',anno_pastorale:'2026/2027',stato:'pubblico',catechista_nome:'Teresa Responsabile',aula:'Sala grande',totale_ragazzi:2},{id:23,nome:'Gruppo giovani due',anno_pastorale:'2026/2027',stato:'bozza',catechista_nome:'Luca Responsabile',totale_ragazzi:3},{id:24,nome:'Gruppo archivio',anno_pastorale:'2025/2026',stato:'chiuso',catechista_nome:'Luca Responsabile',totale_ragazzi:1}]};
   vm.runInContext("currentView='giovani_staff';",context);await context.navigateTo('giovani_staff');
   assert.ok(nodes('youthGroupsGrid').innerHTML.includes('Gruppo giovani uno'));assert.ok(nodes('youthGroupsGrid').innerHTML.includes("openDates('giovani',22)"));
   assert.ok(template.includes('data-view="giovani"'));assert.ok(template.includes('data-view="giovani_staff"'));
+  assert.ok(nodes('youthGroupsGrid').innerHTML.includes('Bozza'));
+  assert.ok(nodes('youthGroupsGrid').innerHTML.includes('pastoral-group-facts'));
+  const youth=vm.runInContext('YouthGroups',context);
+  nodes('youthSearch').value='teresa';youth.render();
+  assert.ok(nodes('youthGroupsGrid').innerHTML.includes('Gruppo giovani uno'));assert.ok(!nodes('youthGroupsGrid').innerHTML.includes('Gruppo giovani due'));
+  nodes('youthSearch').value='Sala grande';youth.render();assert.ok(nodes('youthGroupsGrid').innerHTML.includes('Gruppo giovani uno'));
+  nodes('youthSearch').value='';youth.selectYear('2025/2026');
+  assert.ok(nodes('youthGroupsGrid').innerHTML.includes('Gruppo archivio'));assert.ok(!nodes('youthGroupsGrid').innerHTML.includes('Gruppo giovani uno'));
+  youth.selectYear('');assert.equal((nodes('youthGroupsGrid').innerHTML.match(/class="catechismo-card youth-group-card"/g)||[]).length,3);
+  youth.selectYear('2026/2027');assert.ok(nodes('youthGroupsCount').textContent.includes('2 / 2'));
+  assert.ok(template.indexOf('id="dashboardGroupBoards"')<template.indexOf('id="dashKpiGrid"'));
+  for(const category of ['oratorio','catechismo','doposcuola','giovani']) {
+    assert.ok(template.indexOf('id="'+category+'BoardFamily"')<template.indexOf('id="'+category+'ParentSection"'));
+    assert.ok(template.indexOf('id="'+category+'BoardStaff"')<template.indexOf('id="'+category+'StaffHeaderActions"'));
+  }
+
   context.restoreBoardUser=beforeBoards;context.restoreBoardView=beforeBoardView;vm.runInContext('currentUser=restoreBoardUser;currentView=restoreBoardView;',context);
   fixtures['/api/bacheche']={avvisi:[],gruppi:[]};
   // Messe, liturgia e avvenimenti datati condividono la settimana senza ripetere le date specifiche.
