@@ -50,12 +50,36 @@ def is_admin(user=None):
     user=user or current_user
     return bool(user.is_authenticated and 'admin' in raw_roles(user))
 
+
+def legacy_view_grants(key, values):
+    """Aggiunge soltanto le nuove viste a profili salvati prima delle bacheche.
+
+    I valori memorizzati non vengono riscritti. Dopo un salvataggio esplicito
+    l'amministratore controlla anche i nuovi permessi, senza ulteriori aggiunte.
+    """
+    grants=set(values)
+    pastoral=any(category in grants for category in ('oratorio','catechismo','doposcuola'))
+    if key=='utente' and pastoral:
+        grants|=USER & subtree('giovani')
+    elif key=='segreteria' and 'catechismo' in grants:
+        grants.add('giovani')
+        grants|={'giovani.'+value.split('.',1)[1] for value in list(grants) if value.startswith('catechismo.') and value!='catechismo.genitori'}
+    if 'dashboard' in grants and pastoral:grants.add('dashboard.bacheche')
+    for category in ('oratorio','catechismo','doposcuola','giovani'):
+        if category in grants:
+            grants.add(category+'.bacheca')
+            if category+'.staff' in grants:grants.add(category+'.avvisi')
+    return sorted(grants)
+
 def definitions():
     if has_request_context() and hasattr(g,'access_definitions'):return g.access_definitions
     from models import DefinizioneAccesso
     result={key:{'chiave':key,'nome':value[0],'tipo':value[1],'permessi':sorted(value[2]),'predefinito':True} for key,value in DEFAULTS.items()}
     for row in DefinizioneAccesso.query.all():
-        result[row.chiave]={'chiave':row.chiave,'nome':row.nome,'tipo':row.tipo,'permessi':json.loads(row.permessi),'predefinito':row.chiave in DEFAULTS}
+        grants=json.loads(row.permessi)
+        new_keys=subtree('giovani')|{'dashboard.bacheche'}|{category+'.'+child for category in ('oratorio','catechismo','doposcuola') for child in ('bacheca','avvisi')}
+        if not row.versione_viste and not set(grants)&new_keys:grants=legacy_view_grants(row.chiave,grants)
+        result[row.chiave]={'chiave':row.chiave,'nome':row.nome,'tipo':row.tipo,'permessi':grants,'predefinito':row.chiave in DEFAULTS}
     if has_request_context():g.access_definitions=result
     return result
 

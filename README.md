@@ -269,3 +269,10 @@ nell’incarico staff. Le anteprime sono limitate e il testo completo è conserv
 Il privilegio Responsabile gruppi giovani e i nuovi permessi delle bacheche sono
 configurabili in Utenti e privilegi. Gli avvisi di gruppo non sono avvisi pubblici
 della comunità e non compaiono negli endpoint pubblici.
+
+I profili salvati prima delle bacheche ricevono le sole nuove viste compatibili
+con le sezioni pastorali già abilitate, senza riscrivere le scelte memorizzate.
+I profili interamente disabilitati restano tali. Il salvataggio esplicito da
+Utenti e privilegi registra la scelta anche per le nuove viste, evitando
+riattivazioni automatiche successive; le scelte già fatte sulle nuove viste
+sono conservate.

@@ -284,6 +284,7 @@ class DefinizioneAccesso(db.Model):
     nome = db.Column(db.String(100), nullable=False)
     tipo = db.Column(db.String(20), nullable=False)
     permessi = db.Column(db.Text, nullable=False, default='[]')
+    versione_viste = db.Column(db.Integer, nullable=False, default=1)
 
 
 class Utente(UserMixin, db.Model):
@@ -1182,6 +1183,7 @@ def init_default_configurazioni():
             ('presenza','gruppo_id','INTEGER'),
             ('persona','civico_residenza','VARCHAR(30)'),
             ('celebrazione','data_specifica','DATE'),
+            ('definizione_accesso','versione_viste','INTEGER DEFAULT 0'),
             ('persona','consensi_aggiunta','TEXT'),
             ('gruppo_oratorio','google_calendar_url','VARCHAR(500)'),
             ('gruppo_doposcuola','google_calendar_url','VARCHAR(500)'),

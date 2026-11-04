@@ -46,7 +46,7 @@ def update_definition(key):
     if kind!=existing['tipo']:raise BadRequest('Non puoi cambiare il tipo di un profilo già esistente')
     row=db.session.get(DefinizioneAccesso,key)
     if not row:row=DefinizioneAccesso(chiave=key);db.session.add(row)
-    row.nome=name;row.tipo=kind;row.permessi=json.dumps(grants)
+    row.nome=name;row.tipo=kind;row.permessi=json.dumps(grants);row.versione_viste=1
     db.session.commit();g.pop('access_definitions',None)
     return jsonify(success=True,profilo=definitions()[key])
 
