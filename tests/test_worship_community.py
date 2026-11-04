@@ -108,3 +108,34 @@ class WorshipCommunityTests(unittest.TestCase):
         self.assertEqual(current_pastoral_year(date(2026,8,31)),'2025/2026')
         self.assertEqual(current_pastoral_year(date(2026,9,1)),'2026/2027')
         self.assertEqual(current_pastoral_year(date(2027,1,1)),'2026/2027')
+
+    @patch('services.calendar_events.cached_calendar')
+    @patch('services.calendar_events.expand_events')
+    def test_manual_public_calendar_events_and_private_calendar_privacy(self,expand,cached):
+        cached.return_value=(object(),True)
+        expand.return_value=[{'id':'test','titolo':'Appuntamento', 'giorni':['2026-11-04']}]
+        with self.app.app_context():
+            public=CalendarioComunita(titolo='Pubblico',google_calendar_url='https://calendar.google.com/calendar/embed?src=public%40example.test',is_pubblico=True)
+            private=CalendarioComunita(titolo='Privato',google_calendar_url='https://calendar.google.com/calendar/embed?src=private%40example.test',is_pubblico=False)
+            db.session.add_all([public,private]);db.session.commit();public_id,private_id=public.id,private.id
+        self.client.post('/api/auth/logout')
+        response=self.client.get(f'/api/impostazioni/calendari/{public_id}/appuntamenti?mese=2026-11')
+        self.assertEqual(response.status_code,200,response.json)
+        self.assertTrue(response.json['obsoleto'])
+        self.assertEqual(response.json['eventi'][0]['titolo'],'Appuntamento')
+        self.assertNotIn('presenze',response.json)
+        cached.assert_called_once_with('public@example.test')
+        self.assertEqual(self.client.get(f'/api/impostazioni/calendari/{private_id}/appuntamenti?mese=2026-11').status_code,404)
+        self.assertEqual(self.client.get(f'/api/impostazioni/calendari/{public_id}/appuntamenti?mese=2026-99').status_code,400)
+        self.assertEqual(cached.call_count,1)
+
+    @patch('services.calendar_events.cached_calendar')
+    def test_manual_calendar_feed_failure_is_recoverable(self,cached):
+        from services.calendar_events import CalendarUnavailable
+        cached.side_effect=CalendarUnavailable('Calendario non leggibile')
+        with self.app.app_context():
+            record=CalendarioComunita(titolo='Temporaneamente offline',google_calendar_url='https://calendar.google.com/calendar/embed?src=offline%40example.test',is_pubblico=True)
+            db.session.add(record);db.session.commit();ident=record.id
+        result=self.client.get(f'/api/impostazioni/calendari/{ident}/appuntamenti?mese=2026-11')
+        self.assertEqual(result.status_code,502,result.json)
+        self.assertEqual(result.json['error'],'Calendario non leggibile')

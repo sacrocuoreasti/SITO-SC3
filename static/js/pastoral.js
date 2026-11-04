@@ -69,7 +69,25 @@ const YouthGroups=(()=>{
       </article>`;
     }).join('')||`<div class="pastoral-group-empty">${search?'Nessun gruppo trovato con i filtri selezionati.':'Nessun gruppo giovani per l’anno selezionato.'}${hasPermission('giovani.gestione')?'<p>Usa “Crea nuovo gruppo giovani” per aggiungerne uno. Il limite è di due gruppi per anno pastorale.</p>':''}</div>`;
   }
-  async function form(id=null){const group=groups.find(g=>g.id===id)||{};try{const data=await apiJson('/api/giovani/responsabili');const choices=new Map(data.responsabili.map(u=>[u.id,u]));for(const u of group.catechisti||[])if(!choices.has(u.id))choices.set(u.id,u);document.getElementById('youthStaffChoices').innerHTML=[...choices.values()].map(u=>`<label class="choice-row"><input type="checkbox" value="${u.id}" ${(group.catechisti_ids||[]).includes(u.id)?'checked':''}>${escapeHtml(u.nominativo)}</label>`).join('');for(const [key,value] of Object.entries({youthId:group.id||'',youthName:group.nome||'',youthGroupYear:group.anno_pastorale||selectedYear||currentYear,youthStatus:group.stato||'pubblico',youthTime:group.orario_incontri||'',youthRoom:group.aula||'',youthNotes:group.note||'',youthCalendar:group.google_calendar_url||''}))document.getElementById(key).value=value;setGroupAges('youth',group);document.getElementById('youthFormTitle').textContent=id?'Modifica gruppo giovani':'Crea nuovo gruppo giovani';openModal('modalYouthGroup');}catch(error){showToast(error.message,'error');}}
+  async function form(id=null) {
+    const group=groups.find(g=>g.id===id)||{};
+    try {
+      const data=await apiJson('/api/giovani/responsabili');
+      const choices=new Map(data.responsabili.map(u=>[u.id,u]));
+      for(const user of group.catechisti||[])if(!choices.has(user.id))choices.set(user.id,user);
+      document.getElementById('youthStaffChoices').innerHTML=[...choices.values()].map(user=>`<label class="choice-row"><input type="checkbox" value="${user.id}" ${(group.catechisti_ids||[]).includes(user.id)?'checked':''}>${escapeHtml(user.nominativo)}</label>`).join('');
+      const chosenYear=group.anno_pastorale||selectedYear||currentYear;
+      const adjacentYears=[-1,1].map(offset=>{const year=Number(currentYear.slice(0,4))+offset;return `${year}/${year+1}`;});
+      const years=[...new Set([chosenYear,currentYear,...adjacentYears,...groups.map(g=>g.anno_pastorale)].filter(Boolean))];
+      document.getElementById('youthGroupYear').innerHTML=years.sort().reverse().map(year=>`<option value="${escapeHtml(year)}">${escapeHtml(year)}</option>`).join('');
+      const values={youthId:group.id||'',youthName:group.nome||'',youthGroupYear:chosenYear,youthStatus:group.stato||'pubblico',youthTime:group.orario_incontri||'',youthRoom:group.aula||'',youthNotes:group.note||'',youthCalendar:group.google_calendar_url||''};
+      for(const [key,value] of Object.entries(values))document.getElementById(key).value=value;
+      setGroupAges('youth',group);
+      document.getElementById('youthFormTitle').textContent=id?'Modifica gruppo giovani':'Crea nuovo gruppo giovani';
+      document.getElementById('youthSubmit').textContent=id?'Salva modifiche':'Crea gruppo';
+      openModal('modalYouthGroup');
+    } catch(error) {showToast(error.message,'error');}
+  }
   async function save(event){event.preventDefault();const id=document.getElementById('youthId').value;try{await apiJson('/api/giovani/gruppi'+(id?'/'+id:''),{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome:document.getElementById('youthName').value,anno_pastorale:document.getElementById('youthGroupYear').value,stato:document.getElementById('youthStatus').value,orario_incontri:document.getElementById('youthTime').value,aula:document.getElementById('youthRoom').value,note:document.getElementById('youthNotes').value,google_calendar_url:document.getElementById('youthCalendar').value,catechisti_ids:[...document.querySelectorAll('#youthStaffChoices input:checked')].map(input=>Number(input.value)),...readGroupAges('youth')})});selectedYear=document.getElementById('youthGroupYear').value.replace(/\s/g,'').replace('-','/');document.getElementById('youthSearch').value='';closeModal('modalYouthGroup');await load();}catch(error){showToast(error.message,'error');}}
   async function remove(id){if(!confirm('Eliminare questo gruppo giovani vuoto?'))return;try{await apiJson('/api/giovani/gruppi/'+id,{method:'DELETE'});await load();}catch(error){showToast(error.message,'error');}}
   return {load,render,selectYear,form,save,remove};

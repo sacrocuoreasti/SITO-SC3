@@ -181,6 +181,25 @@ def get_calendari():
     })
 
 
+@impostazioni_bp.route('/calendari/<int:id>/appuntamenti',methods=['GET'])
+def community_calendar_month(id):
+    """Appuntamenti dei calendari manuali pubblici, senza dati di iscrizioni."""
+    from urllib.parse import parse_qs,urlsplit
+    from werkzeug.exceptions import NotFound,BadRequest
+    from services.group_calendar import calendar_url
+    from services.calendar_events import month_range,cached_calendar,expand_events,CalendarUnavailable
+    calendar=db.session.get(CalendarioComunita,id)
+    if not calendar or not calendar.is_pubblico:raise NotFound()
+    start,end=month_range(request.args.get('mese'))
+    try:
+        url=calendar_url(calendar.google_calendar_url)
+        if not url:raise BadRequest('Calendario non configurato')
+        source=parse_qs(urlsplit(url).query)['src'][0]
+        parsed,stale=cached_calendar(source)
+        return jsonify(eventi=expand_events(parsed,start,end),obsoleto=stale,mese=start.strftime('%Y-%m'),configurato=True)
+    except CalendarUnavailable as error:return jsonify(error=str(error)),502
+
+
 @impostazioni_bp.route('/calendari-gruppi/<category>/<int:id>',methods=['GET'])
 def community_group_month(category,id):
     from werkzeug.exceptions import NotFound

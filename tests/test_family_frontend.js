@@ -319,6 +319,59 @@ vm.runInContext("currentUser={codice_fiscale:'RSSMRA80A01H501U',tutti_i_ruoli:['
   assert.ok(nodes('dashWeeklyCalendar').innerHTML.includes('Messa settimanale'));
   context.moveDashboardWeek(0);
   assert.ok(context.groupCalendarMarkup({calendar_api_url:'/api/impostazioni/calendari-gruppi/catechismo/1'}).includes('Calendario mensile'));
+  // Orari ordinati, sostituzione nella sola data e luogo interessati, senza perdere altre messe.
+  const sunday=days[6];
+  const schedule=[
+    {sezione:'messe',giorno:'Domenica',titolo:'Messa domenicale',orario:'09:00 e 11:15',luogo:'Chiesa'},
+    {sezione:'liturgia',giorno:'Domenica',titolo:'Rosario',orario:'10:30',luogo:'Chiesa'},
+    {sezione:'messe',giorno:'Domenica',titolo:'Messa altrove',orario:'11:15',luogo:'Cappella'},
+    {sezione:'avvenimenti',data_specifica:sunday,titolo:'Cresime',orario:'11:00',luogo:'Chiesa'},
+  ];
+  const occurrences=context.celebrationDayEntries(schedule,sunday,6);
+  assert.deepEqual(Array.from(occurrences,c=>c.titolo),['Messa domenicale','Rosario','Cresime','Messa altrove']);
+  assert.equal(occurrences[0].orario,'09:00');
+  assert.equal(schedule[0].orario,'09:00 e 11:15');
+  assert.equal(context.celebrationSlots({orario:'18:00 - 19:00'}).length,1);
+  assert.equal(context.celebrationDayEntries([...schedule,{sezione:'avvenimenti',data_specifica:sunday,titolo:'Altro evento',orario:'15:00',luogo:'Chiesa'}],sunday,6).length,5);
+  assert.equal(context.celebrationDayEntries(schedule,context.weeklyDays(1)[6],6).filter(c=>c.titolo==='Messa domenicale').length,2);
+  context.renderDashboardWeek(schedule,[],{});
+  const sundayHtml=nodes('dashWeeklyCalendar').innerHTML;
+  assert.ok(sundayHtml.indexOf('Rosario')<sundayHtml.indexOf('Cresime'));
+  assert.equal((sundayHtml.match(/Messa domenicale/g)||[]).length,1);
+
+  // Riepilogo: manuali e gruppi, doppioni unificati e guasto di un feed isolato.
+  const summary=context.ParishWeek||vm.runInContext('ParishWeek',context);
+  const month=days[0].slice(0,7);
+  const e={id:'same-uid',titolo:'Incontro condiviso',inizio:days[0]+'T11:00:00+01:00',giorno:days[0],giorni:[days[0]],ora:'11:00'};
+  fixtures['/api/impostazioni/calendari/91/appuntamenti?mese='+month]={eventi:[e,{...e,id:'early',titolo:'Appuntamento mattina',ora:'9:00'}]};
+  fixtures['/api/impostazioni/calendari-gruppi/catechismo/92?mese='+month]={eventi:[{...e,id:'derived-parent-uid'},{...e,id:'outside',titolo:'Fuori settimana',giorno:'1900-01-01',giorni:['1900-01-01']}]};
+  fixtures['/api/impostazioni/dati-pubblici']={celebrazioni:[]};
+  await summary.setCalendars([{id:91,titolo:'Parrocchia'},{id:'auto:catechismo:92',titolo:'Catechismo',calendar_api_url:'/api/impostazioni/calendari-gruppi/catechismo/92'},{id:93,titolo:'Feed non disponibile'}]);
+  const combined=nodes('parishWeeklyCalendar').innerHTML;
+  assert.equal((combined.match(/Incontro condiviso/g)||[]).length,1);
+  assert.ok(combined.includes('Parrocchia · Catechismo'));
+  assert.ok(combined.includes('Feed non disponibile'));
+  assert.ok(!combined.includes('Fuori settimana'));
+  assert.ok(combined.indexOf('Appuntamento mattina')<combined.indexOf('Incontro condiviso'));
+  assert.equal((combined.match(/class="weekly-day /g)||[]).length,7);
+  const calendarReads=requests.filter(r=>r.url==='/api/impostazioni/calendari/91/appuntamenti?mese='+month).length;
+  await summary.move(0);
+  assert.equal(requests.filter(r=>r.url==='/api/impostazioni/calendari/91/appuntamenti?mese='+month).length,calendarReads);
+
+  const menuQuery=context.document.querySelectorAll;
+  const youthMenu={dataset:{view:'giovani'},style:{}},youthStaffMenu={dataset:{view:'giovani_staff'},style:{}};
+  context.document.querySelectorAll=selector=>selector==='.nav-item[data-view]'?[youthMenu,youthStaffMenu]:[];
+  context.beforeMenuUser=vm.runInContext('currentUser',context);
+  vm.runInContext("currentUser={id:999,is_admin:true,permessi:['giovani','giovani.staff']};",context);
+  vm.runInContext('AccessUI.apply()',context);
+  assert.equal(youthMenu.style.display,'none');assert.equal(youthStaffMenu.style.display,'flex');
+  const loadYouth=context.YouthGroups||vm.runInContext('YouthGroups',context);const originalYouthLoad=loadYouth.load;let youthLoaded=0;loadYouth.load=async()=>{youthLoaded++;};
+  await context.navigateTo('giovani');assert.equal(vm.runInContext('currentView',context),'giovani_staff');assert.equal(youthLoaded,1);loadYouth.load=originalYouthLoad;
+  vm.runInContext("currentUser={id:999,is_admin:false,permessi:['giovani','giovani.staff']};",context);
+  vm.runInContext('AccessUI.apply()',context);
+  assert.equal(youthMenu.style.display,'flex');assert.equal(youthStaffMenu.style.display,'flex');
+  context.document.querySelectorAll=menuQuery;
+  vm.runInContext('currentUser=beforeMenuUser;',context);
   context.openModalNuovaCelebrazione();nodes('celSezione').value='avvenimenti';context.updateCelebrationDateMode();
   assert.equal(nodes('celWeekdaysGroup').hidden,true);assert.equal(nodes('celDataSpecifica').required,true);
   nodes('celDataSpecifica').value=days[2];nodes('celTitolo').value='Avvenimento datato';

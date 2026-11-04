@@ -678,6 +678,7 @@ async function validateCFFieldPersona(input) {
 
 // ================= VIEW NAVIGATION =================
 function navigateTo(viewName) {
+  if(viewName==='giovani' && currentUser?.is_admin)viewName='giovani_staff';
   const roles = currentUser ? (currentUser.tutti_i_ruoli || [currentUser.ruolo]) : [];
   const isStaff = roles.some(r => ['admin', 'segreteria', 'parroco'].includes(r));
 
@@ -7823,6 +7824,8 @@ async function loadUserCalendari() {
   try {
     const [data,groups]=await Promise.all([hasPermission('calendari.comunita')?apiJson('/api/impostazioni/calendari?solo_pubblici=true'):Promise.resolve({calendari:[]}),hasPermission('calendari.gruppi')?apiJson('/api/famiglie/calendari-gruppi'):Promise.resolve({calendari:[]})]);
     const calendari = data.calendari || [];
+    const allCalendars=[...calendari,...(groups.calendari||[])];
+    ParishWeek.setCalendars(allCalendars);
     if (!calendari.length && !groups.calendari?.length) {
       container.innerHTML = `<div style="grid-column: 1/-1; padding: 16px; color: var(--ink-500); text-align: center;">Nessun calendario parrocchiale attivo al momento.</div>`;
       return;

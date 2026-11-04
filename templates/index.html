@@ -546,6 +546,7 @@ Domenica: dopo le Sante Messe</p>
         </section>
 
         <section id="viewCalendari" class="view-panel" style="display:none"><div class="page-header"><div class="page-header-title"><h1>Calendari & Appuntamenti Parrocchiali</h1><p>I calendari della comunità e dei gruppi della tua famiglia.</p></div></div>
+          <div class="card"><div class="card-header"><h3>Riepilogo settimanale della parrocchia</h3></div><div class="card-body" id="parishWeeklyCalendar" aria-live="polite"></div></div>
           <!-- Calendari Comunitari & Personali -->
           <div class="card" style="margin-top: 24px;">
             <div class="card-header">
@@ -2984,7 +2985,7 @@ Domenica: dopo le Sante Messe</p>
             <input type="text" id="celTitolo" class="form-control" placeholder="es. Santa Messa Festiva" required>
           </div>
 
-<div class="form-group" id="celSpecificDateGroup" hidden><label for="celDataSpecifica">Data dell’avvenimento *</label><input type="date" id="celDataSpecifica" class="form-control"></div>
+<div class="form-group" id="celSpecificDateGroup" hidden><label for="celDataSpecifica">Data dell’avvenimento *</label><input type="date" id="celDataSpecifica" class="form-control"><small>Quel giorno sostituisce la messa o liturgia più vicina nello stesso luogo, entro 30 minuti. Gli orari abituali restano invariati nelle altre date.</small></div>
           <!-- Selezione Giorni con Checkbox (NO TESTO LIBERO) -->
           <div id="celWeekdaysGroup" class="form-group" style="background: var(--bg-subtle); padding: 12px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-light);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
@@ -4237,16 +4238,76 @@ Domenica: dopo le Sante Messe</p>
 
 <div class="modal-overlay" id="modalGroupHealth"><div class="modal-window" style="max-width:1100px"><div class="modal-header"><div><h3>Quadro sanitario e cucina</h3><p id="groupHealthTitle"></p></div><button type="button" class="btn-close-modal" onclick="closeModal('modalGroupHealth')">×</button></div><div class="modal-body" id="groupHealthContent"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="closeModal('modalGroupHealth')">Chiudi</button></div></div></div>
 <div class="modal-overlay" id="modalGroupBoard"><div class="modal-window" style="max-width:850px"><div class="modal-header"><h3 id="groupBoardTitle">Bacheca del gruppo</h3><button class="btn-close-modal" onclick="closeModal('modalGroupBoard')">×</button></div><div class="modal-body" id="groupBoardContent"></div></div></div>
-<div class="modal-overlay" id="modalYouthGroup"><div class="modal-window" style="max-width:720px"><div class="modal-header"><h3 id="youthFormTitle">Gruppo giovani</h3><button class="btn-close-modal" onclick="closeModal('modalYouthGroup')">×</button></div>
-<form onsubmit="YouthGroups.save(event)"><div class="modal-body"><input type="hidden" id="youthId">
-<div class="form-group"><label for="youthName">Nome del gruppo *</label><input id="youthName" class="form-control" maxlength="120" required></div>
-<div class="form-row"><div class="form-group"><label for="youthGroupYear">Anno pastorale *</label><input id="youthGroupYear" class="form-control" maxlength="20" required placeholder="2026/2027"></div><div class="form-group"><label for="youthStatus">Visibilità</label><select id="youthStatus" class="form-control"><option value="pubblico">🟢 Pubblico</option><option value="bozza">🔒 Bozza</option><option value="chiuso">🔴 Chiuso</option></select></div></div>
-<fieldset class="family-section"><legend>Responsabili del gruppo</legend><div id="youthStaffChoices" class="access-assignment"></div></fieldset>
-<fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="youthEtaMin">Età minima</label><input id="youthEtaMin" class="form-control" type="number" min="0" max="120" placeholder="Nessun limite"></div><div class="form-group"><label for="youthEtaMax">Età massima</label><input id="youthEtaMax" class="form-control" type="number" min="0" max="120" placeholder="Nessun limite"></div></div><small>Lascia vuoto per non imporre limiti di età.</small></fieldset>
-<div class="form-row"><div class="form-group"><label for="youthTime">Orario incontri</label><input id="youthTime" class="form-control" maxlength="100"></div><div class="form-group"><label for="youthRoom">Aula / luogo</label><input id="youthRoom" class="form-control" maxlength="50"></div></div>
-<div class="form-group"><label for="youthCalendar">Calendario Google</label><input id="youthCalendar" class="form-control" type="url" placeholder="https://calendar.google.com/calendar/embed?src=..."></div>
-<div class="form-group"><label for="youthNotes">Note sul gruppo</label><textarea id="youthNotes" class="form-control" maxlength="20000" rows="3"></textarea></div></div>
-<div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="closeModal('modalYouthGroup')">Annulla</button><button class="btn btn-primary" type="submit">Salva gruppo</button></div></form></div></div>
+  <div class="modal-overlay" id="modalYouthGroup">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3 id="youthFormTitle">Crea nuovo gruppo giovani</h3>
+        <button class="btn-close-modal" onclick="closeModal('modalYouthGroup')">×</button>
+      </div>
+      <form onsubmit="YouthGroups.save(event)">
+        <div class="modal-body"><input type="hidden" id="youthId"><fieldset class="family-section"><legend>Età dei partecipanti</legend><div class="form-row"><div class="form-group"><label for="youthEtaMin">Età minima (anni)</label><input id="youthEtaMin" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div><div class="form-group"><label for="youthEtaMax">Età massima (anni)</label><input id="youthEtaMax" type="number" min="0" max="120" step="1" class="form-control" placeholder="Nessun limite"></div></div><small>Gli estremi sono inclusi. Lascia vuoto per non imporre un limite. I membri già presenti restano nel gruppo.</small></fieldset>
+          <div class="form-group">
+            <label>Nome del Gruppo *</label>
+            <input type="text" id="youthName" class="form-control" placeholder="es. Gruppo giovani" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Anno Pastorale *</label>
+              <select id="youthGroupYear" class="form-control">
+                <option value="2026/2027" selected>2026/2027</option>
+                <option value="2025/2026">2025/2026</option>
+                <option value="2027/2028">2027/2028</option>
+                <option value="2024/2025">2024/2025</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Stato del Gruppo *</label>
+              <select id="youthStatus" class="form-control">
+                <option value="pubblico" selected>🟢 Pubblico (visibile ai genitori per iscrizioni)</option>
+                <option value="bozza">🔒 Bozza (visibile solo ad admin/staff)</option>
+                <option value="chiuso">🔴 Chiuso (iscrizioni chiuse, presenze visibili)</option>
+              </select>
+            </div>
+          </div>
+
+<div class="form-group">
+            <label>Responsabili di riferimento (seleziona uno o più responsabili)</label>
+            <div id="youthStaffChoices" style="max-height: 140px; overflow-y: auto; border: 1px solid var(--border-light); border-radius: var(--radius-sm); padding: 8px 12px; background: #fff; display: flex; flex-direction: column; gap: 6px;">
+              <!-- Checkboxes catechisti generati dinamicamente -->
+            </div>
+            <small style="color: var(--ink-500); font-size: 11.5px;">Puoi selezionare più responsabili per lo stesso gruppo.</small>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Orario Incontri</label>
+              <input type="text" id="youthTime" class="form-control" placeholder="es. Sabato 15:00 - 16:30">
+            </div>
+            <div class="form-group">
+              <label>Aula / Spazio Parrocchiale</label>
+              <input type="text" id="youthRoom" class="form-control" placeholder="es. Salone San Francesco">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>📅 Link Google Calendar (opzionale)</label>
+            <input type="url" id="youthCalendar" class="form-control" placeholder="https://calendar.google.com/calendar/u/0?cid=...">
+            <small style="color: var(--ink-500); font-size: 11.5px;">Usa il link di un calendario Google pubblico: gli incontri appariranno nella vista mensile e nelle date del registro.</small>
+          </div>
+
+          <div class="form-group">
+            <label>Note o Obiettivi</label>
+            <textarea id="youthNotes" class="form-control" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modalYouthGroup')">Annulla</button>
+          <button type="submit" id="youthSubmit" class="btn btn-primary">Crea gruppo</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
 </body>
 </html>

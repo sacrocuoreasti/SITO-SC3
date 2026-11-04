@@ -62,6 +62,7 @@ const AccessUI=(()=>{
     if(!currentUser || !Array.isArray(currentUser.permessi))return;
     document.querySelectorAll('.nav-item[data-view]').forEach(link=>{
       const view=link.dataset.view;let allowed=hasPermission(view);
+      if(view==='giovani' && currentUser.is_admin)allowed=false;
       if(['oratorio','catechismo','doposcuola'].includes(view))allowed=allowed && !!(enrollmentOptions?.gruppi?.[view]?.length || enrollmentOptions?.gruppi_iscritti?.[view]?.length);
       link.style.display=allowed?'flex':'none';
     });
