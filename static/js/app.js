@@ -514,7 +514,7 @@ async function handleRegisterSubmit(e) {
   }
 
   try {
-    const form = collectDocuments('regDocumenti');
+    const form = new FormData();
     form.append('data', JSON.stringify({
         nome, cognome, codice_fiscale: cf, telefono, email, password, conferma_password: confermaPassword,
         ...Object.fromEntries([...form.entries()].filter(([key,value])=> typeof value === 'string')),
@@ -587,7 +587,6 @@ function showAuthTab(tab) {
   } else {
     formLogin.style.display = 'none';
     formReg.style.display = 'block';
-    if (!document.getElementById('regDocumenti').innerHTML) renderDocuments('regDocumenti');
     btnLogin.className = 'btn btn-sm btn-secondary';
     btnReg.className = 'btn btn-sm btn-primary';
     renderCustomRegistrationFields();
@@ -613,7 +612,6 @@ async function validateCFField(input) {
   const data = await res.json();
 
   if (data.valido) {
-    updateDocumentAge('regDocumenti',ageFromDate(data.estratto.data_nascita));
     feedbackEl.textContent = `✓ Codice Fiscale valido (${data.estratto.sesso || ''}, nato/a il ${data.estratto.data_nascita || ''})`;
     feedbackEl.className = 'cf-feedback valid';
   } else {
@@ -4427,7 +4425,7 @@ async function apriSchedaVisualizzazionePersona(cf) {
 
     for(const [key,value] of [['Civico',p.civico_residenza],['CAP',p.cap_residenza],['Provincia',p.provincia_residenza]]) document.getElementById('viewScheda'+key).textContent=value || '—';
     const photo=document.getElementById('viewSchedaPhoto');if(p.foto_profilo_url) photo.src=p.foto_profilo_url;else photo.removeAttribute('src');photo.style.display=p.foto_profilo_url ? 'block':'none';
-    document.getElementById('viewSchedaDocumenti').innerHTML=Object.entries(documentKinds).filter(([kind])=>visibleDocumentKind(kind,p.eta) || (p.documenti || []).some(d=>d.tipo===kind)).map(([kind,label])=>`<h4>${escapeHtml(label)}</h4>${(p.documenti || []).filter(d=>d.tipo===kind).map(d=>`<p><a href="${d.download_url}">${escapeHtml(d.nome_originale)}</a>${d.numero_documento ? `<br>${escapeHtml(d.numero_documento)} · ${escapeHtml(d.rilasciato_da)} · ${escapeHtml(d.data_rilascio)} – ${escapeHtml(d.data_scadenza)}`:''}</p>`).join('') || '<p>Nessun allegato presente</p>'}`).join('');
+    document.getElementById('viewSchedaDocumenti').innerHTML=importedDocumentsMarkup(p)+Object.entries(documentKinds).filter(([kind])=>visibleDocumentKind(kind,p.eta) || (p.documenti || []).some(d=>d.tipo===kind)).map(([kind,label])=>`<h4>${escapeHtml(label)}</h4>${(p.documenti || []).filter(d=>d.tipo===kind).map(d=>`<p><a href="${d.download_url}">${escapeHtml(d.nome_originale)}</a>${d.numero_documento ? `<br>${escapeHtml(d.numero_documento)} · ${escapeHtml(d.rilasciato_da)} · ${escapeHtml(d.data_rilascio)} – ${escapeHtml(d.data_scadenza)}`:''}</p>`).join('') || '<p>Nessun allegato presente</p>'}`).join('');
     openModal('modalSchedaPersonaVisualizzazione');
   } catch (err) {
     showToast(err.message, 'error');
@@ -5756,6 +5754,7 @@ async function uploadExcelFile(file) {
 
   const formData = new FormData();
   formData.append('file', file);
+  formData.append('tipo',document.getElementById('excelImportType').value);
 
   try {
     const res = await fetch('/api/excel/import', {
@@ -5765,8 +5764,8 @@ async function uploadExcelFile(file) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Errore importazione file');
 
-    statusDisplay.textContent = '✓ Completato con successo!';
-    showToast(data.message, 'success');
+    statusDisplay.textContent = data.dettagli.errori.length?'Elaborato con righe da correggere':'✓ Completato';
+    showToast(data.dettagli.errori.length?'Controlla le righe segnalate nel report':data.message,data.dettagli.errori.length?'warning':'success');
 
     const d = data.dettagli;
     reportBox.style.display = 'block';
@@ -5774,8 +5773,8 @@ async function uploadExcelFile(file) {
       <div>Righe analizzate: <strong>${d.totale_righe}</strong></div>
       <div>Persone create: <strong>${d.persone_create}</strong> · Aggiornate: <strong>${d.persone_aggiornate}</strong></div>
       <div>Nuclei familiari collegati: <strong>${d.nuclei_creati}</strong></div>
-      <div>Iscrizioni registrate: <strong>${d.iscrizioni_create}</strong></div>
-      ${d.errori.length ? `<div style="color:#b91c1c; margin-top:6px;">Avvisi: ${d.errori.join('<br>')}</div>` : ''}
+      <div>Iscrizioni registrate: <strong>${d.iscrizioni_create}</strong> · Già presenti: <strong>${d.iscrizioni_esistenti||0}</strong></div>
+      ${d.errori.length ? `<div style="color:#b91c1c; margin-top:6px;">Righe da correggere: ${d.errori.map(escapeHtml).join('<br>')}</div>` : ''}
     `;
   } catch (err) {
     statusDisplay.textContent = '✗ Errore';
@@ -6083,7 +6082,7 @@ async function openModalModificaPersona(cf) {
 
     setupProfileExtras('modPersona','profiloDocumenti',p);
     renderDocuments('profiloDocumenti',p.eta);
-    document.getElementById('profiloDocumentiElenco').innerHTML = (p.documenti || []).map(d=>`<p><a href="${d.download_url}">${escapeHtml(documentKinds[d.tipo] || d.tipo)} — ${escapeHtml(d.nome_originale)}</a>${d.numero_documento ? `<br><small>${escapeHtml(d.numero_documento)} · ${escapeHtml(d.rilasciato_da)} · ${escapeHtml(d.data_rilascio)} – ${escapeHtml(d.data_scadenza)}</small>` : ''}</p>`).join('');
+    document.getElementById('profiloDocumentiElenco').innerHTML = importedDocumentsMarkup(p)+(p.documenti || []).map(d=>`<p><a href="${d.download_url}">${escapeHtml(documentKinds[d.tipo] || d.tipo)} — ${escapeHtml(d.nome_originale)}</a>${d.numero_documento ? `<br><small>${escapeHtml(d.numero_documento)} · ${escapeHtml(d.rilasciato_da)} · ${escapeHtml(d.data_rilascio)} – ${escapeHtml(d.data_scadenza)}</small>` : ''}</p>`).join('');
     openModal('modalModificaPersona');
   } catch (err) {
     showToast(err.message, 'error');
@@ -8099,6 +8098,12 @@ async function handleRimuoviFotoProfilo() {
 
 // Documenti personali: file e dati inviati insieme, senza URL pubblici.
 const documentKinds = {identita:"Carta d’identità",battesimo:'Certificato di battesimo',comunione:'Certificato di comunione',cresima:'Certificato di cresima',matrimonio:'Certificato di matrimonio'};
+function importedDocumentsMarkup(person) {
+  const imported=person.documenti_importati||{};
+  const labels={...documentKinds,numero_documento:'Numero documento',rilasciato_da:'Rilasciato da',data_rilascio:'Data rilascio',data_scadenza:'Data scadenza'};
+  const entries=Object.entries(imported).filter(([,value])=>value);
+  return entries.length?`<div class="weekly-extra"><strong>Dati documenti importati da Excel</strong><p>I riferimenti non sostituiscono gli allegati: carica i file nel profilo.</p>${entries.map(([key,value])=>`<p><strong>${escapeHtml(labels[key]||key)}:</strong> ${escapeHtml(value)}</p>`).join('')}</div>`:'';
+}
 function passwordMismatch() { return document.getElementById('regPassword').value !== document.getElementById('regConfermaPassword').value; }
 function renderDocuments(containerId,age=null) {
   const container = document.getElementById(containerId);

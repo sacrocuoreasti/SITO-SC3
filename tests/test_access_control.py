@@ -104,7 +104,9 @@ class AccessControlTests(unittest.TestCase):
         response=self.client.get('/api/excel/export-anagrafica')
         self.assertEqual(response.status_code,200)
         book=openpyxl.load_workbook(io.BytesIO(response.data))
-        self.assertTrue(all(not row[15].value for row in list(book.active.rows)[1:]))
+        headers=[cell.value for cell in book.active[1]]
+        health_columns=[headers.index(label) for label in ('Allergie','Intolleranze Alimentari','Terapie e medicinali','Note')]
+        self.assertTrue(all(not row[column].value for row in list(book.active.rows)[1:] for column in health_columns))
         self.login('admin@example.test')
         with self.app.app_context():
             user=Utente.query.filter_by(email='head@example.test').one();user.ruolo='utente';user.privilegi_extra='["admin"]';db.session.commit()

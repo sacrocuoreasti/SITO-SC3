@@ -217,7 +217,7 @@ def catalog():
     return [{'chiave':section,'nome':label,'figli':[{'chiave':section+'.'+key,'nome':name,'solo_admin':section+'.'+key in ADMIN_ONLY} for key,name in children.items()]} for section,(label,children) in SECTIONS.items()]
 
 HEALTH_FIELDS={'allergie','intolleranze_alimentari','terapie_medicinali','note_mediche','note_generali'}
-DOCUMENT_FIELDS={'documenti','certificato_battesimo_path','certificato_battesimo_url'}
+DOCUMENT_FIELDS={'documenti_importati','documenti','certificato_battesimo_path','certificato_battesimo_url'}
 
 def profile_prefix():
     return 'anagrafica' if can('anagrafica.gestione') or can('anagrafica.elenco') else 'famiglia'

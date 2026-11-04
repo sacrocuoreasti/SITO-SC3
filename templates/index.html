@@ -328,7 +328,6 @@ Domenica: dopo le Sante Messe</p>
             <input type="password" id="regPassword" class="form-control" minlength="8" autocomplete="new-password" placeholder="Minimo 8 caratteri" required>
           </div>
           <div class="form-group"><label for="regConfermaPassword">Conferma password *</label><input type="password" id="regConfermaPassword" class="form-control" minlength="8" autocomplete="new-password" required></div>
-          <div id="regDocumenti"></div>
           <!-- Campi Personalizzati Dinamici configurati da Segreteria -->
           <div id="regCampiPersonalizzatiContainer"></div>
           <div id="registrationConsents" class="registration-consents"></div>
@@ -1692,7 +1691,7 @@ Domenica: dopo le Sante Messe</p>
               <p>Carica file Excel (.xlsx o .csv) per creare o aggiornare le anagrafiche e i nuclei familiari parrocchiali.</p>
             </div>
             <div class="header-actions">
-              <a href="/api/excel/template" data-permission="excel.template" class="btn btn-secondary"><i>📥</i> Scarica File Modello Excel</a>
+              <a href="/api/excel/template?tipo=iscrizioni" data-permission="excel.template" class="btn btn-secondary">Modello iscrizioni</a><a href="/api/excel/export-iscrizioni" data-permission="excel.export" class="btn btn-secondary">Esporta iscrizioni e codici gruppi</a><a href="/api/excel/template" data-permission="excel.template" class="btn btn-secondary"><i>📥</i> Modello anagrafica</a>
             </div>
           </div>
 
@@ -1702,11 +1701,12 @@ Domenica: dopo le Sante Messe</p>
                 <h3><i>↥</i> Carica File Excel Parrocchiale</h3>
               </div>
               <div class="card-body">
+                <div class="form-group"><label for="excelImportType">Cosa vuoi importare?</label><select id="excelImportType" class="form-control"><option value="anagrafica">Anagrafica persone e famiglie</option><option value="iscrizioni">Iscrizioni ai gruppi</option></select></div>
                 <div data-permission="excel.import" class="dropzone" id="excelDropzone" onclick="document.getElementById('excelFileInput').click()">
                   <div class="dropzone-icon">📊</div>
                   <strong style="font-size: 15px;">Trascina qui il file Excel (.xlsx o .csv)</strong>
                   <p style="font-size: 12.5px; color: var(--ink-500);">oppure clicca per selezionarlo dal tuo computer</p>
-                  <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" style="display: none;" onchange="handleExcelFileSelected(event)">
+                  <input type="file" id="excelFileInput" accept=".xlsx,.csv" style="display: none;" onchange="handleExcelFileSelected(event)">
                 </div>
 
                 <div id="fileUploadProgress" style="display: none; margin-top: 16px;">
@@ -1723,13 +1723,11 @@ Domenica: dopo le Sante Messe</p>
                 <h3><i>ℹ️</i> Struttura e Chiave Codice Fiscale</h3>
               </div>
               <div class="card-body" style="font-size: 13px; color: var(--ink-700); line-height: 1.6;">
-                <p>Il sistema esegue l'<strong>upsert</strong> basandosi rigorosamente sul <strong>Codice Fiscale</strong> come chiave primaria:</p>
-                <ul style="padding-left: 20px; margin: 12px 0;">
-                  <li>Se il Codice Fiscale è già presente, i dati anagrafici e contatti vengono aggiornati.</li>
-                  <li>Se il Codice Fiscale è nuovo, viene creata una nuova scheda anagrafica.</li>
-                  <li>La colonna <code>CF Capofamiglia</code> ricollega automaticamente il componente al proprio nucleo familiare.</li>
-                  <li>Colonne dedicate per <strong>Intolleranze Alimentari</strong> (celiachia, lattosio) e <strong>Allergie</strong> per la cucina dell'oratorio.</li>
-                </ul>
+                <p><strong>Anagrafica:</strong> il codice fiscale identifica la persona. I dati compilati aggiornano il profilo; le celle vuote conservano i dati esistenti. Nome e cognome sono obbligatori per nuove persone.</p>
+                <p><strong>Codice famiglia:</strong> tre lettere o numeri. Un codice esistente collega al nucleo; uno nuovo crea il nucleo. Se vuoto, una nuova persona riceve un nuovo codice. Il ruolo familiare e il flag capofamiglia sono separati.</p>
+                <p>Il modello contiene residenza, contatti, salute, foto e riferimenti ai documenti. I file dei documenti si caricano dal profilo: Excel conserva soltanto i riferimenti e i dati dichiarati.</p>
+                <p><strong>Iscrizioni:</strong> bastano <code>Codice Fiscale</code> e <code>Codice Gruppo</code>. Le altre colonne sono ignorate. D = doposcuola, C = catechismo, O = oratorio, G = giovani, seguiti da tre cifre. Trovi i codici nell’esportazione iscrizioni, foglio “Gruppi”.</p>
+                <p>Le persone devono essere già in anagrafica. I doppioni vengono ignorati; fasce di età e limite di un gruppo di catechismo per anno restano validi. Gli eventuali errori indicano la riga da correggere.</p>
 
                 <div id="importReportBox" style="display: none; margin-top: 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-md); padding: 14px;">
                   <strong style="color: #166534; display: block; margin-bottom: 6px;">Ultima Elaborazione Excel:</strong>

@@ -78,6 +78,7 @@ class Persona(db.Model):
     provincia_nascita = db.Column(db.String(10), nullable=True)
     
     consensi_aggiunta = db.Column(db.Text, nullable=True)
+    documenti_importati = db.Column(db.Text, nullable=True)
 
     # Residenza
     civico_residenza = db.Column(db.String(30), nullable=True)
@@ -166,6 +167,7 @@ class Persona(db.Model):
             'ruolo_famiglia': self.ruolo_famiglia or 'Figlio/a',
             'has_account': bool(self.utente),
             'documenti': self.visible_documents(),
+            'documenti_importati': json.loads(self.documenti_importati or '{}'),
             'liste': [{'id': l.id, 'nome': l.nome, 'colore': l.colore or '#8B1E1E', 'icona': getattr(l, 'icona', '🏅') or '🏅', 'descrizione': l.descrizione or ''} for l in self.liste],
             'badges': [{'id': l.id, 'nome': l.nome, 'colore': l.colore or '#8B1E1E', 'icona': getattr(l, 'icona', '🏅') or '🏅', 'descrizione': l.descrizione or ''} for l in self.liste]
         }
@@ -590,6 +592,7 @@ class GruppoCatechismo(db.Model):
     eta_max = db.Column(db.Integer, nullable=True)
 
     id = db.Column(db.Integer, primary_key=True)
+    codice_gruppo = db.Column(db.String(4), nullable=True, unique=True)
     nome = db.Column(db.String(120), nullable=False)  # es. "3ª Elementare - Gruppo A"
     anno_pastorale = db.Column(db.String(20), default='2026/2027')
     anno_catechismo = db.Column(db.String(50), nullable=True)  # es. "1° Anno Comunione", "2° Anno Comunione", "Cresima"
@@ -636,6 +639,7 @@ class GruppoCatechismo(db.Model):
 
         d = {
             'id': self.id,
+            'codice_gruppo': self.codice_gruppo,
             'eta_min': self.eta_min,
             'eta_max': self.eta_max,
             'nome': self.nome,
@@ -669,6 +673,7 @@ class GruppoGiovani(db.Model):
     eta_max = db.Column(db.Integer, nullable=True)
 
     id = db.Column(db.Integer, primary_key=True)
+    codice_gruppo = db.Column(db.String(4), nullable=True, unique=True)
     nome = db.Column(db.String(120), nullable=False)  # es. "3ª Elementare - Gruppo A"
     anno_pastorale = db.Column(db.String(20), default='2026/2027')
     anno_catechismo = db.Column(db.String(50), nullable=True)  # es. "1° Anno Comunione", "2° Anno Comunione", "Cresima"
@@ -715,6 +720,7 @@ class GruppoGiovani(db.Model):
 
         d = {
             'id': self.id,
+            'codice_gruppo': self.codice_gruppo,
             'eta_min': self.eta_min,
             'eta_max': self.eta_max,
             'nome': self.nome,
@@ -763,6 +769,7 @@ class GruppoDoposcuola(db.Model):
     eta_max = db.Column(db.Integer, nullable=True)
 
     id = db.Column(db.Integer, primary_key=True)
+    codice_gruppo = db.Column(db.String(4), nullable=True, unique=True)
     nome = db.Column(db.String(120), nullable=False)  # es. "Doposcuola Primaria - Compiti e Studio"
     anno_scolastico = db.Column(db.String(20), default='2026/2027')
     fascia_eta = db.Column(db.String(50), nullable=True)  # es. "Scuola Primaria (6-10 anni)", "Secondaria (11-14 anni)"
@@ -791,6 +798,7 @@ class GruppoDoposcuola(db.Model):
         names=', '.join(u.persona.nominativo if u.persona else u.email.split('@')[0] for u in educators)
         d = {
             'id': self.id,
+            'codice_gruppo': self.codice_gruppo,
             'google_calendar_url': self.google_calendar_url or '',
             'calendar_embed_url': calendar_info(self),
             'calendar_api_url': f'/api/calendari-gruppi/doposcuola/{self.id}' if calendar_info(self) else '',
@@ -829,6 +837,7 @@ class GruppoOratorio(db.Model):
     eta_max = db.Column(db.Integer, nullable=True)
 
     id = db.Column(db.Integer, primary_key=True)
+    codice_gruppo = db.Column(db.String(4), nullable=True, unique=True)
     nome = db.Column(db.String(120), nullable=False)  # es. "Squadra Gialla - Estivo", "Oratorio Invernale Medie"
     anno_pastorale = db.Column(db.String(20), default='2026/2027')
     tipo_oratorio = db.Column(db.String(30), default='estivo')  # 'estivo' (Estate Ragazzi) o 'invernale' (Oratorio Invernale)
@@ -872,6 +881,7 @@ class GruppoOratorio(db.Model):
 
         d = {
             'id': self.id,
+            'codice_gruppo': self.codice_gruppo,
             'google_calendar_url': self.google_calendar_url or '',
             'calendar_embed_url': calendar_info(self),
             'calendar_api_url': f'/api/calendari-gruppi/oratorio/{self.id}' if calendar_info(self) else '',
@@ -899,6 +909,21 @@ class GruppoOratorio(db.Model):
         if include_ragazzi:
             d['ragazzi'] = [r.to_dict(include_family=True) for r in self.ragazzi]
         return d
+
+
+class ProgressivoGruppo(db.Model):
+    __tablename__ = 'progressivo_gruppo'
+    categoria = db.Column(db.String(20), primary_key=True)
+    ultimo = db.Column(db.Integer, nullable=False, default=0)
+
+
+def assign_group_code(mapper,connection,group):
+    from services.group_codes import allocate_code
+    category={GruppoCatechismo:'catechismo',GruppoGiovani:'giovani',GruppoDoposcuola:'doposcuola',GruppoOratorio:'oratorio'}[type(group)]
+    group.codice_gruppo=allocate_code(connection,category)
+
+for _group_model in (GruppoCatechismo,GruppoGiovani,GruppoDoposcuola,GruppoOratorio):
+    event.listen(_group_model,'before_insert',assign_group_code)
 
 
 class Presenza(db.Model):
@@ -1199,6 +1224,11 @@ def init_default_configurazioni():
         # Verifica ed aggiunta colonne mancanti per SQLite
         from sqlalchemy import text
         col_checks = [
+            ('persona','documenti_importati','TEXT'),
+            ('gruppo_catechismo','codice_gruppo','VARCHAR(4)'),
+            ('gruppo_giovani','codice_gruppo','VARCHAR(4)'),
+            ('gruppo_oratorio','codice_gruppo','VARCHAR(4)'),
+            ('gruppo_doposcuola','codice_gruppo','VARCHAR(4)'),
             ('definizione_accesso','eliminato','BOOLEAN NOT NULL DEFAULT 0'),
             ('calendario_comunita','tipo',"VARCHAR(20) NOT NULL DEFAULT 'google'"),
             ('calendario_comunita','origine_gruppo','VARCHAR(80)'),
@@ -1264,6 +1294,8 @@ def init_default_configurazioni():
             db.session.execute(text('UPDATE nucleo_familiare SET codice_invito=:code WHERE id=:id'), {'code': code, 'id': family_id})
         db.session.execute(text('CREATE UNIQUE INDEX IF NOT EXISTS ux_nucleo_codice_invito ON nucleo_familiare (codice_invito)'))
         db.session.commit()
+        from services.group_codes import initialize_codes
+        initialize_codes()
         if existing_database:
             return
 

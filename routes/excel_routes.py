@@ -1,14 +1,12 @@
 from services.access_control import can
-import os
 from flask import Blueprint, request, jsonify, send_file, current_app
 from models import Persona, Attivita
 from services.excel_service import (
     genera_template_excel,
     esporta_anagrafica_excel,
     esporta_iscritti_attivita_excel,
-    importa_da_excel
+    importa_da_excel, esporta_gruppi_excel
 )
-from werkzeug.utils import secure_filename
 from io import BytesIO
 
 excel_bp = Blueprint('excel_bp', __name__, url_prefix='/api/excel')
@@ -21,7 +19,7 @@ def check_staff_excel():
         return any(r in ['admin', 'segreteria', 'parroco'] for r in roles)
     return False
 
-ALLOWED_EXTENSIONS = {'xlsx', 'xls', 'csv'}
+ALLOWED_EXTENSIONS = {'xlsx', 'csv'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -31,20 +29,19 @@ def download_template():
     """Scarica il file Excel modello per l'importazione parrocchiale."""
     if not check_staff_excel():
         return jsonify({'error': 'Funzionalità riservata alla segreteria parrocchiale'}), 403
-    template_stream = genera_template_excel()
+    tipo=request.args.get('tipo','anagrafica')
+    template_stream = genera_template_excel(tipo)
     return send_file(
         template_stream,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         as_attachment=True,
-        download_name='template_anagrafica_sacro_cuore.xlsx'
+        download_name=f'template_{tipo}_sacro_cuore.xlsx'
     )
 
 @excel_bp.route('/import', methods=['POST'])
 def import_excel():
     """
-    Riceve un file Excel (.xlsx o .xls) o CSV caricato dall'utente ed esegue l'importazione
-    con inserimento e aggiornamento (upsert) su Codice Fiscale, creando anagrafiche,
-    nuclei familiari e iscrizioni.
+    Importa un file .xlsx o CSV UTF-8 nel flusso scelto, segnalando gli errori per riga.
     """
     if not check_staff_excel():
         return jsonify({'error': 'Funzionalità riservata alla segreteria parrocchiale'}), 403
@@ -56,45 +53,36 @@ def import_excel():
         return jsonify({'error': 'Nessun file selezionato'}), 400
 
     if not allowed_file(file.filename):
-        return jsonify({'error': 'Formato non supportato. Carica un file .xlsx, .xls o .csv'}), 400
+        return jsonify({'error': 'Formato non supportato. Carica un file .xlsx o .csv; salva i vecchi file .xls come .xlsx'}), 400
 
     try:
         stream = BytesIO(file.read())
-        risultati = importa_da_excel(stream)
+        risultati = importa_da_excel(stream,tipo=request.form.get('tipo','anagrafica'),filename=file.filename,include_health=can('anagrafica.salute'),include_documents=can('anagrafica.documenti'))
         return jsonify({
             'success': True,
             'message': 'File Excel elaborato con successo!',
             'dettagli': risultati
         })
     except Exception as e:
+        from models import db
+        from werkzeug.exceptions import BadRequest
+        db.session.rollback()
+        if isinstance(e,BadRequest):return jsonify(success=False,error=e.description),400
+        current_app.logger.exception('Importazione Excel non completata')
         return jsonify({
             'success': False,
-            'error': f'Errore durante la lettura del file Excel: {str(e)}'
+            'error': 'Importazione non completata. Verifica il file e riprova.'
         }), 500
 
-@excel_bp.route('/import-sample', methods=['POST'])
+@excel_bp.route('/import-sample',methods=['POST'])
 def import_sample():
-    """
-    Carica ed elabora istantaneamente il file Excel parrocchiale di esempio preconfigurato
-    ('template_anagrafica_sacro_cuore.xlsx') nel database.
-    """
-    if not check_staff_excel():
-        return jsonify({'error': 'Funzionalità riservata alla segreteria parrocchiale'}), 403
-    sample_path = current_app.config.get('TEMPLATE_EXCEL_PATH')
-    if not sample_path or not os.path.exists(sample_path):
-        # Genera al volo
-        stream = genera_template_excel()
-        risultati = importa_da_excel(stream)
-    else:
-        with open(sample_path, 'rb') as f:
-            stream = BytesIO(f.read())
-            risultati = importa_da_excel(stream)
+    return jsonify(error='Scarica il modello vuoto e carica il tuo file: non vengono importati dati di esempio.'),400
 
-    return jsonify({
-        'success': True,
-        'message': 'Dati parrocchiali importati dall\'Excel modello!',
-        'dettagli': risultati
-    })
+
+@excel_bp.route('/export-iscrizioni',methods=['GET'])
+def export_group_memberships():
+    if not check_staff_excel():return jsonify(error='Funzionalità riservata alla segreteria'),403
+    return send_file(esporta_gruppi_excel(),mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',as_attachment=True,download_name='iscrizioni_e_codici_gruppi.xlsx')
 
 @excel_bp.route('/export-anagrafica', methods=['GET'])
 def export_anagrafica():
@@ -109,7 +97,7 @@ def export_anagrafica():
     else:
         persone = Persona.query.order_by(Persona.cognome.asc(), Persona.nome.asc()).all()
 
-    stream = esporta_anagrafica_excel(persone,include_health=can('anagrafica.salute'))
+    stream = esporta_anagrafica_excel(persone,include_health=can('anagrafica.salute'),include_documents=can('anagrafica.documenti'))
     return send_file(
         stream,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
